@@ -34,6 +34,12 @@ const InstagramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const TiktokIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/>
+  </svg>
+);
+
 export const Footer = () => {
   const { t } = useLanguage();
 
@@ -63,10 +69,11 @@ export const Footer = () => {
             <a href="#" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
               <TwitterIcon className="w-5 h-5" />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
-              <GithubIcon className="w-5 h-5" />
+            <a href="https://www.tiktok.com/@hisabati.app" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
+              <TiktokIcon className="w-5 h-5" />
             </a>
           </div>
+
 
         </div>
 
