@@ -66,8 +66,28 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'حساباتي',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Web',
+    url: 'https://hisabati.pages.dev',
+    offers: {
+      '@type': 'Offer',
+      price: '0', 
+      priceCurrency: 'USD',
+    },
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className={`${inter.className} min-h-screen flex flex-col bg-background text-foreground overflow-x-hidden`}>
         <ThemeProvider>
           <LanguageProvider>
@@ -78,3 +98,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+
