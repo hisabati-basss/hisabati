@@ -57,7 +57,7 @@ export const Footer = () => {
             <a href="https://www.instagram.com/hisabati.basss?utm_source=qr" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
               <InstagramIcon className="w-5 h-5" />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
+            <a href="https://www.facebook.com/share/1BPvxD3aAr/" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
               <FacebookIcon className="w-5 h-5" />
             </a>
             <a href="#" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
