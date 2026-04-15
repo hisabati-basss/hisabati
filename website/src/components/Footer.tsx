@@ -28,6 +28,12 @@ const GithubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const InstagramIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+  </svg>
+);
+
 export const Footer = () => {
   const { t } = useLanguage();
 
@@ -48,6 +54,9 @@ export const Footer = () => {
             <a href="https://www.linkedin.com/in/hisabati-undefined-0a9b9a402/?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BLp5IunXXT3KAVwYUpbY0dA%3D%3D" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
               <LinkedinIcon className="w-5 h-5" />
             </a>
+            <a href="https://www.instagram.com/hisabati.basss?utm_source=qr" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
+              <InstagramIcon className="w-5 h-5" />
+            </a>
             <a href="#" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
               <FacebookIcon className="w-5 h-5" />
             </a>
@@ -58,6 +67,7 @@ export const Footer = () => {
               <GithubIcon className="w-5 h-5" />
             </a>
           </div>
+
         </div>
 
         <div>
