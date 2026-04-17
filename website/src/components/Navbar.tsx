@@ -57,7 +57,7 @@ export const Navbar = () => {
           transition={{ 
             y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
             opacity: { duration: 0.6 },
-            initial: { type: "spring", stiffness: 100, damping: 20 }
+            default: { type: "spring", stiffness: 100, damping: 20 }
           }}
           className="fixed top-6 w-[95%] max-w-6xl z-50"
         >
