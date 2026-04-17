@@ -24,9 +24,13 @@ export const Hero = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       const ua = navigator.userAgent;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (ua.indexOf("Win") !== -1) setOs("Windows");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       else if (ua.indexOf("like Mac") !== -1) setOs("iOS");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       else if (ua.indexOf("Mac") !== -1) setOs("Mac");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       else if (ua.indexOf("Android") !== -1) setOs("Android");
     }, 0);
     return () => clearTimeout(timer);

@@ -709,9 +709,11 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     const timer = setTimeout(() => {
       const saved = localStorage.getItem("hisabati_lang") as Language;
       if (saved && (saved === "en" || saved === "ar")) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLanguage(saved);
       } else {
         const isArabic = navigator.language.startsWith("ar");
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLanguage(isArabic ? "ar" : "en");
       }
     }, 0);
