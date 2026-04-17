@@ -52,15 +52,16 @@ export const Navbar = () => {
     <>
       <div className="flex justify-center w-full">
         <motion.nav
-          initial={{ y: -100 }}
-          animate={{ y: [0, 2, 0] }}
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: [0, 2, 0], opacity: 1 }}
           transition={{ 
             y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
+            opacity: { duration: 0.6 },
             initial: { type: "spring", stiffness: 100, damping: 20 }
           }}
           className="fixed top-6 w-[95%] max-w-6xl z-50"
         >
-          <div className="w-full h-full rounded-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-white/40 dark:border-white/10 shadow-xl transition-all duration-300">
+          <div className="w-full h-full rounded-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-black/5 dark:border-white/10 shadow-2xl transition-all duration-300">
             <div className="px-6 h-20 flex items-center justify-between">
               {/* Logo */}
               <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
@@ -124,7 +125,7 @@ export const Navbar = () => {
             exit={{ opacity: 0, y: -20 }}
             className="fixed top-28 left-[2.5%] right-[2.5%] z-40 lg:hidden"
           >
-            <div className="w-full h-full bg-white/85 dark:bg-neutral-900/80 backdrop-blur-xl backdrop-saturate-150 border border-white/60 dark:border-white/10 rounded-3xl shadow-xl p-6 flex flex-col gap-3">
+            <div className="w-full h-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-black/5 dark:border-white/10 rounded-3xl shadow-2xl p-6 flex flex-col gap-3">
               {navLinks.map((link) => (
                 <button
                   key={link.id}
