@@ -9,21 +9,15 @@ export const TrustMarquee = () => {
     <span key="6" className="text-2xl font-mono border border-current px-3 rounded-lg">SQLite</span>,
   ];
 
-  // Duplicate the array to ensure the width is larger than ultra-wide monitors for a perfect seamless loop
-  const logos = [...baseLogos, ...baseLogos];
+  // We duplicate the set twice for the -50% trick, and each set is repeated internally to ensure length.
+  const fullSet = [...baseLogos, ...baseLogos, ...baseLogos];
+  const allLogos = [...fullSet, ...fullSet];
 
   return (
-    <div className="py-12 border-y border-foreground/5 bg-background overflow-hidden flex whitespace-nowrap">
-      <div className="animate-marquee flex min-w-full flex-shrink-0 items-center justify-around gap-8 px-8">
-        {logos.map((logo, index) => (
-          <div key={`logo-1-${index}`} className="opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 cursor-pointer hover:scale-110">
-            {logo}
-          </div>
-        ))}
-      </div>
-      <div className="animate-marquee flex min-w-full flex-shrink-0 items-center justify-around gap-8 px-8" aria-hidden="true">
-        {logos.map((logo, index) => (
-          <div key={`logo-2-${index}`} className="opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 cursor-pointer hover:scale-110">
+    <div className="py-12 border-y border-foreground/5 bg-background overflow-hidden flex">
+      <div className="animate-marquee flex flex-shrink-0 items-center gap-16 pr-16">
+        {allLogos.map((logo, index) => (
+          <div key={index} className="opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 cursor-pointer hover:scale-110">
             {logo}
           </div>
         ))}
