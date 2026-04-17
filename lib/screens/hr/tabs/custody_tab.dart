@@ -76,7 +76,7 @@ class _CustodyTabState extends State<CustodyTab> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
+        color: Colors.white.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10, style: BorderStyle.solid),
       ),
@@ -90,7 +90,7 @@ class _CustodyTabState extends State<CustodyTab> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -111,7 +111,7 @@ class _CustodyTabState extends State<CustodyTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isCleared ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                  color: isCleared ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -131,7 +131,7 @@ class _CustodyTabState extends State<CustodyTab> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -139,7 +139,7 @@ class _CustodyTabState extends State<CustodyTab> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
             child: const Icon(Icons.laptop_mac, color: Colors.blue),
           ),
           const SizedBox(width: 16),

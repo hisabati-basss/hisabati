@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,7 +26,7 @@ class BackupService {
       
       return backupPath;
     } catch (e) {
-      print("🚨 Backup Error: $e");
+      debugPrint("🚨 Backup Error: $e");
       return null;
     }
   }
@@ -65,3 +66,4 @@ class BackupService {
     }
   }
 }
+

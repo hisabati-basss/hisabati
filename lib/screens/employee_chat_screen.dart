@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../services/chat_service.dart';
@@ -147,8 +146,14 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                       children: [
                         IconButton(
                           icon: Icon(Icons.attach_file, color: context.mutedText),
-                          onPressed: () {}, // Add attachment logic
-                        ),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('خاصية إرفاق الملفات قادمة في التحديث القادم'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },                        ),
                         Expanded(
                           child: TextField(
                             controller: _msgController,

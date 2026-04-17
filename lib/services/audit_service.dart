@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'database_helper.dart';
 
@@ -31,7 +32,7 @@ class AuditService {
       });
     } catch (e) {
       // Fail silently to not block user operations, but log to debug
-      print("🚨 Audit Log Error: $e");
+      debugPrint("?? Audit Log Error: $e");
     }
   }
 
@@ -41,3 +42,4 @@ class AuditService {
     return await db.query('security_audit', orderBy: 'updated_at DESC', limit: limit);
   }
 }
+

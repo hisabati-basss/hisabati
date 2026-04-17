@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database_helper.dart';
@@ -47,7 +48,7 @@ class SupabaseService {
       final String publicUrl = _supabase.storage.from(bucketName).getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
-      print('Supabase Storage Error: $e');
+      debugPrint('Supabase Storage Error: $e');
       return null;
     }
   }
@@ -56,3 +57,4 @@ class SupabaseService {
   /// Note: Supabase handles 'now' via triggers if needed, but for 'Last Write Wins',
   /// we rely on the device's ISO string which is already in our SQLite.
 }
+

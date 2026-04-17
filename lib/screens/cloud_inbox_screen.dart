@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/database_helper.dart';
 import '../services/gmail_service.dart';
 import '../services/ocr_service.dart';
@@ -17,12 +18,12 @@ class CloudInboxScreen extends StatefulWidget {
 
 class _CloudInboxScreenState extends State<CloudInboxScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final GmailService _gmailService = GmailService();
   final OCRService _ocrService = OCRService();
+  final ImagePicker _picker = ImagePicker();
 
   List<Map<String, dynamic>> _drafts = [];
   bool _isLoading = true;
-  bool _isSyncing = false;
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -33,41 +34,46 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
   Future<void> _loadDrafts() async {
     setState(() => _isLoading = true);
     final drafts = await _dbHelper.getDraftInvoices();
-    setState(() {
-      // Only show pending drafts
-      _drafts = drafts.where((d) => d['status'] == 'pending').toList();
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _drafts = drafts.where((d) => d['status'] == 'pending').toList();
+        _isLoading = false;
+      });
+    }
   }
 
-  Future<void> _syncGmail() async {
-     setState(() => _isSyncing = true);
-     
-     try {
-       final mockDrafts = await _gmailService.getMockDrafts();
-       for (var draft in mockDrafts) {
-          await _dbHelper.saveDraftInvoice(draft);
-       }
-       
-       await Future.delayed(const Duration(seconds: 2));
-       await _loadDrafts();
-       
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text(tr('cloud_inbox.sync_success')), backgroundColor: Colors.greenAccent),
-         );
-       }
-     } catch (e) {
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text("${tr('cloud_inbox.sync_error')}: $e"), backgroundColor: Colors.redAccent),
-         );
-       }
-     } finally {
-       if (mounted) {
-         setState(() => _isSyncing = false);
-       }
-     }
+  Future<void> _scanInvoice() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    if (photo == null) return;
+
+    setState(() => _isScanning = true);
+    
+    try {
+      final File imageFile = File(photo.path);
+      // AI OCR Parsing
+      final invoiceData = await _ocrService.parseInvoiceImage(imageFile);
+      
+      // Save to drafts
+      await _dbHelper.saveDraftInvoice(invoiceData);
+      
+      await _loadDrafts();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ تم مسح الفاتورة واستخراج البيانات بنجاح"), backgroundColor: Colors.greenAccent),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ خطأ في مسح الفاتورة: $e"), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+    }
   }
 
   Future<void> _approveDraft(Map<String, dynamic> draft) async {
@@ -138,16 +144,16 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: _isSyncing ? null : _syncGmail,
-                icon: Icon(Icons.sync_rounded, size: context.iconSize - 2),
+                onPressed: _isScanning ? null : _scanInvoice,
+                icon: Icon(_isScanning ? Icons.hourglass_empty : Icons.camera_alt_rounded, size: context.iconSize - 2),
                 label: Text(
-                  _isSyncing ? tr('cloud_inbox.syncing') : tr('cloud_inbox.sync'),
-                  style: TextStyle(fontSize: context.bodySize),
+                  _isScanning ? "جاري المسح..." : "مسح فاتورة ذكية",
+                  style: TextStyle(fontSize: context.bodySize, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryOrange,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius / 2)),
                 ),
               ),
@@ -163,82 +169,82 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.inbox_outlined, color: Colors.white24, size: 48),
-                          const SizedBox(height: 12),
-                          Text(tr('cloud_inbox.empty'), style: const TextStyle(color: Colors.white24)),
+                          const Icon(Icons.receipt_long_outlined, color: Colors.white24, size: 64),
+                          const SizedBox(height: 16),
+                          Text("لا توجد فواتير معلقة", style: TextStyle(color: context.mutedText, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          Text("اضغط على 'مسح فاتورة ذكية' للبدء", style: TextStyle(color: context.mutedText.withValues(alpha: 0.5), fontSize: 12)),
                         ],
                       ),
                     )
                   : ListView.builder(
                       itemCount: _drafts.length,
                       itemBuilder: (context, index) {
-                        final draft = _drafts[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: GlassContainer(
-                            padding: EdgeInsets.all(context.cardPadding),
-                            borderRadius: context.cardRadius,
-                            child: Column(
-                              children: [
-                                // Header Row
-                                Row(
-                                  children: [
-                                    Icon(Icons.mark_email_unread_outlined, color: Colors.blueAccent, size: context.iconSize),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(draft['supplier_name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
-                                          Text("${draft['date']} | ${draft['total_amount']} ${tr('onboarding.currency_hint')}", style: TextStyle(color: Colors.white38, fontSize: context.bodySize - 2)),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: () => _showReviewDialog(draft),
-                                      icon: Icon(Icons.visibility_outlined, color: Colors.white54, size: context.iconSize),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                // Action Buttons Row
-                                Row(
-                                  children: [
-                                    // Reject button
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _rejectDraft(draft),
-                                        icon: const Icon(Icons.close, size: 16, color: Colors.redAccent),
-                                        label: Text(tr('cloud_inbox.reject'), style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
-                                          padding: const EdgeInsets.symmetric(vertical: 6),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Approve button
-                                    Expanded(
-                                      flex: 2,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => _approveDraft(draft),
-                                        icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.black),
-                                        label: Text(tr('cloud_inbox.approve'), style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.greenAccent,
-                                          padding: const EdgeInsets.symmetric(vertical: 6),
-                                          elevation: 0,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                         final draft = _drafts[index];
+                         return Padding(
+                           padding: const EdgeInsets.only(bottom: 12),
+                           child: GlassContainer(
+                             padding: EdgeInsets.all(context.cardPadding),
+                             borderRadius: context.cardRadius,
+                             child: Column(
+                               children: [
+                                 Row(
+                                   children: [
+                                     Container(
+                                       padding: const EdgeInsets.all(10),
+                                       decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                                       child: Icon(Icons.description_outlined, color: Colors.blueAccent, size: context.iconSize),
+                                     ),
+                                     const SizedBox(width: 12),
+                                     Expanded(
+                                       child: Column(
+                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                         children: [
+                                           Text(draft['supplier_name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
+                                           Text("${draft['date']} | ${draft['total_amount']} ${tr('onboarding.currency_hint')}", style: TextStyle(color: Colors.white38, fontSize: context.bodySize - 2)),
+                                         ],
+                                       ),
+                                     ),
+                                     IconButton(
+                                       onPressed: () => _showReviewDialog(draft),
+                                       icon: Icon(Icons.edit_note_rounded, color: primaryOrange, size: context.iconSize + 4),
+                                     ),
+                                   ],
+                                 ),
+                                 const SizedBox(height: 12),
+                                 Row(
+                                   children: [
+                                     Expanded(
+                                       child: OutlinedButton.icon(
+                                         onPressed: () => _rejectDraft(draft),
+                                         icon: const Icon(Icons.close, size: 16, color: Colors.redAccent),
+                                         label: Text(tr('cloud_inbox.reject'), style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                                         style: OutlinedButton.styleFrom(
+                                           side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                                           padding: const EdgeInsets.symmetric(vertical: 8),
+                                         ),
+                                       ),
+                                     ),
+                                     const SizedBox(width: 8),
+                                     Expanded(
+                                       flex: 2,
+                                       child: ElevatedButton.icon(
+                                         onPressed: () => _approveDraft(draft),
+                                         icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.black),
+                                         label: Text(tr('cloud_inbox.approve'), style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
+                                         style: ElevatedButton.styleFrom(
+                                           backgroundColor: Colors.greenAccent,
+                                           padding: const EdgeInsets.symmetric(vertical: 8),
+                                           elevation: 0,
+                                         ),
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ],
+                             ),
+                           ),
+                         );
                       }
                     ),
           ),
@@ -264,7 +270,6 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
             children: [
               Text(tr('cloud_inbox.ai_extracted'), style: TextStyle(fontSize: context.bodySize - 2, color: Colors.white38)),
               const SizedBox(height: 12),
-              // Editable fields (QuickBooks style — edit before approve)
               TextField(
                 controller: supplierController,
                 decoration: InputDecoration(
@@ -285,12 +290,11 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                height: 80,
-                width: double.infinity,
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(context.cardRadius / 2)),
-                child: Center(child: Text(tr('cloud_inbox.invoice_preview'), style: TextStyle(fontSize: context.bodySize - 2, color: Colors.white24))),
-              ),
+              if (draft['attachment_path'] != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(draft['attachment_path']), height: 150, width: double.infinity, fit: BoxFit.cover),
+                ),
             ],
           ),
         ),
@@ -298,14 +302,13 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('common.cancel'), style: TextStyle(fontSize: context.bodySize))),
           ElevatedButton.icon(
             onPressed: () async {
-              // Update draft with edited values then approve
               final db = await _dbHelper.database;
               await db.update('draft_invoices', {
                 'supplier_name': supplierController.text,
                 'total_amount': double.tryParse(totalController.text) ?? draft['total_amount'],
               }, where: 'id = ?', whereArgs: [draft['id']]);
               
-              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
               _approveDraft({...draft, 'supplier_name': supplierController.text, 'total_amount': double.tryParse(totalController.text) ?? draft['total_amount']});
             },
             icon: const Icon(Icons.check, color: Colors.black, size: 16),

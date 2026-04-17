@@ -47,38 +47,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         });
       }
 
-      // Seed dummy data if empty for preview
-      if (enrichedProjects.isEmpty && query.isEmpty) {
-        final db = await dbHelper.database;
-        await db.insert('projects', {
-          'id': 'PRJ_001',
-          'name': 'مشروع مجمع الرياض السكني',
-          'budget_amount': 2500000.0,
-          'cost_center_id': 'CC_RYD_01',
-          'start_date': '2026-01-01',
-          'end_date': '2026-12-31',
-          'status': 'active',
-        });
-        await db.insert('projects', {
-          'id': 'PRJ_002',
-          'name': 'كوبري مسار الملك سلمان',
-          'budget_amount': 8000000.0,
-          'cost_center_id': 'CC_KSD_02',
-          'start_date': '2025-06-01',
-          'end_date': '2027-06-01',
-          'status': 'active',
-        });
-        
-        // Seed Dummy expenses to show actual cost on PRJ_001
-        final entryId = 'JE_DEMO_PRJ_001';
-        await db.insert('journal_entries', {'id': entryId, 'date': '2026-02-10', 'description': 'فاتورة حديد تسليح للمجمع'});
-        await db.insert('journal_entry_lines', {'id': '${entryId}_1', 'entry_id': entryId, 'account_id': 'ACC_COGS', 'debit': 2100000.0, 'project_id': 'PRJ_001'});
-        
-        // Run internal load again
-        if (mounted) setState(() => _isLoading = false);
-        _loadProjects();
-        return;
-      }
+      // Show empty state if no projects exist — user creates them via the + button
 
       if (mounted) {
         setState(() {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 class CurrencyService {
@@ -83,12 +84,13 @@ class CurrencyService {
     //   final response = await http.get(Uri.parse('https://v6.exchangerate-api.com/v6/YOUR_API_KEY/latest/USD'));
     //   ... logic to update local cache ...
     // } catch (e) {
-    //   print("Failed to update rates: $e");
+    //   debugPrint("Failed to update rates: $e");
     // }
     
-    print("CurrencyService: Syncing with simulated cloud endpoint...");
+    debugPrint("CurrencyService: Syncing with simulated cloud endpoint...");
     await Future.delayed(const Duration(seconds: 1)); // Simulate network latency
     
     return baseRatesUSD; // Currently returning the static offline map
   }
 }
+

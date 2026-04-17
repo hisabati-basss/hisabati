@@ -18,6 +18,12 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _crController = TextEditingController();
+  final _vatController = TextEditingController();
+  final _addressController = TextEditingController();
+
   IndustryType _selectedIndustry = IndustryType.general;
   String _selectedCountry = "saudi";
   String _selectedCurrency = "sar";
@@ -26,6 +32,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   
   XFile? _logoFile;
   final ImagePicker _picker = ImagePicker();
+
+  static const Map<String, String> _countryPrefixes = {
+    "saudi": "+966", "egypt": "+20", "uae": "+971", "kuwait": "+965",
+    "jordan": "+962", "oman": "+968", "qatar": "+974", "bahrain": "+973",
+    "iraq": "+964", "lebanon": "+961", "morocco": "+212", "tunisia": "+216",
+    "algeria": "+213", "turkey": "+90", "usa": "+1", "uk": "+44",
+  };
 
   Future<void> _pickLogo() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -44,11 +57,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: SingleChildScrollView(
               padding: EdgeInsets.all(context.sectionPadding),
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 600),
-                padding: EdgeInsets.all(context.cardPadding * 2),
+                constraints: const BoxConstraints(maxWidth: 750),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: context.cardSurface,
-                  borderRadius: BorderRadius.circular(context.cardRadius * 2),
+                  borderRadius: BorderRadius.circular(context.cardRadius * 1.5),
                   border: Border.all(color: context.cardBorder),
                 ),
                 child: Column(
@@ -56,30 +69,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(context),
-                    const SizedBox(height: 20),
-
-                    _buildLabel(tr('onboarding.org_name_label')),
-                    _buildTextField(_nameController, tr('onboarding.org_name_hint')),
-                    const SizedBox(height: 16),
-
-                    _buildLabel(tr('onboarding.activity_type_label')),
-                    _buildIndustryGrid(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(tr('onboarding.country_label')),
-                              _buildDropdown<String>(
-                                value: _selectedCountry,
-                                items: ["egypt", "saudi", "kuwait", "uae", "jordan"],
-                                formatText: (v) => tr('onboarding.countries.$v'),
-                                onChanged: (v) => setState(() => _selectedCountry = v!),
-                              ),
-                            ],
+                        GestureDetector(
+                          onTap: _pickLogo,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: context.bgSurface.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: context.cardBorder),
+                            ),
+                            child: _logoFile != null 
+                              ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(_logoFile!.path), fit: BoxFit.cover))
+                              : Icon(Icons.add_a_photo_outlined, color: context.mutedText, size: 20),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -87,28 +94,132 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildLabel(tr('onboarding.currency_label')),
-                              _buildDropdown<String>(
-                                value: _selectedCurrency,
-                                items: ["egp", "sar", "aed", "kwd", "usd"],
-                                formatText: (v) => tr('onboarding.currencies.$v'),
-                                onChanged: (v) => setState(() => _selectedCurrency = v!),
+                              _buildLabel(tr('onboarding.org_name_label')),
+                              _buildTextField(_nameController, tr('onboarding.org_name_hint'), icon: Icons.business_outlined),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(tr('onboarding.phone_label')),
+                              _buildTextField(
+                                _phoneController, 
+                                "5xxxxxxx", 
+                                icon: Icons.phone_outlined,
+                                prefix: _countryPrefixes[_selectedCountry] ?? "+",
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(tr('onboarding.email_label')),
+                              _buildTextField(_emailController, "info@company.com", icon: Icons.email_outlined),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+
+                    _buildLabel(tr('onboarding.activity_type_label')),
+                    _buildIndustryGrid(),
+                    const SizedBox(height: 5),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(tr('onboarding.cr_label')),
+                              _buildTextField(_crController, "1010xxxxxx"),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(tr('onboarding.vat_label')),
+                              _buildTextField(_vatController, "300xxxxxxxx"),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(tr('onboarding.tax_rate_label')),
+                              _buildDropdown<double>(
+                                value: _taxRate,
+                                items: [0.0, 5.0, 10.0, 15.0],
+                                formatText: (v) => "$v%",
+                                onChanged: (v) => setState(() => _taxRate = v!),
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 5),
 
-                    _buildLabel(tr('onboarding.tax_rate_label')),
-                    _buildDropdown<double>(
-                      value: _taxRate,
-                      items: [0.0, 5.0, 10.0, 15.0],
-                      formatText: (v) => "$v%",
-                      onChanged: (v) => setState(() => _taxRate = v!),
+                    _buildLabel(tr('onboarding.address_label')),
+                    _buildTextField(_addressController, "City, Street, Building", icon: Icons.location_on_outlined),
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                                _buildLabel(tr('onboarding.country_label')),
+                                _buildDropdown<String>(
+                                  value: _selectedCountry,
+                                  items: [
+                                    "egypt", "saudi", "kuwait", "uae", "jordan", "oman", "qatar", "bahrain", 
+                                    "iraq", "lebanon", "morocco", "tunisia", "algeria", "turkey", "usa", "uk"
+                                  ],
+                                  formatText: (v) => tr('onboarding.countries.$v'),
+                                  onChanged: (v) => setState(() => _selectedCountry = v!),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                                _buildLabel(tr('onboarding.currency_label')),
+                                _buildDropdown<String>(
+                                  value: _selectedCurrency,
+                                  items: ["egp", "sar", "aed", "kwd", "omr", "qar", "bhd", "usd", "eur", "gbp", "jod", "try"],
+                                  formatText: (v) => tr('onboarding.currencies.$v'),
+                                  onChanged: (v) => setState(() => _selectedCurrency = v!),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 12),
 
                     _buildSubmitButton(context),
                   ],
@@ -122,55 +233,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tr('onboarding.setup_title'), 
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.textColor)
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tr('onboarding.setup_subtitle'), 
-                style: TextStyle(color: context.mutedText, fontSize: 13)
-              ),
-            ],
-          ),
+        Text(
+          tr('onboarding.setup_title'), 
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textColor)
         ),
-        GestureDetector(
-          onTap: _pickLogo,
-          child: Hero(
-            tag: 'org_logo',
-            child: Container(
-              width: 70, height: 70,
-              decoration: BoxDecoration(
-                color: context.bgSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: context.cardBorder, width: 2),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 1)
-                ]
-              ),
-              child: _logoFile == null 
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_a_photo_outlined, color: primaryOrange, size: 24),
-                      const SizedBox(height: 4),
-                      Text(tr('onboarding.logo_label'), style: TextStyle(color: context.mutedText, fontSize: 10)),
-                    ],
-                  )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: kIsWeb 
-                      ? Image.network(_logoFile!.path, fit: BoxFit.cover)
-                      : Image.file(File(_logoFile!.path), fit: BoxFit.cover),
-                  ),
-            ),
-          ),
+        Text(
+          tr('onboarding.setup_subtitle'), 
+          style: TextStyle(color: context.mutedText, fontSize: 10)
         ),
       ],
     );
@@ -178,30 +250,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildIndustryGrid() {
     return Container(
-      height: 220,
+      height: 65,
       decoration: BoxDecoration(
-        color: context.bgSurface.withValues(alpha: 0.3),
+        color: context.bgSurface.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(context.cardRadius),
         border: Border.all(color: context.cardBorder),
       ),
-      child: GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1.1,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(context.cardRadius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: GridView.builder(
+            padding: const EdgeInsets.all(4),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 11,
+              crossAxisSpacing: 3,
+              mainAxisSpacing: 3,
+              childAspectRatio: 1.0,
+            ),
+            itemCount: IndustryType.values.length,
+            itemBuilder: (context, index) {
+              final industry = IndustryType.values[index];
+              final isSelected = _selectedIndustry == industry;
+              return _IndustryCard(
+                industry: industry,
+                isSelected: isSelected,
+                onTap: () => setState(() => _selectedIndustry = industry),
+              );
+            },
+          ),
         ),
-        itemCount: IndustryType.values.length,
-        itemBuilder: (context, index) {
-          final industry = IndustryType.values[index];
-          final isSelected = _selectedIndustry == industry;
-          return _IndustryCard(
-            industry: industry,
-            isSelected: isSelected,
-            onTap: () => setState(() => _selectedIndustry = industry),
-          );
-        },
       ),
     );
   }
@@ -209,7 +287,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildSubmitButton(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 50,
+      height: 48,
       decoration: BoxDecoration(
         gradient: context.primaryGradient,
         borderRadius: BorderRadius.circular(context.cardRadius),
@@ -239,24 +317,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8.0, left: 4),
-    child: Text(text, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600)),
+    padding: const EdgeInsets.only(bottom: 4.0, left: 4),
+    child: Text(text, style: TextStyle(color: context.textColor, fontSize: 10, fontWeight: FontWeight.bold)),
   );
 
-  Widget _buildTextField(TextEditingController controller, String hint) => Container(
+  Widget _buildTextField(TextEditingController controller, String hint, {IconData? icon, String? prefix}) => Container(
     decoration: BoxDecoration(
-      color: context.bgSurface.withValues(alpha: 0.5), 
+      color: context.bgSurface.withValues(alpha: 0.4), 
       borderRadius: BorderRadius.circular(context.cardRadius), 
       border: Border.all(color: context.cardBorder)
     ),
-    child: TextField(
-      controller: controller,
-      style: TextStyle(color: context.textColor, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint, 
-        hintStyle: TextStyle(color: context.mutedText, fontSize: 14), 
-        border: InputBorder.none, 
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(context.cardRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: TextField(
+          controller: controller,
+          style: TextStyle(color: context.textColor, fontSize: 12),
+          decoration: InputDecoration(
+            prefixIcon: icon != null ? Icon(icon, size: 18, color: context.mutedText) : null,
+            prefixText: prefix != null ? "$prefix " : null,
+            prefixStyle: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold, fontSize: 13),
+            hintText: hint, 
+            hintStyle: TextStyle(color: context.mutedText, fontSize: 13), 
+            border: InputBorder.none, 
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+          ),
+        ),
       ),
     ),
   );
@@ -264,19 +351,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildDropdown<T>({required T value, required List<T> items, required ValueChanged<T?> onChanged, String Function(T)? formatText}) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16),
     decoration: BoxDecoration(
-      color: context.bgSurface.withValues(alpha: 0.5), 
+      color: context.bgSurface.withValues(alpha: 0.4), 
       borderRadius: BorderRadius.circular(context.cardRadius), 
       border: Border.all(color: context.cardBorder)
     ),
-    child: DropdownButtonHideUnderline(
-      child: DropdownButton<T>(
-        value: value,
-        dropdownColor: context.cardSurface,
-        icon: Icon(Icons.keyboard_arrow_down_rounded, color: primaryOrange),
-        isExpanded: true,
-        style: TextStyle(color: context.textColor, fontSize: 14),
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(formatText != null ? formatText(e) : e.toString()))).toList(),
-        onChanged: onChanged,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(context.cardRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<T>(
+            value: value,
+            dropdownColor: context.bgSurface.withValues(alpha: 0.95),
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: primaryOrange, size: 16),
+            isExpanded: true,
+            style: TextStyle(color: context.textColor, fontSize: 12),
+            items: items.map((e) => DropdownMenuItem(
+              value: e, 
+              child: Text(
+                formatText != null ? formatText(e) : e.toString(),
+                style: TextStyle(color: context.textColor, fontSize: 12),
+              )
+            )).toList(),
+            onChanged: onChanged,
+          ),
+        ),
       ),
     ),
   );
@@ -296,16 +395,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final db = DatabaseHelper();
       final companyId = "COMP_${DateTime.now().millisecondsSinceEpoch}";
       
-      // 1. Set Company & Industry Metadata
       await db.setCurrentCompany(companyId, _selectedIndustry.name);
       await db.setCompanySettings(
+        companyName: _nameController.text.trim(),
         taxRate: _taxRate, 
         currency: _selectedCurrency, 
         country: _selectedCountry,
         logoPath: _logoFile?.path,
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        crNumber: _crController.text.trim(),
+        vatNumber: _vatController.text.trim(),
+        address: _addressController.text.trim(),
       );
 
-      // 2. Initialize Industry-Specific COA (Senior Level Logic)
       await db.seedIndustryAccounts(_selectedIndustry);
       
       widget.onComplete();
@@ -339,51 +442,40 @@ class _IndustryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
+      child: Container(
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? primaryOrange.withValues(alpha: 0.2) 
-              : context.cardSurface,
-          borderRadius: BorderRadius.circular(context.cardRadius),
+          color: isSelected ? primaryOrange.withValues(alpha: 0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isSelected ? primaryOrange : context.cardBorder,
-            width: isSelected ? 2 : 1,
+            color: isSelected ? primaryOrange : Colors.transparent,
+            width: 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(color: primaryOrange.withValues(alpha: 0.2), blurRadius: 8, spreadRadius: 1)
-          ] : null,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(context.cardRadius),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _getIconForIndustry(industry),
-                  color: isSelected ? primaryOrange : context.mutedText,
-                  size: 24,
-                ),
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    tr('onboarding.industries.${industry.name}'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? context.textColor : context.mutedText,
-                    ),
-                  ),
-                ),
-              ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _getIconForIndustry(industry),
+              size: 14,
+              color: isSelected ? primaryOrange : context.mutedText,
             ),
-          ),
+            const SizedBox(height: 2),
+            Flexible(
+              child: Text(
+                tr('onboarding.industries.${industry.name}'),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 6,
+                  height: 0.9,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? context.textColor : context.mutedText,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

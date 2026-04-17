@@ -36,7 +36,7 @@ class _AiCoreScreenState extends State<AiCoreScreen> {
     };
 
     _controller.onReportRequested = (type) async {
-       // Logic to generate and show report
+
        await ReportingService().generateAndShareReport(type);
     };
 

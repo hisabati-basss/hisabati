@@ -1,6 +1,5 @@
 // lib/screens/fiscal_year_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import '../services/database_helper.dart';
 import '../core/accounting/accounting_engine.dart';
 import '../theme/app_theme_extension.dart';
@@ -50,7 +49,7 @@ class _FiscalYearScreenState extends State<FiscalYearScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: Stack(
         children: [
           Positioned.fill(
@@ -77,7 +76,7 @@ class _FiscalYearScreenState extends State<FiscalYearScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {}, 
+        onPressed: _showAddYearDialog,
         label: const Text('فتح سنة مالية جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.calendar_today),
         backgroundColor: Colors.teal,
@@ -102,7 +101,7 @@ class _FiscalYearScreenState extends State<FiscalYearScreen> {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.event_available, size: 80, color: Colors.teal.withOpacity(0.2)),
+          Icon(Icons.event_available, size: 80, color: Colors.teal.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           const Text('لم يتم تعريف سنوات مالية بعد'),
         ],
@@ -121,7 +120,7 @@ class _FiscalYearScreenState extends State<FiscalYearScreen> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(context.cardRadius),
-            side: BorderSide(color: isClosed ? Colors.grey.withOpacity(0.2) : Colors.teal.withOpacity(0.3)),
+            side: BorderSide(color: isClosed ? Colors.grey.withValues(alpha: 0.2) : Colors.teal.withValues(alpha: 0.3)),
           ),
           child: ListTile(
             contentPadding: EdgeInsets.all(context.cardPadding),
@@ -150,5 +149,49 @@ class _FiscalYearScreenState extends State<FiscalYearScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إقفال السنة المالية بنجاح'), backgroundColor: Colors.green));
       _loadYears();
     }
+  }
+
+  void _showAddYearDialog() {
+    final nameController = TextEditingController(text: 'سنة ${DateTime.now().year}');
+    final startController = TextEditingController(text: '${DateTime.now().year}-01-01');
+    final endController = TextEditingController(text: '${DateTime.now().year}-12-31');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('فتح سنة مالية جديدة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم السنة')),
+            TextField(controller: startController, decoration: const InputDecoration(labelText: 'تاريخ البداية (YYYY-MM-DD)')),
+            TextField(controller: endController, decoration: const InputDecoration(labelText: 'تاريخ النهاية (YYYY-MM-DD)')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () async {
+              await _addYear(nameController.text, startController.text, endController.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addYear(String name, String start, String end) async {
+    final db = await _db.database;
+    await db.insert('fiscal_years', {
+      'id': 'FY_${DateTime.now().millisecondsSinceEpoch}',
+      'name': name,
+      'start_date': start,
+      'end_date': end,
+      'is_closed': 0,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    _loadYears();
   }
 }

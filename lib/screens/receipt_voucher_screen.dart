@@ -41,33 +41,57 @@ class _ReceiptVoucherScreenState extends State<ReceiptVoucherScreen> with Single
   Future<void> _loadInitialData() async {
     try {
       final db = await _db.database;
-      final clients = await db.query('clients');
-      final banks = await db.query('accounts', where: "type = 'asset' AND name LIKE '%بنك%'");
+      
+      // Self-healing: ensure clients table has all needed columns
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+          id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT,
+          tax_id TEXT, address TEXT, balance REAL DEFAULT 0,
+          sync_status INTEGER DEFAULT 0, updated_at TEXT,
+          device_id TEXT, is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+      // Add missing columns to existing table
+      try { await db.execute('ALTER TABLE clients ADD COLUMN phone TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE clients ADD COLUMN email TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE clients ADD COLUMN balance REAL DEFAULT 0'); } catch (_) {}
+      
+      // Seed default client if empty
+      final clientCheck = await db.query('clients', limit: 1);
+      if (clientCheck.isEmpty) {
+        await db.insert('clients', {
+          'id': 'CL_DEFAULT',
+          'name': 'عميل عام / مشتري نقدي',
+          'sync_status': 0,
+          'is_deleted': 0,
+        });
+      }
+      
+      final clients = await db.query('clients', where: 'is_deleted = 0', orderBy: 'name ASC');
+      final banks = await db.query('accounts', where: "type = 'asset'");
       final vouchers = await db.query('receipt_vouchers', orderBy: 'created_at DESC');
       
-      final companies = await db.query('companies', limit: 1);
+      final companyContext = await _db.getCurrentCompanyContext();
       
       if (mounted) {
         setState(() {
           _clients = clients;
           _banks = banks;
           _vouchers = vouchers;
-          _currency = companies.isNotEmpty ? (companies.first['currency_code']?.toString() ?? 'SAR') : 'SAR';
+          _currency = companyContext['currency']?.toString().toUpperCase() ?? 'SAR';
           if (clients.isNotEmpty) _selectedClientId = clients.first['id']?.toString();
           if (banks.isNotEmpty) _selectedBankId = banks.first['id']?.toString();
         });
       }
     } catch (e) {
-      debugPrint("Error loading receipt vouchers: $e");
+      debugPrint("❌ Error loading receipt vouchers: $e");
       if (mounted) {
-        setState(() {
-          _clients = [];
-          _banks = [];
-          _vouchers = [];
-        });
+        setState(() { _clients = []; _banks = []; _vouchers = []; });
       }
     }
   }
+
+
 
   Future<void> _saveVoucher() async {
     final amount = double.tryParse(_amountCtrl.text) ?? 0.0;
@@ -191,22 +215,36 @@ class _ReceiptVoucherScreenState extends State<ReceiptVoucherScreen> with Single
                   const SizedBox(height: 16),
                   
                   // Client
-                  DropdownButtonFormField<String>(
-                    value: _selectedClientId,
-                    decoration: InputDecoration(
-                      labelText: tr('vouchers.receipt.client_label'),
-                      labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
-                      filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.person_outline),
-                    ),
-                    dropdownColor: context.bgSurface,
-                    items: _clients.map((c) => DropdownMenuItem<String>(
-                      value: c['id']?.toString(),
-                      child: Text(c['name']?.toString() ?? ''),
-                    )).toList(),
-                    onChanged: (v) => setState(() => _selectedClientId = v),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedClientId,
+                          decoration: InputDecoration(
+                            labelText: tr('vouchers.receipt.client_label'),
+                            labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
+                            filled: true,
+                            fillColor: Colors.black.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            prefixIcon: const Icon(Icons.person_outline),
+                          ),
+                          dropdownColor: context.bgSurface,
+                          items: _clients.map((c) => DropdownMenuItem<String>(
+                            value: c['id']?.toString(),
+                            child: Text(c['name']?.toString() ?? ''),
+                          )).toList(),
+                          onChanged: (v) => setState(() => _selectedClientId = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          // TODO: Navigate to Client Management
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يمكنك إضافة عملاء جدد من قسم المبيعات > العملاء")));
+                        },
+                        icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 

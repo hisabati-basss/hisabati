@@ -1,15 +1,16 @@
+import 'package:flutter/foundation.dart';
 import '../services/database_helper.dart';
 
 class CustodyService {
   final DatabaseHelper _db = DatabaseHelper();
 
-  static const String FIN_PENDING = 'معلقة';
-  static const String FIN_CLEARED = 'مصفاة';
-  static const String ASSET_WITH_EMP = 'بحوزة الموظف';
-  static const String ASSET_RETURNED = 'مسترجع';
+  static const String FIN_PENDING = '?????';
+  static const String FIN_CLEARED = '?????';
+  static const String ASSET_WITH_EMP = '????? ??????';
+  static const String ASSET_RETURNED = '??????';
 
   // ---------------------------------------------------------
-  // 1. FINANCIAL CUSTODY (العهد النقدية)
+  // 1. FINANCIAL CUSTODY (????? ???????)
   // ---------------------------------------------------------
 
   Future<void> issueFinancialCustody({
@@ -40,7 +41,7 @@ class CustodyService {
     // Journal entry
     await _db.saveManualJournalEntry(
       date: nowStr.split('T')[0],
-      description: 'صرف عهدة نقدية - $reason',
+      description: '??? ???? ????? - $reason',
       lines: [
         {'account_id': 'ACC_EMP_RECEIVABLE', 'debit': amount, 'credit': 0.0},
         {'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': amount},
@@ -68,7 +69,7 @@ class CustodyService {
 
     await _db.saveManualJournalEntry(
       date: nowStr.split('T')[0],
-      description: 'تصفية عهدة نقدية',
+      description: '????? ???? ?????',
       lines: [
         {'account_id': 'ACC_EXPENSES_GENERAL', 'debit': amount, 'credit': 0.0},
         {'account_id': 'ACC_EMP_RECEIVABLE', 'debit': 0.0, 'credit': amount},
@@ -99,7 +100,7 @@ class CustodyService {
   }
 
   // ---------------------------------------------------------
-  // 2. ASSET CUSTODY (العهد العينية)
+  // 2. ASSET CUSTODY (????? ???????)
   // ---------------------------------------------------------
 
   Future<void> issueAssetCustody({
@@ -111,7 +112,7 @@ class CustodyService {
     final nowStr = DateTime.now().toIso8601String();
 
     await db.update('assets', {
-      'status': 'مسلم لموظف',
+      'status': '???? ?????',
       'assigned_to': employeeId,
       'sync_status': 0,
       'updated_at': nowStr,
@@ -136,7 +137,7 @@ class CustodyService {
     final nowStr = DateTime.now().toIso8601String();
 
     await db.update('assets', {
-      'status': isDamaged ? 'يحتاج صيانة' : 'في الخدمة',
+      'status': isDamaged ? '????? ?????' : '?? ??????',
       'assigned_to': null,
       'location': 'Warehouse',
       'sync_status': 0,
@@ -152,7 +153,7 @@ class CustodyService {
 
   Future<List<Map<String, dynamic>>> getAssetCustodies({String? employeeId}) async {
     final db = await _db.database;
-    String whereClause = "a.status = 'مسلم لموظف'";
+    String whereClause = "a.status = '???? ?????'";
     List<dynamic> args = [];
     
     if (employeeId != null) {
@@ -170,6 +171,7 @@ class CustodyService {
 
   Future<List<Map<String, dynamic>>> getAvailableAssets() async {
     final db = await _db.database;
-    return await db.query('assets', where: "status IN ('في الخدمة', 'متاح', 'available')");
+    return await db.query('assets', where: "status IN ('?? ??????', '????', 'available')");
   }
 }
+

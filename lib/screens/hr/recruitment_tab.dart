@@ -51,7 +51,7 @@ class RecruitmentTab extends StatelessWidget {
         children: [
           const Icon(Icons.handshake_outlined, size: 64, color: Colors.white24),
           const SizedBox(height: 16),
-          Text("لا يوجد مرشحين حالياً", style: TextStyle(color: context.mutedText)),
+          Text(tr('hr.recruitment.no_candidates'), style: TextStyle(color: context.mutedText)),
         ],
       ),
     );
@@ -81,7 +81,7 @@ class RecruitmentTab extends StatelessWidget {
             foregroundColor: Colors.greenAccent
           ),
           onPressed: () => onHire(candidate),
-          child: const Text("توظيف", style: TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(tr('hr.hire_employee'), style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
       ),
     );

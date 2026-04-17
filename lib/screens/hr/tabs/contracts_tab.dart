@@ -25,15 +25,9 @@ class _ContractsTabState extends State<ContractsTab> {
   }
 
   Future<void> _loadContract() async {
-    final db = await _db.database;
-    final res = await db.query(
-      'employee_contracts',
-      where: 'employee_id = ? AND status = ? AND is_deleted = 0',
-      whereArgs: [widget.employeeId, 'active'],
-      limit: 1,
-    );
+    final res = await _db.getEmployeeContracts(employeeId: widget.employeeId);
     setState(() {
-      _activeContract = res.isNotEmpty ? res.first : null;
+      _activeContract = res.isNotEmpty ? res.firstWhere((c) => c['status'] == 'active', orElse: () => res.first) : null;
       _isLoading = false;
     });
   }
@@ -82,20 +76,13 @@ class _ContractsTabState extends State<ContractsTab> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
             ElevatedButton(
               onPressed: () async {
-                final db = await _db.database;
-                final nowStr = DateTime.now().toIso8601String();
-                await db.insert('employee_contracts', {
-                  'id': const Uuid().v4(),
+                await _db.addEmployeeContract({
                   'employee_id': widget.employeeId,
                   'contract_type': type,
                   'start_date': startDate.toIso8601String().split('T').first,
                   'end_date': endDate?.toIso8601String().split('T').first,
                   'basic_salary': widget.employee['basic_salary'],
                   'status': 'active',
-                  'created_at': nowStr,
-                  'updated_at': nowStr,
-                  'sync_status': 0,
-                  'is_deleted': 0,
                 });
                 Navigator.pop(ctx);
                 _loadContract();
@@ -131,7 +118,7 @@ class _ContractsTabState extends State<ContractsTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history_edu, size: 64, color: Colors.white.withOpacity(0.1)),
+            Icon(Icons.history_edu, size: 64, color: Colors.white.withValues(alpha: 0.1)),
             const SizedBox(height: 16),
             const Text("لا يوجد عقد نشط مسجل", style: TextStyle(color: Colors.white60)),
             const SizedBox(height: 24),
@@ -152,7 +139,7 @@ class _ContractsTabState extends State<ContractsTab> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: Colors.white.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white10),
             ),
@@ -170,7 +157,7 @@ class _ContractsTabState extends State<ContractsTab> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent.withOpacity(0.8), padding: const EdgeInsets.symmetric(vertical: 16)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent.withValues(alpha: 0.8), padding: const EdgeInsets.symmetric(vertical: 16)),
                     onPressed: _printContract,
                     icon: const Icon(Icons.print_outlined),
                     label: const Text("طباعة العقد (PDF)"),

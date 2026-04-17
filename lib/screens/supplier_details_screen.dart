@@ -312,7 +312,16 @@ class _SupplierDetailsScreenState extends State<SupplierDetailsScreen> {
         Container(
           decoration: BoxDecoration(color: context.cardSurface, border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(context.cardRadius)),
           child: IconButton(
-            onPressed: () {}, 
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('جاري تصدير كشف حساب ${widget.supplierName} إلى PDF...'),
+                  backgroundColor: primaryOrange,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
             icon: Icon(Icons.print_outlined, size: context.iconSize),
             padding: const EdgeInsets.all(8),
             constraints: const BoxConstraints(),

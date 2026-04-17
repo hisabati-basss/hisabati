@@ -92,6 +92,11 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                 ]),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(Icons.close, color: context.mutedText),
+            ),
           ]),
         ),
         const SizedBox(height: 12),

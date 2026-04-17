@@ -25,7 +25,7 @@ class PerformanceManager {
       }
     } catch (e) {
       // Graceful fallback if device info fails
-      print("Performance Optimization failed: $e");
+      debugPrint("Performance Optimization failed: $e");
     }
   }
 

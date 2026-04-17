@@ -6,7 +6,7 @@ import 'database_helper.dart';
 
 enum SyncStatus { idle, syncing, success, error, offline }
 
-/// SQLite → Supabase Incremental Dirty-Bit Sync Engine
+/// SQLite ? Supabase Incremental Dirty-Bit Sync Engine
 /// Replaces the old Isar-based sync with direct SQLite queries.
 class SyncService with ChangeNotifier {
   static final SyncService _instance = SyncService._internal();
@@ -21,7 +21,7 @@ class SyncService with ChangeNotifier {
   int _pendingCount = 0;
   int get pendingCount => _pendingCount;
 
-  String _lastSyncInfo = "لم يتم المزامنة بعد";
+  String _lastSyncInfo = "?? ??? ???????? ???";
   String get lastSyncInfo => _lastSyncInfo;
 
   Timer? _autoSyncTimer;
@@ -176,10 +176,10 @@ class SyncService with ChangeNotifier {
 
       _status = SyncStatus.success;
       _lastSyncInfo =
-          "آخر مزامنة: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}";
+          "??? ??????: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}";
     } catch (e) {
       _status = SyncStatus.error;
-      _lastSyncInfo = "خطأ في المزامنة";
+      _lastSyncInfo = "??? ?? ????????";
       debugPrint('Sync Error: $e');
     } finally {
       await refreshPendingCount();

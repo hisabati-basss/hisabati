@@ -235,7 +235,7 @@ class _AiCenterDockState extends State<AiCenterDock> with TickerProviderStateMix
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: Text(
-                    _controller.isThinking ? "جاري التفكير..." : (_controller.messages.isNotEmpty ? _controller.messages.first.text : "أهلاً بك يا سيدي..."),
+                    _controller.isThinking ? tr('common.thinking') : (_controller.messages.isNotEmpty ? _controller.messages.first.text : tr('screens.ai_welcome')),
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.6,

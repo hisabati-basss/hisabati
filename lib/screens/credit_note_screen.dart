@@ -1,9 +1,8 @@
-// lib/screens/credit_note_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import '../services/database_helper.dart';
 import '../core/accounting/accounting_engine.dart';
 import '../theme/app_theme_extension.dart';
+import '../core/config/app_constants.dart';
 
 class CreditNoteScreen extends StatefulWidget {
   const CreditNoteScreen({super.key});
@@ -47,203 +46,193 @@ class _CreditNoteScreenState extends State<CreditNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
-      body: Stack(
-        children: [
-          // Background Gradient
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.primary.withOpacity(0.05),
-                    theme.colorScheme.surface,
-                    theme.colorScheme.secondary.withOpacity(0.05),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.all(context.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  SizedBox(height: context.sectionPadding),
-                  Expanded(
-                    child: _isLoading 
-                      ? const Center(child: CircularProgressIndicator())
-                      : _notes.isEmpty 
-                        ? _buildEmptyState(theme)
-                        : _buildNotesList(context, theme),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateDialog(context),
-        label: const Text('إشعار دائن جديد', style: TextStyle(fontWeight: FontWeight.bold)),
-        icon: const Icon(Icons.add_chart),
-        backgroundColor: theme.colorScheme.primary,
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
+      backgroundColor: context.bgSurface,
+      appBar: AppBar(
+        backgroundColor: context.bgSurface,
+        elevation: 0,
+        leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new),
+          icon: Icon(Icons.arrow_back_ios_new, color: context.textColor),
         ),
-        Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'الإشعارات الدائنة',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onBackground,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: context.textColor),
             ),
             Text(
               'إدارة مرتجعات المبيعات والتسويات الضريبية',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-              ),
+              style: TextStyle(color: context.mutedText, fontSize: 11),
             ),
           ],
         ),
-      ],
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryOrange))
+        : _notes.isEmpty 
+          ? _buildEmptyState(context)
+          : ListView.builder(
+              padding: EdgeInsets.all(context.sectionPadding),
+              itemCount: _notes.length,
+              itemBuilder: (context, index) => _buildNoteCard(context, _notes[index]),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreateDialog(context),
+        label: const Text('إشعار دائن جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        icon: const Icon(Icons.assignment_return, color: Colors.white),
+        backgroundColor: Colors.orange.shade700,
+      ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.assignment_return_outlined, size: 80, color: theme.colorScheme.primary.withOpacity(0.2)),
+          Icon(Icons.assignment_return_outlined, size: 80, color: context.mutedText.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'لا توجد إشعارات دائنة حالياً',
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onBackground.withOpacity(0.5)),
+            style: TextStyle(color: context.mutedText, fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'استخدم الإشعارات الدائنة لتوثيق مرتجعات المبيعات',
+            style: TextStyle(color: context.mutedText.withValues(alpha: 0.6), fontSize: 13),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotesList(BuildContext context, ThemeData theme) {
-    return ListView.builder(
-      itemCount: _notes.length,
-      itemBuilder: (context, index) {
-        final note = _notes[index];
-        return Container(
-          margin: EdgeInsets.only(bottom: context.cardPadding),
+  Widget _buildNoteCard(BuildContext context, Map<String, dynamic> note) {
+    final statusColor = note['status'] == 'posted' ? Colors.green : Colors.orange;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(context.cardRadius),
-            border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+            color: Colors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(context.cardRadius),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: ListTile(
-                contentPadding: EdgeInsets.all(context.cardPadding),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'إشعار رقم: ${note['id']}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    _buildStatusChip(note['status'], theme),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text('العميل: ${note['client_id']}'),
-                    Text('السبب: ${note['reason']}'),
-                    Text('التاريخ: ${note['date'].toString().split('T')[0]}'),
-                  ],
-                ),
-                trailing: Text(
-                  '${note['amount']} ر.س',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+          child: const Icon(Icons.undo_rounded, color: Colors.orange),
+        ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'إشعار رقم: ${note['id'].toString().substring(0, 8)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
+            _buildStatusChip(note['status'], statusColor),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text('العميل: ${note['client_id']}'),
+            const SizedBox(height: 2),
+            Text('السبب: ${note['reason'] ?? 'غير محدد'}', style: TextStyle(color: context.mutedText, fontSize: 12)),
+          ],
+        ),
+        trailing: Text(
+          '${(note['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'} ر.س',
+          style: TextStyle(
+            color: Colors.orange.shade800,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildStatusChip(String status, ThemeData theme) {
+  Widget _buildStatusChip(String? status, Color color) {
     bool isPosted = status == 'posted';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isPosted ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isPosted ? Colors.green : Colors.orange, width: 0.5),
+        border: Border.all(color: color, width: 0.5),
       ),
       child: Text(
         isPosted ? 'تم الترحيل' : 'مسودة',
-        style: TextStyle(
-          color: isPosted ? Colors.green : Colors.orange,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
   }
 
   void _showCreateDialog(BuildContext context) {
-    // Specialized dialog for creating credit notes
-    // In a real app, we'd have a full form screen. 
-    // For Phase 12 completion, I'll provide a simplified mock interaction.
+    final invoiceIdCtrl = TextEditingController();
+    final clientIdCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إصدار إشعار دائن'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(decoration: InputDecoration(labelText: 'رقم الفاتورة الأصلية')),
-            TextField(decoration: InputDecoration(labelText: 'المبلغ المسترد')),
-            TextField(decoration: InputDecoration(labelText: 'سبب الارتجاع')),
-          ],
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('إصدار إشعار دائن', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: clientIdCtrl, decoration: const InputDecoration(labelText: 'معرف العميل', prefixIcon: Icon(Icons.person))),
+              const SizedBox(height: 12),
+              TextField(controller: invoiceIdCtrl, decoration: const InputDecoration(labelText: 'رقم الفاتورة الأصلية', prefixIcon: Icon(Icons.receipt))),
+              const SizedBox(height: 12),
+              TextField(controller: amountCtrl, decoration: const InputDecoration(labelText: 'المبلغ المسترد', prefixIcon: Icon(Icons.money)), keyboardType: TextInputType.number),
+              const SizedBox(height: 12),
+              TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: 'سبب الارتجاع', prefixIcon: Icon(Icons.info_outline))),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: TextStyle(color: context.mutedText))),
           ElevatedButton(
             onPressed: () async {
-              // Call engine.processCreditNote(...)
-              Navigator.pop(context);
-              _loadNotes();
+              if (clientIdCtrl.text.isEmpty || amountCtrl.text.isEmpty) return;
+              
+              final success = await _engine.processCreditNote(
+                invoiceId: invoiceIdCtrl.text,
+                clientId: clientIdCtrl.text,
+                amount: double.tryParse(amountCtrl.text) ?? 0,
+                reason: reasonCtrl.text,
+                items: [], // Simplified for now
+                returnToStock: false,
+              );
+
+              if (success && mounted) {
+                Navigator.pop(ctx);
+                _loadNotes();
+              }
             }, 
-            child: const Text('ترحيل')
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('ترحيل الإشعار', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
           ),
         ],
       ),
     );
   }
 }
+

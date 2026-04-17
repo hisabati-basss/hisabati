@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'database_helper.dart';
 import 'sync_service.dart';
@@ -7,13 +8,13 @@ class ChequeService {
   final Uuid _uuid = const Uuid();
 
   // Status definitions
-  static const String STATUS_PENDING = 'تحت التحصيل';
-  static const String STATUS_CLEARED = 'محصل';
-  static const String STATUS_BOUNCED = 'مرفوض';
+  static const String STATUS_PENDING = 'pending';
+  static const String STATUS_CLEARED = 'cleared';
+  static const String STATUS_BOUNCED = 'bounced';
 
   // Type definitions
-  static const String TYPE_RECEIVABLE = 'وارد'; // Got from client
-  static const String TYPE_PAYABLE = 'صادر'; // Gave to supplier
+  static const String TYPE_RECEIVABLE = 'receivable'; // Got from client
+  static const String TYPE_PAYABLE = 'payable'; // Gave to supplier
 
   /// Adds a new cheque and automatically generates the Journal Entry.
   Future<String> addCheque({
@@ -38,7 +39,7 @@ class ChequeService {
     await db.insert('journal_entries', {
       'id': entryId,
       'date': issueDate.toIso8601String(),
-      'description': 'إثبات شيك $type رقم $chequeNumber - $partnerName',
+      'description': 'شيك \${type == TYPE_RECEIVABLE ? "وارد" : "صادر"} رقم \$chequeNumber - \$partnerName',
       'reference_id': chequeId,
       'sync_status': 0,
       'updated_at': nowStr,
@@ -137,7 +138,7 @@ class ChequeService {
      await db.insert('journal_entries', {
        'id': entryId,
        'date': nowStr,
-       'description': 'تحصيل شيك $type رقم $chequeNum بالبنك - $partnerName',
+       'description': 'تحصيل شيك \${type == TYPE_RECEIVABLE ? "وارد" : "صادر"} رقم \$chequeNum - \$partnerName',
        'reference_id': chequeId,
        'sync_status': 0,
        'updated_at': nowStr,
@@ -226,3 +227,4 @@ class ChequeService {
     };
   }
 }
+

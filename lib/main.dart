@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:hisabati_app/services/module_config_service.dart';
 import 'package:hisabati_app/services/industry_provider.dart';
 import 'package:hisabati_app/services/ai_chat_controller.dart';
@@ -82,6 +84,20 @@ import 'screens/purchase_order_screen.dart';
 import 'screens/recurring_invoices_screen.dart';
 import 'screens/aging_report_screen.dart';
 import 'screens/fiscal_year_screen.dart';
+import 'package:hisabati_app/screens/monitoring_control_screen.dart';
+import 'package:hisabati_app/screens/invoice_audit_screen.dart';
+import 'package:hisabati_app/screens/cash_flow_statement_screen.dart';
+import 'package:hisabati_app/screens/quick_statements_screen.dart';
+import 'package:hisabati_app/screens/joint_ventures_screen.dart';
+import 'package:hisabati_app/screens/expense_management_screen.dart';
+import 'package:hisabati_app/screens/cost_accounting_screen.dart';
+import 'package:hisabati_app/screens/subscriptions_screen.dart';
+import 'screens/bank_reconciliation_screen.dart';
+import 'screens/currency_center_screen.dart';
+import 'screens/recurring_transactions_screen.dart';
+
+
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -147,6 +163,9 @@ class _HisabatiAppState extends State<HisabatiApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    
+    // Auto-process recurring transactions on startup
+    DatabaseHelper().processRecurringTransactions();
 
     // 🛡️ Auto-Entry Booster: Re-check onboarding whenever auth state changes
     AuthService().onAuthStateChange.listen((data) {
@@ -285,7 +304,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       } catch (_) {
         role = UserRole.admin; // Default to admin for now
       }
-      PermissionService().setRole(role);
+      PermissionService().setUserContext(
+        user.id,
+        roleStr,
+        user.userMetadata?['permissions']?.toString(),
+        user.userMetadata?['branch_id']?.toString(),
+      );
       AuditService.log(action: 'login', entityType: 'user', entityId: user.id);
     }
     
@@ -428,6 +452,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         return CustodyScreen(isMobile: isMobile);
       case 29:
         return const SecurityAuditScreen();
+      case 30:
+        return const SubscriptionsScreen();
       case 31:
         return const RealEstateScreen();
       case 32:
@@ -454,6 +480,27 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         return const AgingReportScreen();
       case 46:
         return const FiscalYearScreen();
+      case 47:
+        return const MonitoringControlScreen();
+      case 48:
+        return const InvoiceAuditScreen();
+      case 49:
+        return const CashFlowStatementScreen();
+      case 50:
+        return const QuickStatementsScreen();
+      case 51:
+        return const JointVenturesScreen();
+      case 52:
+        return const ExpenseManagementScreen();
+      case 53:
+        return const CostAccountingScreen();
+      case 54:
+        return const BankReconciliationScreen();
+      case 55:
+        return const CurrencyCenterScreen();
+      case 56:
+        return const RecurringTransactionsScreen();
+
       case 100:
         return HubScreen(
           onNavigate: (index) => setState(() => _selectedIndex = index),
@@ -901,18 +948,18 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   ),
                 if (PermissionService().isVisible('purchases'))
                   _buildAnimatedNavItem(
-                    1,
+                    16,
                     Icons.document_scanner,
                     tr('sidebar.purchases'),
                   ),
                 if (PermissionService().isVisible('taxes'))
                   _buildAnimatedNavItem(
-                    2,
+                    3,
                     Icons.receipt_long,
                     tr('sidebar.taxes'),
                   ),
                 if (PermissionService().isVisible('hr'))
-                  _buildAnimatedNavItem(3, Icons.people, tr('sidebar.hr')),
+                  _buildAnimatedNavItem(4, Icons.people, tr('sidebar.hr')),
                 _buildAnimatedNavItem(
                   100,
                   Icons.apps,
@@ -1200,7 +1247,7 @@ class SidebarWidget extends StatelessWidget {
       builder: (context, showBlur, _) {
         final double blur = showBlur ? 40 : 0;
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
           child: Column(
             children: [
               // 🤖 AI Floating Orb tightly coupled to Capsule
@@ -1253,7 +1300,7 @@ class SidebarWidget extends StatelessWidget {
                               opacity: isExpanded ? 1.0 : 0.0,
                               duration: const Duration(milliseconds: 300),
                               child: Text(
-                                "الذكاء Мالي (HBASSS)",
+                                "الذكاء المالي (HBASSS)",
                                 style: TextStyle(
                                   color: selectedIndex == 0 ? Colors.black87 : (isDark ? Colors.white : Colors.black87),
                                   fontWeight: FontWeight.bold,
@@ -1271,74 +1318,84 @@ class SidebarWidget extends StatelessWidget {
 
               Expanded(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(100),
+                  borderRadius: BorderRadius.circular(40),
                   child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                    filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       curve: Curves.easeInOutCubic,
-                      width: isExpanded ? 220 : 76, // Apple-style fluid expansion while maintaining capsule
+                      width: isExpanded ? 230 : 80,
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.black.withValues(alpha: 0.03),
+                        color: isDark 
+                            ? const Color(0xFF1E1E1E).withValues(alpha: 0.4)
+                            : Colors.white.withValues(alpha: 0.5),
                         border: Border.all(
-                          color: context.cardBorder.withValues(alpha: 0.2),
+                          color: context.cardBorder.withValues(alpha: 0.4),
+                          width: 1,
                         ),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 12),
-                          // Toggle and Search Area
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: isExpanded ? 24 : 0),
-                            child: isExpanded
-                                ? Row(
-                                    children: [
-                                      Expanded(
-                                        child: SizedBox(
-                                          height: 40,
-                                          child: TextField(
-                                            style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13),
-                                            decoration: InputDecoration(
-                                              hintText: "بحث...",
-                                              hintStyle: TextStyle(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.4)),
-                                              prefixIcon: const Icon(Icons.search, size: 18, color: AppConstants.primaryOrange),
-                                              contentPadding: EdgeInsets.zero,
-                                              filled: true,
-                                              fillColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: const Icon(Icons.keyboard_double_arrow_right, color: Colors.white54, size: 20),
-                                        onPressed: onToggle,
-                                      ),
-                                    ],
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.menu, color: Colors.white54),
-                                    onPressed: onToggle,
-                                  ),
-                          ),
-                          if (isExpanded) const Divider(color: Colors.white12, height: 24, indent: 24, endIndent: 24),
-                          
-                          // Scrollable Items
-                          Expanded(
-                            child: SingleChildScrollView(
-                              physics: const BouncingScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(vertical: 0),
-                              child: Column(children: _buildSidebarItems(context)),
-                            ),
+                        borderRadius: BorderRadius.circular(40),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 15,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      // Toggle and Search Area
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: isExpanded ? 16 : 0),
+                        child: isExpanded
+                            ? Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: TextField(
+                                        style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13),
+                                        decoration: InputDecoration(
+                                            hintText: "بحث...",
+                                            hintStyle: TextStyle(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.4)),
+                                            prefixIcon: const Icon(Icons.search, size: 18, color: AppConstants.primaryOrange),
+                                            contentPadding: EdgeInsets.zero,
+                                            filled: true,
+                                            fillColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(Icons.keyboard_double_arrow_right, color: AppConstants.primaryOrange, size: 22),
+                                    onPressed: onToggle,
+                                    tooltip: "طي القائمة",
+                                  ),
+                                ],
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.menu, color: AppConstants.primaryOrange),
+                                onPressed: onToggle,
+                                tooltip: "توسيع القائمة",
+                              ),
+                      ),
+                      if (isExpanded) const Divider(color: Colors.black12, height: 24, indent: 24, endIndent: 24),
+                      
+                      // Scrollable Items
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          child: Column(children: _buildSidebarItems(context)),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+              ),
                 ),
               ),
             ],
@@ -1375,131 +1432,92 @@ class SidebarWidget extends StatelessWidget {
     final cfg = ModuleConfigService();
     List<Widget> items = [];
 
-    // 1️⃣ MAIN / الرئيسية
-    items.add(_buildSectionHeader(tr('sidebar.group.main')));
-    items.add(
-      _buildAnimatedNavItem(
-        context,
-        1,
-        Icons.dashboard_rounded,
-        tr('sidebar.dashboard'),
-      ),
-    );
+    // 1️⃣ الرئيسية (Dashboard)
+    items.add(_buildSectionHeader('الرئيسية'));
+    items.add(_buildAnimatedNavItem(context, 1, Icons.dashboard_rounded, 'لوحة القيادة'));
+    items.add(_buildAnimatedNavItem(context, 24, Icons.insert_chart, 'المؤشرات المالية (BI)'));
 
-    // 2️⃣ FINANCE & ACCOUNTING / المالية والمحاسبة
-    if (cfg.isModuleActive('accounting')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.finance')));
-      items.add(
-        _buildAnimatedNavItem(context, 2, Icons.account_balance_wallet, tr('sidebar.accounts')),
-      );
-      items.add(
-        _buildAnimatedNavItem(context, 3, Icons.calculate, tr('sidebar.taxes_short')),
-      );
-      items.add(
-        _buildAnimatedNavItem(context, 5, Icons.fact_check, tr('sidebar.financial_audit')),
-      );
-      items.add(
-        _buildAnimatedNavItem(context, 32, Icons.trending_up, tr('sidebar.investments')),
-      );
-      if (cfg.isModuleActive('financial_reports')) {
-        items.add(
-          _buildAnimatedNavItem(context, 9, Icons.bar_chart, tr('sidebar.financial_reports')),
-        );
-      }
-      if (cfg.isModuleActive('trial_balance')) {
-        items.add(
-          _buildAnimatedNavItem(context, 35, Icons.balance, tr('sidebar.trial_balance')),
-        );
+    // 2️⃣ المالية والنقدية (Finance & Banking)
+    items.add(_buildSectionHeader('المالية والنقدية'));
+    items.add(_buildAnimatedNavItem(context, 18, Icons.account_balance_wallet, 'البنوك والصندوق'));
+    items.add(_buildAnimatedNavItem(context, 49, Icons.water_drop, 'التدفق النقدي'));
+    items.add(_buildAnimatedNavItem(context, 28, Icons.monetization_on, 'العهد والسلف'));
+    items.add(_buildAnimatedNavItem(context, 54, Icons.account_balance, 'التسوية البنكية'));
+    items.add(_buildAnimatedNavItem(context, 55, Icons.currency_exchange, 'مركز العملات'));
+    items.add(_buildAnimatedNavItem(context, 27, Icons.payments, 'الشيكات'));
+
+    // 3️⃣ المبيعات والعملاء (Sales & CRM)
+    items.add(_buildSectionHeader('المبيعات والعملاء'));
+    items.add(_buildAnimatedNavItem(context, 33, Icons.storefront, 'الفواتير وعروض الأسعار'));
+    items.add(_buildAnimatedNavItem(context, 21, Icons.point_of_sale, 'نقاط البيع (POS)'));
+    items.add(_buildAnimatedNavItem(context, 50, Icons.speed, 'كشوفات سريعة'));
+    if (cfg.isModuleActive('sales_commissions')) {
+      items.add(_buildAnimatedNavItem(context, 37, Icons.request_quote, 'العمولات'));
+    }
+
+    // 4️⃣ المشتريات والموردين (Purchases)
+    items.add(_buildSectionHeader('المشتريات والموردين'));
+    items.add(_buildAnimatedNavItem(context, 43, Icons.shopping_cart_checkout, 'أوامر الشراء'));
+    items.add(_buildAnimatedNavItem(context, 16, Icons.shopping_basket, 'فواتير الموردين'));
+    items.add(_buildAnimatedNavItem(context, 17, Icons.business, 'دليل الموردين'));
+    items.add(_buildAnimatedNavItem(context, 52, Icons.receipt_long, 'المصروفات'));
+
+    // 5️⃣ المخزون والإنتاج (Inventory & Production)
+    if (cfg.isModuleActive('inventory')) {
+      items.add(_buildSectionHeader('المخزون والإنتاج'));
+      items.add(_buildAnimatedNavItem(context, 10, Icons.inventory_2, 'إدارة المستودعات'));
+      items.add(_buildAnimatedNavItem(context, 19, Icons.warehouse, 'جرد المخزون'));
+      items.add(_buildAnimatedNavItem(context, 38, Icons.event_busy, 'صلاحية المنتجات'));
+      if (cfg.isModuleActive('hub_industrial')) {
+        items.add(_buildAnimatedNavItem(context, 25, Icons.precision_manufacturing, 'عمليات التصنيع'));
+        items.add(_buildAnimatedNavItem(context, 26, Icons.build_circle, 'تركيبات (BOM)'));
       }
     }
 
-    // 3️⃣ SALES & PURCHASES / المبيعات والمشتريات
-    if (cfg.isModuleActive('hub_commercial') || cfg.isModuleActive('sales_purchase') || cfg.isModuleActive('purchases')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.sales')));
-      if (cfg.isModuleActive('hub_commercial')) {
-        items.add(_buildAnimatedNavItem(context, 33, Icons.storefront, tr('sidebar.commercial')));
-        items.add(_buildAnimatedNavItem(context, 21, Icons.point_of_sale, tr('sidebar.pos')));
-      }
-      if (cfg.isModuleActive('purchases')) {
-        items.add(_buildAnimatedNavItem(context, 16, Icons.shopping_basket, tr('sidebar.purchases')));
-        items.add(_buildAnimatedNavItem(context, 17, Icons.business, tr('sidebar.suppliers')));
-        items.add(_buildAnimatedNavItem(context, 43, Icons.shopping_cart_checkout, tr('sidebar.purchase_orders')));
-      }
-      if (cfg.isModuleActive('accounting')) {
-        items.add(_buildAnimatedNavItem(context, 41, Icons.assignment_return, tr('sidebar.credit_returns')));
-        items.add(_buildAnimatedNavItem(context, 42, Icons.outbox_rounded, tr('sidebar.debit_returns')));
-        items.add(_buildAnimatedNavItem(context, 44, Icons.autorenew, tr('sidebar.recurring_invoices')));
-        items.add(_buildAnimatedNavItem(context, 45, Icons.timer_outlined, tr('sidebar.aging_report')));
-      }
-    }
-
-    // 4️⃣ INVENTORY & WAREHOUSES / المخازن والمستودعات
-    if (cfg.isModuleActive('inventory') || cfg.isModuleActive('erp_management')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.inventory')));
-      items.add(_buildAnimatedNavItem(context, 10, Icons.inventory_2, tr('sidebar.inventory')));
-      items.add(_buildAnimatedNavItem(context, 19, Icons.warehouse, tr('sidebar.warehouses')));
-      if (cfg.isModuleActive('expiry_control') || cfg.isModuleActive('expiry')) {
-        items.add(_buildAnimatedNavItem(context, 38, Icons.event_busy, tr('sidebar.expiry')));
-      }
-    }
-
-    // 5️⃣ HUMAN RESOURCES / الموارد البشرية
-    if (cfg.isModuleActive('hr') || cfg.isModuleActive('hr_payroll')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.hr')));
-      items.add(_buildAnimatedNavItem(context, 4, Icons.people, tr('sidebar.hr')));
-      items.add(_buildAnimatedNavItem(context, 40, Icons.forum, tr('sidebar.team_chat')));
-    }
-
-    // 6️⃣ OPERATIONS / إدارة العمليات
-    if (cfg.isModuleActive('projects') || cfg.isModuleActive('budgeting') || cfg.isModuleActive('real_estate') || cfg.isModuleActive('maintenance')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.operations')));
+    // 6️⃣ المشاريع والأصول (Projects & Assets)
+    if (cfg.isModuleActive('projects') || cfg.isModuleActive('real_estate') || cfg.isModuleActive('maintenance')) {
+      items.add(_buildSectionHeader('المشاريع والأصول'));
       if (cfg.isModuleActive('projects')) {
-        items.add(_buildAnimatedNavItem(context, 11, Icons.assignment, tr('sidebar.projects')));
-      }
-      if (cfg.isModuleActive('budgeting')) {
-        items.add(_buildAnimatedNavItem(context, 22, Icons.pie_chart, tr('sidebar.budget_setup')));
-        items.add(_buildAnimatedNavItem(context, 23, Icons.insights, tr('sidebar.budget_monitor')));
+        items.add(_buildAnimatedNavItem(context, 11, Icons.assignment, 'إدارة المشاريع'));
       }
       if (cfg.isModuleActive('real_estate')) {
-        items.add(_buildAnimatedNavItem(context, 31, Icons.domain, tr('sidebar.real_estate')));
+        items.add(_buildAnimatedNavItem(context, 31, Icons.domain, 'العقارات والمقاولات'));
       }
       if (cfg.isModuleActive('maintenance')) {
-        items.add(_buildAnimatedNavItem(context, 36, Icons.build, tr('sidebar.maintenance')));
+        items.add(_buildAnimatedNavItem(context, 36, Icons.build, 'صيانة الأصول'));
       }
+      items.add(_buildAnimatedNavItem(context, 14, Icons.category, 'سجل الأصول'));
     }
 
-    // 7️⃣ PRODUCTION & MANUFACTURING / الإنتاج والتصنيع
-    if (cfg.isModuleActive('hub_industrial')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.manufacturing')));
-      items.add(_buildAnimatedNavItem(context, 15, Icons.hub, tr('sidebar.industrial_hub')));
-      items.add(_buildAnimatedNavItem(context, 25, Icons.precision_manufacturing, tr('sidebar.manufacturing')));
-      items.add(_buildAnimatedNavItem(context, 26, Icons.build_circle, tr('sidebar.bom')));
+    // 7️⃣ الموارد البشرية (HR & Payroll)
+    if (cfg.isModuleActive('hr')) {
+      items.add(_buildSectionHeader('الموارد البشرية'));
+      items.add(_buildAnimatedNavItem(context, 4, Icons.people, 'شؤون الموظفين والرواتب'));
+      items.add(_buildAnimatedNavItem(context, 40, Icons.forum, 'تواصل الفريق'));
     }
 
-    // 8️⃣ ADVANCED FINANCE / المالية المتقدمة
+    // 8️⃣ المحاسبة والتدقيق (Accounting & Audit)
     if (cfg.isModuleActive('accounting')) {
-      items.add(_buildSectionHeader(tr('sidebar.group.advanced_finance')));
-      items.add(_buildAnimatedNavItem(context, 18, Icons.account_balance, tr('sidebar.banks_vaults')));
-      items.add(_buildAnimatedNavItem(context, 27, Icons.payments, tr('sidebar.cheques')));
-      if (cfg.isModuleActive('sales_commissions')) {
-        items.add(_buildAnimatedNavItem(context, 37, Icons.monetization_on, tr('sidebar.commissions')));
-      }
-      if (cfg.isModuleActive('accounting')) {
-        items.add(_buildAnimatedNavItem(context, 6, Icons.analytics, tr('sidebar.feasibility')));
-        items.add(_buildAnimatedNavItem(context, 46, Icons.calendar_month, tr('sidebar.fiscal_year')));
-      }
+      items.add(_buildSectionHeader('المحاسبة والتدقيق'));
+      items.add(_buildAnimatedNavItem(context, 2, Icons.account_balance_wallet, 'الدليل والقيود'));
+      items.add(_buildAnimatedNavItem(context, 56, Icons.auto_mode, 'قيود متكررة'));
+      items.add(_buildAnimatedNavItem(context, 35, Icons.balance, 'ميزان المراجعة'));
+      items.add(_buildAnimatedNavItem(context, 5, Icons.fact_check, 'كشف التلاعب (Fraud)'));
+      items.add(_buildAnimatedNavItem(context, 48, Icons.fact_check, 'تدقيق الفواتير'));
+      items.add(_buildAnimatedNavItem(context, 46, Icons.calendar_month, 'إغلاق السنة المالية'));
     }
 
-    // 9️⃣ SYSTEM / النظام
-    items.add(_buildSectionHeader(tr('sidebar.group.system')));
-    if (cfg.isModuleActive('cloud_inbox') || cfg.isModuleActive('purchases')) {
-      items.add(_buildAnimatedNavItem(context, 20, Icons.cloud_queue, tr('sidebar.cloud_inbox')));
-    }
-    if (cfg.isModuleActive('auditing')) {
-      items.add(_buildAnimatedNavItem(context, 29, Icons.security, tr('sidebar.security')));
-    }
-    items.add(_buildAnimatedNavItem(context, 100, Icons.apps, tr('sidebar.hub')));
-    items.add(_buildAnimatedNavItem(context, 12, Icons.settings, tr('sidebar.settings_general')));
+    // 9️⃣ التقارير (Reports)
+    items.add(_buildSectionHeader('التقارير'));
+    items.add(_buildAnimatedNavItem(context, 9, Icons.bar_chart, 'القوائم المالية'));
+    items.add(_buildAnimatedNavItem(context, 3, Icons.calculate, 'التقارير الضريبية'));
+    items.add(_buildAnimatedNavItem(context, 45, Icons.timer_outlined, 'أعمار الديون'));
+
+    // 🔟 الإعدادات (Settings)
+    items.add(_buildSectionHeader('الإعدادات'));
+    items.add(_buildAnimatedNavItem(context, 7, Icons.manage_accounts, 'المستخدمون والصلاحيات'));
+    items.add(_buildAnimatedNavItem(context, 29, Icons.security, 'سجل النظام'));
+    items.add(_buildAnimatedNavItem(context, 12, Icons.settings, 'إعدادات المنشأة'));
 
     items.add(const SizedBox(height: 20));
     items.add(_buildSyncSidebarItem(context));
@@ -1724,19 +1742,43 @@ class TopBarWidget extends StatefulWidget {
 }
 
 class _TopBarWidgetState extends State<TopBarWidget> {
-  String selectedBranch = tr('branches.riyadh');
-  final List<String> branches = [
-    tr('branches.riyadh'),
-    tr('branches.jeddah'),
-    tr('branches.dubai'),
-    tr('branches.cairo'),
-    tr('branches.london'),
-    tr('branches.new_york'),
-    tr('branches.paris'),
-    tr('branches.tokyo'),
-    tr('branches.beijing'),
-  ];
+  String selectedBranch = '';
+  List<String> branches = [];
   String selectedCurrency = 'SAR';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // tr() must be called with context available — do it here not at field init
+    if (selectedBranch.isEmpty) {
+      selectedBranch = tr('branches.main');
+      branches = [tr('branches.main')];
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final contextData = await DatabaseHelper().getCurrentCompanyContext();
+      final companyName = contextData['company_name'] ?? tr('branches.main');
+      
+      // Load actual branches (cost_centers) from DB
+      final costCenters = await DatabaseHelper().getCostCenters();
+      final branchNames = costCenters.map((cc) => cc['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+      
+      if (mounted) {
+        setState(() {
+          selectedBranch = companyName.toString();
+          branches = [companyName.toString(), ...branchNames];
+        });
+      }
+    } catch (_) {}
+  }
 
   Widget _buildGlassButton(
     BuildContext context,
@@ -1806,7 +1848,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
             final String displayName =
                 metadata?['full_name']?.split(' ')[0] ??
                 metadata?['name']?.split(' ')[0] ??
-                'المدير';
+                tr('topbar.default_name');
 
             return _buildExpandingMenu(
               context,
@@ -1853,7 +1895,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                 _buildMenuActionItem(
                   context,
                   icon: Icons.person_outline,
-                  title: 'الملف الشخصي',
+                  title: context.tr('topbar.profile'),
                   onTap: () {
                     widget.onActiveIndexChanged(null);
                     widget.onNavigate(100);
@@ -1862,7 +1904,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                 _buildMenuActionItem(
                   context,
                   icon: Icons.settings_outlined,
-                  title: 'إعدادات الحساب',
+                  title: context.tr('topbar.account_settings'),
                   onTap: () {
                     widget.onActiveIndexChanged(null);
                     widget.onNavigate(12);
@@ -1872,7 +1914,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                 _buildMenuActionItem(
                   context,
                   icon: Icons.logout,
-                  title: 'تسجيل الخروج',
+                  title: context.tr('topbar.logout'),
                   color: Colors.redAccent,
                   onTap: () async {
                     final confirmed = await showDialog<bool>(
@@ -1883,21 +1925,21 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                           borderRadius: BorderRadius.circular(24),
                           side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
                         ),
-                        title: const Row(
+                        title: Row(
                           children: [
-                            Icon(Icons.logout, color: Colors.redAccent),
-                            SizedBox(width: 12),
-                            Text('تسجيل الخروج', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Icon(Icons.logout, color: Colors.redAccent),
+                            const SizedBox(width: 12),
+                            Text(ctx.tr('topbar.logout'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                           ],
                         ),
-                        content: const Text(
-                          'هل أنت متأكد أنك تريد تسجيل الخروج من حسابك؟\nسيتم إغلاق جلستك وستحتاج لتسجيل الدخول مرة أخرى.',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        content: Text(
+                          ctx.tr('topbar.logout_confirm'),
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+                            child: Text(ctx.tr('common.cancel'), style: const TextStyle(color: Colors.white54)),
                           ),
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
@@ -1907,7 +1949,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                             ),
                             onPressed: () => Navigator.pop(ctx, true),
                             icon: const Icon(Icons.logout, size: 18),
-                            label: const Text('تسجيل الخروج', style: TextStyle(fontWeight: FontWeight.bold)),
+                            label: Text(ctx.tr('topbar.logout'), style: const TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ),
@@ -1973,7 +2015,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
                               Icon(Icons.notifications_off_outlined, color: context.mutedText, size: 32),
                               const SizedBox(height: 8),
                               Text(
-                                "لا توجد تنبيهات حالياً",
+                                tr('topbar.no_notifications'),
                                 style: TextStyle(color: context.mutedText, fontSize: 13),
                               ),
                             ],
@@ -2148,8 +2190,8 @@ class _TopBarWidgetState extends State<TopBarWidget> {
       builder: (context, showBlur, _) {
         final double blur = showBlur ? 50 : 0;
         final res = SizedBox(
-          width: baseWidth,
-          height: baseHeight,
+          width: isExpanded ? width : baseWidth,
+          height: isExpanded ? null : baseHeight,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.centerLeft,
@@ -2157,6 +2199,7 @@ class _TopBarWidgetState extends State<TopBarWidget> {
               Positioned(
                 top: 0,
                 left: 0,
+                right: isNotif ? null : 0,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 500),
                   curve: Curves.easeInOutQuart,

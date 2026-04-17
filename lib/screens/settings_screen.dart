@@ -26,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _selectedLanguage = "العربية";
   String _selectedCurrency = "sar";
-  String _selectedCountry = "Saudi Arabia";
+  String _selectedCountry = "saudi";
   double _taxRate = 15.0;
   
   String? _logoPath;
@@ -47,7 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final contextData = await DatabaseHelper().getCurrentCompanyContext();
     setState(() {
       _selectedCurrency = contextData['currency'] ?? "sar";
-      _selectedCountry = contextData['country'] ?? "Saudi Arabia";
+      _selectedCountry = contextData['country'] ?? "saudi";
       _taxRate = contextData['tax_rate'] ?? 15.0;
       _logoPath = contextData['logo_path'];
       _nameController.text = contextData['name'] ?? "";
@@ -172,17 +172,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icon(Icons.arrow_drop_down, color: primaryOrange, size: context.iconSize),
                 style: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold, fontSize: context.bodySize),
                 items: [
-                  "Saudi Arabia", "UAE", "Egypt", "Kuwait", "Jordan", 
-                  "Bahrain", "Oman", "Qatar", "Turkey", "USA", "UK"
-                ].map((c) => DropdownMenuItem(value: c, child: Text(tr('countries.${c.toLowerCase().replaceAll(' ', '_')}') ))).toList(),
+                  "egypt", "saudi", "kuwait", "uae", "jordan", "oman", "qatar", "bahrain", 
+                  "iraq", "lebanon", "morocco", "tunisia", "algeria", "turkey", "usa", "uk"
+                ].map((c) => DropdownMenuItem(value: c, child: Text(tr('onboarding.countries.$c')))).toList(),
                 onChanged: (v) {
                   if (v == null) return;
                   final taxConfig = TaxEngine.getConfigForCountry(v);
                   setState(() {
                     _selectedCountry = v;
                     // Standardized keys mapping
-                    final String key = v.toLowerCase().replaceAll(' ', '_');
-                    if (key == "saudi_arabia") _selectedCurrency = "sar";
+                    final String key = v.toLowerCase();
+                    if (key == "saudi") _selectedCurrency = "sar";
                     else if (key == "uae") _selectedCurrency = "aed";
                     else if (key == "egypt") _selectedCurrency = "egp";
                     else if (key == "kuwait") _selectedCurrency = "kwd";
@@ -190,6 +190,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     else if (key == "usa") _selectedCurrency = "usd";
                     else if (key == "uk") _selectedCurrency = "gbp";
                     else if (key == "jordan") _selectedCurrency = "jod";
+                    else if (key == "oman") _selectedCurrency = "omr";
+                    else if (key == "qatar") _selectedCurrency = "qar";
+                    else if (key == "bahrain") _selectedCurrency = "bhd";
                     
                     _taxRate = taxConfig.standardRate;
                     _taxController.text = _taxRate.toString();

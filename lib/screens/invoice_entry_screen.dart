@@ -42,11 +42,13 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
   bool _isSaving = false;
   String _paymentType = 'cash';
   String? _selectedAccountId;
+  String? _selectedClientId;
   String? _attachmentPath;
   String? _selectedAgentId;
   DateTime? _dueDate;
   String _pickerSearchQuery = "";
   List<Map<String, dynamic>> _salesAgents = [];
+  List<Map<String, dynamic>> _clients = [];
   String _currency = 'SAR';
 
   @override
@@ -69,16 +71,22 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
         _currency = comp['currency_code']?.toString() ?? 'SAR';
       });
     } else {
-      setState(() => _company = {'name': tr('ceo.demo_company'), 'tax_rate': 15.0, 'currency': 'SAR'});
+      setState(() => _company = {'name': tr('ceo.default_company_name'), 'tax_rate': 15.0, 'currency': 'SAR'});
     }
 
     final accs = await db.query('accounts', where: "type = 'asset'");
     List<Map<String, dynamic>> agents = [];
+    List<Map<String, dynamic>> clients = [];
     try { agents = await _db.getSalesAgents(); } catch (_) {}
+    try { clients = await _db.getClients(); } catch (_) {}
     setState(() {
       _cashAccounts = accs;
       _salesAgents = agents;
+      _clients = clients;
       if (accs.isNotEmpty) _selectedAccountId = accs.first['id']?.toString();
+      if (clients.isNotEmpty) {
+        _selectedClientId = clients.firstWhere((c) => c['id'] == 'CL_DEFAULT', orElse: () => clients.first)['id']?.toString();
+      }
     });
   }
 
@@ -549,17 +557,40 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
             ],
           ),
         ),
+        // Client Selector
+        if (_clients.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: DropdownButtonFormField<String>(
+              value: _selectedClientId,
+              decoration: InputDecoration(
+                labelText: tr('sales_module.client'),
+                labelStyle: TextStyle(color: context.mutedText, fontSize: 12),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white24)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white12)),
+              ),
+              dropdownColor: const Color(0xFF1E1E1E),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              items: _clients.map((c) => DropdownMenuItem<String>(
+                value: c['id']?.toString(),
+                child: Text(c['name']?.toString() ?? ''),
+              )).toList(),
+              onChanged: (val) => setState(() => _selectedClientId = val),
+            ),
+          ),
         // Sales Agent Selector (optional)
         if (_salesAgents.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
             child: DropdownButtonFormField<String>(
               value: _selectedAgentId,
               decoration: InputDecoration(
                 labelText: tr('sales_module.invoice_entry.agent_optional'),
                 labelStyle: TextStyle(color: context.mutedText, fontSize: 12),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white24)),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white12)),
               ),
@@ -825,29 +856,78 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedAccountId,
-                          isExpanded: true,
-                          dropdownColor: isDark
-                              ? const Color(0xFF151515)
-                              : Colors.white,
-                          style: TextStyle(
-                            color: context.textColor,
-                            fontSize: 13,
+                      // Payment Type Selector
+                      Row(
+                        children: [
+                          ChoiceChip(
+                            label: Text(tr('sales_module.cash'), style: const TextStyle(fontSize: 10)),
+                            selected: _paymentType == 'cash',
+                            onSelected: (s) => setState(() => _paymentType = 'cash'),
+                            selectedColor: primaryOrange.withValues(alpha: 0.2),
+                            labelStyle: TextStyle(color: _paymentType == 'cash' ? primaryOrange : context.mutedText),
                           ),
-                          items: _cashAccounts
-                              .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: e['id']?.toString(),
-                                  child: Text(e['name']?.toString() ?? ''),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) =>
-                              setState(() => _selectedAccountId = val),
-                        ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: Text(tr('sales_module.credit'), style: const TextStyle(fontSize: 10)),
+                            selected: _paymentType == 'credit',
+                            onSelected: (s) => setState(() => _paymentType = 'credit'),
+                            selectedColor: primaryOrange.withValues(alpha: 0.2),
+                            labelStyle: TextStyle(color: _paymentType == 'credit' ? primaryOrange : context.mutedText),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+                      if (_paymentType == 'cash')
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedAccountId,
+                            isExpanded: true,
+                            dropdownColor: isDark
+                                ? const Color(0xFF151515)
+                                : Colors.white,
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 13,
+                            ),
+                            items: _cashAccounts
+                                .map(
+                                  (e) => DropdownMenuItem<String>(
+                                    value: e['id']?.toString(),
+                                    child: Text(e['name']?.toString() ?? ''),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedAccountId = val),
+                          ),
+                        )
+                      else
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (picked != null) setState(() => _dueDate = picked);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 14, color: primaryOrange),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _dueDate == null 
+                                    ? tr('sales_module.due_date') 
+                                    : _dueDate!.toIso8601String().split('T').first,
+                                  style: const TextStyle(color: primaryOrange, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -892,10 +972,12 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
 
   Future<void> _saveAndPrint() async {
     if (_lines.isEmpty) return;
-    if (_selectedAccountId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('الرجاء اختيار حساب الدفع')));
+    if (_paymentType == 'cash' && _selectedAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('sales_module.invoice_entry.select_account'))));
+      return;
+    }
+    if (_selectedClientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('sales_module.invoice_entry.select_client'))));
       return;
     }
 
@@ -905,7 +987,7 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
       final invoiceId = "INV_${DateTime.now().millisecondsSinceEpoch}";
       final now = DateTime.now().toIso8601String();
       
-      final invoiceLines = _lines.map((l) => {
+      final invoiceLines = _lines.map((l) => <String, dynamic>{
         'name': l.name,
         'quantity': l.quantity,
         'price_at_sale': l.price,
@@ -917,17 +999,19 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
         invoice: {
           'id': invoiceId,
           'issue_date': now,
+          'due_date': _dueDate?.toIso8601String(),
           'subtotal': _subtotal - _discountAmount,
           'tax_amount': _taxAmount,
           'total': _total,
           'payment_type': _paymentType,
+          'client_id': _selectedClientId,
           'sales_agent_id': _selectedAgentId,
         },
-        lines: invoiceLines.map((l) => {
+        lines: invoiceLines.map((l) => <String, dynamic>{
           ...l,
           'invoice_id': invoiceId,
         }).toList(),
-        paymentAccountId: _selectedAccountId,
+        paymentAccountId: _paymentType == 'cash' ? _selectedAccountId : null,
       );
 
       // Generate PDF

@@ -1,9 +1,8 @@
-// lib/screens/purchase_order_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import '../services/database_helper.dart';
 import '../core/accounting/accounting_engine.dart';
 import '../theme/app_theme_extension.dart';
+import '../core/config/app_constants.dart';
 
 class PurchaseOrderScreen extends StatefulWidget {
   const PurchaseOrderScreen({super.key});
@@ -26,11 +25,10 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 
   Future<void> _loadOrders() async {
     try {
-      final db = await _db.database;
-      final res = await db.query('purchase_orders', where: 'is_deleted = 0', orderBy: 'created_at DESC');
+      final res = await _db.getPurchaseOrders();
       if (mounted) {
         setState(() {
-          _orders = res;
+          _orders = res.where((o) => (o['is_deleted'] ?? 0) == 0).toList();
           _isLoading = false;
         });
       }
@@ -48,194 +46,283 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.colorScheme.background,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  colors: [
-                    theme.colorScheme.primary.withOpacity(0.05),
-                    theme.colorScheme.surface,
-                    Colors.blue.withOpacity(0.03),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.all(context.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  SizedBox(height: context.sectionPadding),
-                  Expanded(
-                    child: _isLoading 
-                      ? const Center(child: CircularProgressIndicator())
-                      : _orders.isEmpty 
-                        ? _buildEmptyState(theme)
-                        : _buildOrdersList(context, theme),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {}, // PO Creation Flow
-        label: const Text('أمر شراء جديد', style: TextStyle(fontWeight: FontWeight.bold)),
-        icon: const Icon(Icons.shopping_cart_checkout),
-        backgroundColor: Colors.blueAccent,
-      ),
-    );
-  }
+    final isDark = theme.brightness == Brightness.dark;
 
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
+    return Scaffold(
+      backgroundColor: context.bgSurface,
+      appBar: AppBar(
+        backgroundColor: context.bgSurface,
+        elevation: 0,
+        leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new),
+          icon: Icon(Icons.arrow_back_ios_new, color: context.textColor),
         ),
-        Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'أوامر الشراء',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: context.textColor,
               ),
             ),
             Text(
               'أتمتة الطلبات والتحويل إلى فواتير مشتريات',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+              style: TextStyle(
+                color: context.mutedText,
+                fontSize: 11,
               ),
             ),
           ],
         ),
-      ],
+        actions: [
+          IconButton(
+            onPressed: _loadOrders,
+            icon: Icon(Icons.refresh, color: context.textColor),
+          ),
+        ],
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryOrange))
+        : _orders.isEmpty 
+          ? _buildEmptyState(context)
+          : ListView.builder(
+              padding: EdgeInsets.all(context.sectionPadding),
+              itemCount: _orders.length,
+              itemBuilder: (context, index) => _buildOrderCard(context, _orders[index]),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddOrderDialog,
+        label: const Text('أمر شراء جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
+        backgroundColor: AppConstants.primaryOrange,
+      ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.add_shopping_cart, size: 80, color: theme.colorScheme.primary.withOpacity(0.2)),
+          Icon(Icons.shopping_cart_outlined, size: 80, color: context.mutedText.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'لا توجد أوامر شراء حالياً',
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onBackground.withOpacity(0.5)),
+            style: TextStyle(color: context.mutedText, fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'ابدأ بإضافة أول أمر شراء للموردين',
+            style: TextStyle(color: context.mutedText.withValues(alpha: 0.6), fontSize: 13),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOrdersList(BuildContext context, ThemeData theme) {
-    return ListView.builder(
-      itemCount: _orders.length,
-      itemBuilder: (context, index) {
-        final order = _orders[index];
-        final bool isConverted = order['status'] == 'received';
-        
-        return Container(
-          margin: EdgeInsets.only(bottom: context.cardPadding),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(context.cardRadius),
-            border: Border.all(color: Colors.blue.withOpacity(0.1)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
-            ],
+  Widget _buildOrderCard(BuildContext context, Map<String, dynamic> order) {
+    final theme = Theme.of(context);
+    final bool isConverted = order['status'] == 'received';
+    final statusColor = _getStatusColor(order['status']);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(context.cardRadius),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: ListTile(
-                contentPadding: EdgeInsets.all(context.cardPadding),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.receipt_long, color: statusColor),
+            ),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'أمر رقم: ${order['id'].toString().substring(0, 8)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                _buildStatusChip(order['status'], statusColor),
+              ],
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  'المورد: ${order['supplier_name'] ?? order['supplier_id'] ?? 'غير محدد'}',
+                  style: TextStyle(color: context.textColor, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 4),
+                Row(
                   children: [
+                    Icon(Icons.calendar_today, size: 12, color: context.mutedText),
+                    const SizedBox(width: 4),
                     Text(
-                      'أمر رقم: ${order['id']}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      'المتوقع: ${order['expected_delivery'] ?? order['expected_date'] ?? '-'}',
+                      style: TextStyle(color: context.mutedText, fontSize: 12),
                     ),
-                    _buildStatusChip(order['status'], theme),
                   ],
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text('المورد: ${order['supplier_id']}'),
-                    Text('تاريخ التوريد المتوقع: ${order['expected_delivery']}'),
-                  ],
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${order['total']} ر.س',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.blueAccent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (!isConverted)
-                      TextButton(
-                        onPressed: () => _convertToInvoice(order['id']),
-                        child: const Text('تحويل لفاتورة', style: TextStyle(fontSize: 12)),
-                      ),
-                  ],
-                ),
+              ],
+            ),
+            trailing: Text(
+              '${(order['total'] as num?)?.toStringAsFixed(2) ?? '0.00'} ر.س',
+              style: TextStyle(
+                color: AppConstants.primaryOrange,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
           ),
-        );
-      },
+          if (!isConverted)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: context.mutedText.withValues(alpha: 0.03),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _convertToInvoice(order['id']),
+                    icon: const Icon(Icons.swap_horiz, size: 18),
+                    label: const Text('تحويل لفاتورة مشتريات', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.blueAccent),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatusChip(String status, ThemeData theme) {
-    Color color = Colors.orange;
+  Widget _buildStatusChip(String status, Color color) {
     String label = 'مسودة';
-    if (status == 'sent') { color = Colors.blue; label = 'تم الإرسال'; }
-    if (status == 'received') { color = Colors.green; label = 'تم الاستلام'; }
+    if (status == 'sent') label = 'تم الإرسال';
+    if (status == 'received') label = 'تم الاستلام';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color, width: 0.5),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == 'sent') return Colors.blue;
+    if (status == 'received') return Colors.green;
+    return Colors.orange;
   }
 
   Future<void> _convertToInvoice(String poId) async {
     final success = await _engine.convertPOToInvoice(poId, 'credit');
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحويل أمر الشراء إلى فاتورة مشتريات وتم تحديث المخزون'), backgroundColor: Colors.green),
-      );
-      _loadOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحويل أمر الشراء إلى فاتورة مشتريات بنجاح'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _loadOrders();
+      }
     }
   }
+
+  void _showAddOrderDialog() {
+    final supplierCtrl = TextEditingController();
+    final totalCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('أمر شراء جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: supplierCtrl,
+              decoration: const InputDecoration(
+                labelText: 'اسم المورد',
+                prefixIcon: Icon(Icons.business),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: totalCtrl,
+              decoration: const InputDecoration(
+                labelText: 'المبلغ الإجمالي المتوقع',
+                prefixIcon: Icon(Icons.monetization_on),
+                suffixText: 'ر.س',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('إلغاء', style: TextStyle(color: context.mutedText)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (supplierCtrl.text.isEmpty) return;
+              await _db.addPurchaseOrder({
+                'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                'supplier_id': 'SUP_${DateTime.now().millisecondsSinceEpoch}',
+                'supplier_name': supplierCtrl.text,
+                'issue_date': DateTime.now().toIso8601String().split('T')[0],
+                'expected_date': DateTime.now().add(const Duration(days: 7)).toIso8601String().split('T')[0],
+                'total': double.tryParse(totalCtrl.text) ?? 0,
+                'status': 'sent',
+                'is_deleted': 0,
+              }, []);
+              if (mounted) {
+                Navigator.pop(ctx);
+                _loadOrders();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryOrange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('حفظ وإرسال', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

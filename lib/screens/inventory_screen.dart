@@ -72,13 +72,14 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     final skuCtrl = TextEditingController(text: item?['sku']?.toString());
     final minQtyCtrl = TextEditingController(text: (item?['min_quantity'] ?? 5).toString());
     final categoryCtrl = TextEditingController(text: item?['category']?.toString());
+    final expiryCtrl = TextEditingController(text: item?['expiry_date']?.toString());
 
     showDialog(context: context, builder: (ctx) => BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
       child: AlertDialog(
-        backgroundColor: context.cardSurface.withValues(alpha: 0.95),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
-        title: Text(isEdit ? tr('inventory_module.edit_item_dialog') : tr('inventory_module.add_new_item'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: context.obsidianGlass,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: context.cardBorder, width: 1.5)),
+        title: Text(isEdit ? tr('inventory_module.edit_item_dialog') : tr('inventory_module.add_new_item'), style: TextStyle(fontWeight: FontWeight.bold, color: context.textColor)),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           _dialogField(nameCtrl, tr('inventory_module.name_label')),
           const SizedBox(height: 8),
@@ -99,6 +100,23 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
             const SizedBox(width: 8),
             Expanded(child: _dialogField(minQtyCtrl, tr('inventory_module.min_limit_label'), isNum: true)),
           ]),
+          const SizedBox(height: 8),
+          _dialogField(
+            expiryCtrl, 
+            'تاريخ الصلاحية (اختياري)', 
+            readOnly: true, 
+            onTap: () async {
+              DateTime? picked = await showDatePicker(
+                context: ctx,
+                initialDate: DateTime.now(),
+                firstDate: DateTime.now(),
+                lastDate: DateTime(2050),
+              );
+              if (picked != null) {
+                expiryCtrl.text = picked.toIso8601String().split('T')[0];
+              }
+            }
+          ),
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'), style: TextStyle(color: context.mutedText))),
@@ -118,12 +136,26 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                 'base_price': double.tryParse(priceCtrl.text) ?? 0.0,
                 'cost_price': double.tryParse(costCtrl.text) ?? 0.0,
                 'quantity': double.tryParse(qtyCtrl.text) ?? 0.0,
-                'min_quantity': double.tryParse(minQtyCtrl.text) ?? 5.0,
-                'category': categoryCtrl.text.trim(),
+                'min_stock_level': double.tryParse(minQtyCtrl.text) ?? 5.0,
+                'industry_type': categoryCtrl.text.trim(),
+                'expiry_date': expiryCtrl.text.trim(),
               };
-              if (isEdit) { data['id'] = item!['id']; await _db.updateProduct(data); }
-              else { await _db.insertProduct(data); }
-              if (mounted) { Navigator.pop(ctx); _loadItems(); }
+              try {
+                if (isEdit) { data['id'] = item!['id']; await _db.updateProduct(data); }
+                else { 
+                  data['id'] = 'ITM_${DateTime.now().millisecondsSinceEpoch}';
+                  await _db.insertProduct(data); 
+                }
+                if (mounted) { 
+                  Navigator.pop(ctx); 
+                  _loadItems(); 
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح"), backgroundColor: Colors.green));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحفظ: $e"), backgroundColor: Colors.red));
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black87, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: Text(isEdit ? tr('inventory_module.update') : tr('common.save'), style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -234,7 +266,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     final price = (item['base_price'] as num?)?.toDouble() ?? 0;
     final cost = (item['cost_price'] as num?)?.toDouble() ?? 0;
     final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
-    final category = item['category']?.toString() ?? '';
+    final category = item['industry_type']?.toString() ?? '';
     final margin = price > 0 ? ((price - cost) / price * 100) : 0.0;
     final isLow = qty > 0 && qty <= 5;
     final isOut = qty <= 0;
@@ -311,9 +343,11 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-  Widget _dialogField(TextEditingController ctrl, String hint, {bool isNum = false}) {
+  Widget _dialogField(TextEditingController ctrl, String hint, {bool isNum = false, bool readOnly = false, VoidCallback? onTap}) {
     return TextField(
       controller: ctrl,
+      readOnly: readOnly,
+      onTap: onTap,
       keyboardType: isNum ? TextInputType.number : TextInputType.text,
       style: TextStyle(color: context.textColor, fontSize: 13),
       decoration: InputDecoration(

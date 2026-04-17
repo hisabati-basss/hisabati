@@ -31,14 +31,14 @@ class PdfService {
           companyLogo = pw.MemoryImage(await logoFile.readAsBytes());
         }
       } catch (e) {
-        print("Error loading company logo: $e");
+        debugPrint("Error loading company logo: $e");
       }
     }
 
     // 2. Load Application Logo
     pw.ImageProvider? appLogo;
     try {
-      final ByteData data = await rootBundle.load('assets/image/hisabatilogo.PNG');
+      final ByteData data = await rootBundle.load('assets/image/logo icon.PNG');
       appLogo = pw.MemoryImage(data.buffer.asUint8List());
     } catch (_) {}
 

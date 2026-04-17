@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --color-brand: #ff6b00;
   --color-brand-hover: #e66000;
@@ -19,9 +21,9 @@
 }
 
 .dark {
-  --background: #121212;
+  --background: #0a0a0a;
   --foreground: #fafafa;
-  --card: #1e1e1e;
+  --card: #161616;
   --card-foreground: #fafafa;
 }
 
@@ -44,16 +46,56 @@ button:focus-visible {
   outline: none !important;
 }
 
+/* ─── Light Mode Glass: soft frosted white ─── */
 .glass {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
+/* ─── Dark Mode Glass: opaque frosted dark ─── */
 .dark .glass {
-  background: rgba(40, 40, 40, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(28, 28, 28, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Heavy glass variant (for cards, modals) ─── */
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.dark .glass-heavy {
+  background: rgba(22, 22, 22, 0.85);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Smooth scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 107, 0, 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 107, 0, 0.5); }
+
+/* ─── Gradient animations ─── */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+/* ─── Marquee animation ─── */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.animate-marquee {
+  animation: marquee 15s linear infinite;
 }

@@ -56,36 +56,20 @@ class _AssetsScreenState extends State<AssetsScreen> {
       final results = await db.rawQuery(sqlQuery, ['%$query%', '%$query%', '%$query%']);
       
       if (results.isEmpty && query.isEmpty) {
-        await _seedDummyData(db);
-        final newResults = await db.rawQuery(sqlQuery, ['%%', '%%', '%%']);
-        setState(() => _assets = newResults);
+        // Show empty state — user adds assets from the + button
+        setState(() => _assets = []);
       } else {
         setState(() => _assets = results);
       }
     } catch (e) {
-      print("Database error: $e");
+      debugPrint("Database error: $e");
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('assets_module.error_load', args: [e.toString()]))));
     }
 
     setState(() => _isLoading = false);
   }
 
-  Future<void> _seedDummyData(Database db) async {
-    // 1. Seed Cost Centers
-    await db.insert('cost_centers', {'id': 'CC_OPS', 'name': 'قسم العمليات والتشغيل'}, conflictAlgorithm: ConflictAlgorithm.ignore);
-    await db.insert('cost_centers', {'id': 'CC_MGMT', 'name': 'الإدارة العامة'}, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    // 2. Seed Employees
-    await db.insert('employees', {'id': 'EMP01', 'name': 'أحمد سعيد', 'job_title': 'مهندس موقع', 'basic_salary': 5000, 'hiring_date': '2025-01-01'}, conflictAlgorithm: ConflictAlgorithm.ignore);
-    
-    // 3. Seed Assets
-    await db.insert('assets', {
-      'id': 'AST_001', 'name': 'جهاز قياس ليزر Bosch', 'barcode': 'BSCH-10023', 'serial_number': 'S-99120', 'location': 'المستودع الرئيسي', 'cost_price': 1500, 'status': 'available', 'purchase_date': '2026-03-01', 'cost_center_id': 'CC_OPS'
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-    await db.insert('assets', {
-      'id': 'AST_002', 'name': 'لابتوب Dell XPS 15', 'barcode': 'DELL-404', 'serial_number': 'S-11223', 'location': 'الفرع الهندسي', 'cost_price': 8500, 'status': 'in_use', 'assigned_to': 'EMP01', 'purchase_date': '2025-10-15', 'cost_center_id': 'CC_MGMT'
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
+  // Dummy data seeding removed — assets are now user-created only
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -174,7 +158,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
       builder: (ctx) => Container(
         height: MediaQuery.of(context).size.height * 0.9,
         decoration: BoxDecoration(
-          color: context.bgSurface.withOpacity(0.95),
+          color: context.bgSurface.withValues(alpha: 0.95),
           borderRadius: BorderRadius.vertical(top: Radius.circular(context.cardRadius + 8)), // 📉 Adjusted from 40
           border: Border.all(color: context.cardBorder),
         ),
@@ -210,7 +194,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent.withOpacity(0.1),
+                        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
                         foregroundColor: Colors.redAccent,
                         padding: EdgeInsets.all(context.cardPadding + 4), // 📉 Reduced from 20
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius)), // 📉 Reduced from 16
@@ -260,14 +244,14 @@ class _AssetsScreenState extends State<AssetsScreen> {
       child: Container(
         padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 16
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 20
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(color: color.withOpacity(0.6), fontSize: context.bodySize - 2)), // 📉 Reduced from 10
+            Text(label, style: TextStyle(color: color.withValues(alpha: 0.6), fontSize: context.bodySize - 2)), // 📉 Reduced from 10
             const SizedBox(height: 2), // 📉 Reduced from 4
             Text("${value.toStringAsFixed(0)} ${tr('ceo.currency.sar')}", style: TextStyle(color: color, fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)), // 📉 Reduced from 18
           ],
@@ -354,9 +338,9 @@ class _AssetsScreenState extends State<AssetsScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: context.cardPadding, vertical: 8), // 📉 Reduced from 24
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryOrange.withOpacity(0.08), Colors.white.withOpacity(0.01)]), // 📉 Lighter
+        gradient: LinearGradient(colors: [primaryOrange.withValues(alpha: 0.08), Colors.white.withValues(alpha: 0.01)]), // 📉 Lighter
         borderRadius: BorderRadius.circular(context.cardRadius / 2), // 📉 Sharper
-        border: Border.all(color: primaryOrange.withOpacity(0.15)),
+        border: Border.all(color: primaryOrange.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -427,7 +411,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
     return Container(
       padding: const EdgeInsets.all(6), // 📉 Reduced from cardPadding
       decoration: BoxDecoration(
-        color: context.cardSurface.withOpacity(0.8),
+        color: context.cardSurface.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(context.cardRadius / 2), // 📉 Reduced from 24
         border: Border.all(color: context.cardBorder, width: 0.5),
       ),
@@ -438,7 +422,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
           children: [
             Row(
               children: [
-                CircleAvatar(backgroundColor: statusColor.withOpacity(0.08), radius: 12, child: Icon(Icons.handyman, color: statusColor, size: context.iconSize - 6)), // 📉 Reduced from 16
+                CircleAvatar(backgroundColor: statusColor.withValues(alpha: 0.08), radius: 12, child: Icon(Icons.handyman, color: statusColor, size: context.iconSize - 6)), // 📉 Reduced from 16
                 const SizedBox(width: 6), // 📉 Reduced from 8
                 Expanded(
                   child: Column(
@@ -451,7 +435,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), // 📉 Reduced
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.08), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(4)),
                   child: Text(_getStatusText(asset['status']), style: TextStyle(color: statusColor, fontSize: context.bodySize - 4, fontWeight: FontWeight.bold)),
                 ),
               ],
@@ -466,7 +450,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
                     Text("${asset['cost_price']}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)),
                   ],
                 ),
-                Icon(Icons.chevron_right, size: context.iconSize - 6, color: primaryOrange.withOpacity(0.5)), // 📉 Simplified
+                Icon(Icons.chevron_right, size: context.iconSize - 6, color: primaryOrange.withValues(alpha: 0.5)), // 📉 Simplified
               ],
             ),
           ],

@@ -24,6 +24,10 @@ class GeminiAiBrain implements AiBrainProvider {
 
   String getApiKey() => _apiKey;
 
+  void clearHistory() {
+    _history.clear();
+  }
+
   @override
   void setUiActionCallback(Function(String, Map<String, dynamic>) callback) {
     _onUiAction = callback;
@@ -127,16 +131,16 @@ class GeminiAiBrain implements AiBrainProvider {
          }
       }
       return "تم تنفيذ طلبك بنجاح.";
-    } else if (response.statusCode == 429 && retryCount < 5) {
-      // Robust Backoff: 2, 5, 10, 15, 20 seconds
-      final delays = [2, 5, 10, 15, 20];
+    } else if (response.statusCode == 429 && retryCount < 2) {
+      // Shorter retries for better responsiveness: 2, 4 seconds
+      final delays = [2, 4];
       final delay = Duration(seconds: delays[retryCount]);
-      debugPrint("ℹ️ Gemini Quota Notice (429): Retrying in ${delay.inSeconds}s... (Attempt ${retryCount + 1}/5)");
+      debugPrint("ℹ️ Gemini Quota Notice (429): Retrying in ${delay.inSeconds}s... (Attempt ${retryCount + 1}/2)");
       await Future.delayed(delay);
       return _callGeminiRest(retryCount: retryCount + 1);
     } else {
       if (response.statusCode == 429) {
-        debugPrint("ℹ️ Gemini Quota Fully Exhausted after 5 retries. Switching to Local Assistant Mode.");
+        debugPrint("ℹ️ Gemini Quota Exhausted. switching to Local Assistant Mode.");
       } else {
         debugPrint("❌ Gemini REST Error: ${response.statusCode} - ${response.body}");
       }

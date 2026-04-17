@@ -31,24 +31,25 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
     try {
       final db = await _db.database;
 
-      // Get employees with sales role
-      final employees = await db.rawQuery('''
-        SELECT e.id, e.name, e.department,
-          COALESCE((SELECT SUM(i.total) FROM invoices i WHERE i.salesperson_id = e.id), 0) as total_sales,
-          COALESCE((SELECT COUNT(*) FROM invoices i WHERE i.salesperson_id = e.id), 0) as invoice_count
-        FROM employees e
+      // Get sales agents
+      final agents = await db.rawQuery('''
+        SELECT a.id, a.name, 'مندوب مبيعات' as department, a.commission_rate,
+          COALESCE((SELECT SUM(i.total) FROM invoices i WHERE i.salesperson_id = a.id AND i.is_deleted = 0), 0) as total_sales,
+          COALESCE((SELECT COUNT(*) FROM invoices i WHERE i.salesperson_id = a.id AND i.is_deleted = 0), 0) as invoice_count
+        FROM sales_agents a
+        WHERE a.status = 'active'
         ORDER BY total_sales DESC
       ''');
 
       // Get commissions log
       final comms = await db.rawQuery('''
-        SELECT c.*, e.name as employee_name FROM commissions c
-        LEFT JOIN employees e ON c.employee_id = e.id
+        SELECT c.*, a.name as employee_name FROM commissions c
+        LEFT JOIN sales_agents a ON c.employee_id = a.id
         ORDER BY c.created_at DESC LIMIT 50
       ''');
 
       if (mounted) setState(() {
-        _salespeople = employees.map((e) => Map<String, dynamic>.from(e)).toList();
+        _salespeople = agents.map((a) => Map<String, dynamic>.from(a)).toList();
         _commissions = comms.map((c) => Map<String, dynamic>.from(c)).toList();
         _isLoading = false;
       });
@@ -61,10 +62,11 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
   Future<void> _calculateCommissions() async {
     try {
       final db = await _db.database;
-      final commissionRate = 0.05; // 5% default
-
       for (var sp in _salespeople) {
         final totalSales = (sp['total_sales'] as num?)?.toDouble() ?? 0;
+        final ratePercent = (sp['commission_rate'] as num?)?.toDouble() ?? 5.0; // Default 5%
+        final commissionRate = ratePercent / 100;
+
         if (totalSales > 0) {
           final commission = totalSales * commissionRate;
           await db.insert('commissions', {
@@ -164,7 +166,7 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text("${sales.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: context.bodySize + 1)),
-              Text("عمولة: ${(sales * 0.05).toStringAsFixed(0)}", style: TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+              Text("عمولة: ${((sp['commission_rate'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1)}%", style: TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
             ]),
           ]),
         );

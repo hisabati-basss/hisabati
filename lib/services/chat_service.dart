@@ -1,5 +1,7 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'database_helper.dart';
 
 class ChatMessage {
   final String id;
@@ -16,25 +18,27 @@ class ChatMessage {
     required this.timestamp,
   });
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+  factory ChatMessage.fromMap(Map<String, dynamic> map) {
     return ChatMessage(
-      id: json['id'] ?? '',
-      senderId: json['sender_id'] ?? '',
-      senderName: json['sender_name'] ?? 'Unknown',
-      text: json['text'] ?? '',
-      timestamp: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']).toLocal() 
+      id: map['id'] ?? '',
+      senderId: map['sender_id'] ?? '',
+      senderName: map['sender_name'] ?? 'Unknown',
+      text: map['content'] ?? '',
+      timestamp: map['created_at'] != null 
+          ? DateTime.parse(map['created_at']).toLocal() 
           : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'channel_id': 'CH_GENERAL',
       'sender_id': senderId,
       'sender_name': senderName,
-      'text': text,
-      'created_at': timestamp.toUtc().toIso8601String(),
+      'content': text,
+      'created_at': timestamp.toIso8601String(),
+      'is_task': 0
     };
   }
 }
@@ -42,14 +46,38 @@ class ChatMessage {
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
-  ChatService._internal();
+  ChatService._internal() {
+    _startPolling();
+  }
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final DatabaseHelper _dbHelper = DatabaseHelper();
   final _uuid = const Uuid();
+  final StreamController<List<ChatMessage>> _controller = StreamController<List<ChatMessage>>.broadcast();
 
-  RealtimeChannel? _channel;
+  Timer? _pollingTimer;
 
-  /// Broadcast a message (No storage, pure realtime ping for high speed sync)
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _refreshChat();
+    });
+  }
+
+  Future<void> _refreshChat() async {
+    try {
+      final db = await _dbHelper.database;
+      final results = await db.query('messages', 
+        where: 'channel_id = ?', 
+        whereArgs: ['CH_GENERAL'], 
+        orderBy: 'created_at DESC', 
+        limit: 100
+      );
+      final messages = results.map((m) => ChatMessage.fromMap(m)).toList();
+      _controller.add(messages);
+    } catch (e) {
+      debugPrint("Chat Refresh Error: $e");
+    }
+  }
+
   Future<void> sendMessage(String text, {required String senderId, required String senderName}) async {
     final msg = ChatMessage(
       id: _uuid.v4(),
@@ -60,33 +88,21 @@ class ChatService {
     );
 
     try {
-      // 1. Insert into Supabase Table 'internal_chat' for history
-      await _supabase.from('internal_chat').insert(msg.toJson());
+      final db = await _dbHelper.database;
+      await db.insert('messages', msg.toMap());
+      _refreshChat(); // Immediate refresh
     } catch (e) {
-      // Supabase table might not exist in dev, ignore for now
-      print("SQL Error ignored for chat insert: $e");
-    }
-
-    // 2. Broadcast for instant UI feel without polling
-    if (_channel != null) {
-      await _channel!.sendBroadcastMessage(
-        event: 'new_message',
-        payload: msg.toJson(),
-      );
+      debugPrint("Chat Send Error: $e");
     }
   }
 
-  /// Listen to chat stream directly from DB (Postgres Changes)
   Stream<List<ChatMessage>> getChatStream() {
-    return _supabase
-        .from('internal_chat')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .limit(100)
-        .map((maps) => maps.map((m) => ChatMessage.fromJson(m)).toList());
+    _refreshChat(); // Initial load
+    return _controller.stream;
   }
 
   void dispose() {
-    _channel?.unsubscribe();
+    _pollingTimer?.cancel();
+    _controller.close();
   }
 }

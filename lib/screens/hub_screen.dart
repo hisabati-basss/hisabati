@@ -51,16 +51,16 @@ class HubScreen extends StatelessWidget {
               if (PermissionService().isVisible('bi')) _buildHubTile(context, 24, tr('hub.tiles.bi'), Icons.dashboard_customize_rounded, Colors.purpleAccent, isFeatured: true),
               if (PermissionService().isVisible('hr')) _buildHubTile(context, 4, tr('hub.tiles.hr'), Icons.people, Colors.blue),
               if (PermissionService().isVisible('custody')) _buildHubTile(context, 28, tr('hub.tiles.custody'), Icons.work_history_outlined, Colors.indigoAccent, isFeatured: true),
-              if (PermissionService().isVisible('feasibility')) _buildHubTile(context, 5, tr('hub.tiles.feasibility'), Icons.lightbulb, Colors.yellow),
-              if (PermissionService().isVisible('users')) _buildHubTile(context, 6, tr('hub.tiles.users'), Icons.group_work, Colors.teal),
+              if (PermissionService().isVisible('feasibility')) _buildHubTile(context, 6, tr('hub.tiles.feasibility'), Icons.lightbulb, Colors.yellow),
+              if (PermissionService().isVisible('users')) _buildHubTile(context, 7, tr('hub.tiles.users'), Icons.group_work, Colors.teal),
               if (PermissionService().isVisible('projects')) _buildHubTile(context, 11, tr('hub.tiles.projects'), Icons.assignment, Colors.cyan),
             ], isMobile),
 
             const SizedBox(height: 16), // Reduced from 32
 
             _buildCategory(context, tr('hub.categories.growth'), [
-              if (PermissionService().isVisible('marketing')) _buildHubTile(context, 7, tr('hub.tiles.marketing'), Icons.monetization_on, Colors.purple),
-              if (PermissionService().isVisible('subscriptions')) _buildHubTile(context, 8, tr('hub.tiles.subscriptions'), Icons.card_membership, Colors.indigo),
+              if (PermissionService().isVisible('marketing')) _buildHubTile(context, 8, tr('hub.tiles.marketing'), Icons.monetization_on, Colors.purple),
+              if (PermissionService().isVisible('subscriptions')) _buildHubTile(context, 30, tr('hub.tiles.subscriptions'), Icons.card_membership, Colors.indigo),
               if (PermissionService().isVisible('cheques')) _buildHubTile(context, 27, tr('hub.tiles.cheques'), Icons.account_balance_wallet, Colors.greenAccent, isFeatured: true),
               if (PermissionService().isVisible('accounting')) _buildHubTile(context, 35, tr('hub.tiles.trial_balance'), Icons.balance, Colors.amberAccent, isFeatured: true),
             ], isMobile),
@@ -70,6 +70,18 @@ class HubScreen extends StatelessWidget {
             _buildCategory(context, tr('hub.categories.ai'), [
               if (PermissionService().isVisible('ai_chat')) _buildHubTile(context, 0, tr('hub.tiles.ai_chat'), Icons.chat_bubble_rounded, primaryOrange, isFeatured: true),
               if (PermissionService().isVisible('internal_chat')) _buildHubTile(context, 40, "شات الموظفين الداخلي", Icons.forum_rounded, Colors.tealAccent, isFeatured: true),
+            ], isMobile),
+
+            const SizedBox(height: 16),
+
+            _buildCategory(context, "الرقابة والتحليل", [
+               _buildHubTile(context, 47, "الرقابة والمتابعة", Icons.monitor_heart_rounded, Colors.redAccent),
+               _buildHubTile(context, 48, "تدقيق الفواتير", Icons.fact_check_rounded, Colors.lightBlueAccent),
+               _buildHubTile(context, 49, "قائمة التدفقات", Icons.account_tree_rounded, Colors.green),
+               _buildHubTile(context, 50, "كشوفات سريعة", Icons.quick_contacts_mail_rounded, Colors.orange),
+               _buildHubTile(context, 51, "القيود المشتركة", Icons.merge_type_rounded, Colors.blueGrey),
+               _buildHubTile(context, 52, "إدارة المصروفات", Icons.money_off_rounded, Colors.pinkAccent),
+               _buildHubTile(context, 53, "محاسبة التكاليف", Icons.calculate_rounded, Colors.deepOrangeAccent),
             ], isMobile),
           ],
         ),

@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'dart:ui';
 import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/database_helper.dart';
 import '../services/reporting_service.dart';
 import 'trial_balance_screen.dart';
 import '../services/export_service.dart';
-import '../services/pdf_service.dart';
-import '../utils/tafqeet.dart';
 
 class FinancialReportsScreen extends StatefulWidget {
   const FinancialReportsScreen({super.key});

@@ -174,13 +174,13 @@ class _DocumentsTabState extends State<DocumentsTab> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.03),
+                        color: Colors.white.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.white10),
                       ),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: expiryColor.withOpacity(0.1),
+                          backgroundColor: expiryColor.withValues(alpha: 0.1),
                           child: Icon(Icons.description, color: expiryColor),
                         ),
                         title: Text(doc['name'] ?? 'مستند', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

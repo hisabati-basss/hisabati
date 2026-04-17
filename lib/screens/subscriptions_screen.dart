@@ -165,7 +165,16 @@ class SubscriptionsScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('تم اختيار باقة "$title" — سيتم تفعيلها قريباً'),
+                    backgroundColor: const Color(0xFFFF6B00),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isFeatured
                     ? primaryOrange

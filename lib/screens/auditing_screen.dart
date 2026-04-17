@@ -167,10 +167,16 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     final unbalanced = (_auditSummary['unbalanced_entries'] as List?) ?? [];
     final duplicates = (_auditSummary['duplicate_payments'] as List?) ?? [];
     final overruns = (_auditSummary['budget_overruns'] as List?) ?? [];
+    final risks = (_auditSummary['audit_risks'] as List?) ?? [];
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(context.sectionPadding),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Audit Risks (Fraud/Errors)
+        _buildInspectionSection("كشف التلاعب والأخطاء", "تحليل عميق للعمليات المشبوهة", Icons.security, Colors.red, risks, (e) =>
+          "${e['title']}: ${e['description']}"),
+        const SizedBox(height: 12),
+
         // Unbalanced Entries
         _buildInspectionSection("القيود غير المتوازنة", "قيود محاسبية حيث المدين ≠ الدائن", Icons.warning, Colors.red, unbalanced, (e) =>
           "القيد: ${e['id']?.toString().substring(0, 8) ?? ''} | فرق: ${((e['imbalance'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} | ${e['date'] ?? ''}"),

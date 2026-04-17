@@ -87,7 +87,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_toggle_off, size: 80, color: context.mutedText.withOpacity(0.1)),
+          Icon(Icons.history_toggle_off, size: 80, color: context.mutedText.withValues(alpha: 0.1)),
           const SizedBox(height: 16),
           Text("لا يوجد سجل فواتير حالياً", style: TextStyle(color: context.mutedText)),
         ],

@@ -43,16 +43,106 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
     }
   }
 
-  Future<void> _addMockSupplier() async {
-    final db = await DatabaseHelper().database;
-    await db.insert('suppliers', {
-      'id': 'SUP_${DateTime.now().millisecondsSinceEpoch}',
-      'name': tr('suppliers.title') == 'إدارة الموردين' ? 'شركة الموردين الذهبية' : 'Golden Suppliers Co.',
-      'contact_info': '0501234567',
-      'tax_id': '300000000000003',
-      'balance': 0.0,
-    });
-    _loadSuppliers();
+  Future<void> _showAddSupplierDialog() async {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController contactController = TextEditingController();
+    final TextEditingController taxIdController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: EdgeInsets.all(context.cardPadding * 1.5),
+            decoration: BoxDecoration(
+              color: context.obsidianGlass,
+              borderRadius: BorderRadius.circular(context.cardRadius),
+              border: Border.all(color: context.cardBorder),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(tr('suppliers.new_supplier'), style: TextStyle(color: context.textColor, fontSize: context.headerSize, fontWeight: FontWeight.bold)),
+                    IconButton(icon: Icon(Icons.close, color: context.mutedText), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  style: TextStyle(color: context.textColor),
+                  decoration: InputDecoration(
+                    labelText: "اسم المورد *",
+                    labelStyle: TextStyle(color: context.mutedText),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: context.cardBorder), borderRadius: BorderRadius.circular(8)),
+                    focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: primaryOrange), borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contactController,
+                  style: TextStyle(color: context.textColor),
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: "رقم التواصل",
+                    labelStyle: TextStyle(color: context.mutedText),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: context.cardBorder), borderRadius: BorderRadius.circular(8)),
+                    focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: primaryOrange), borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: taxIdController,
+                  style: TextStyle(color: context.textColor),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: "الرقم الضريبي",
+                    labelStyle: TextStyle(color: context.mutedText),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: context.cardBorder), borderRadius: BorderRadius.circular(8)),
+                    focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: primaryOrange), borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (nameController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("اسم المورد مطلوب"), backgroundColor: Colors.red));
+                        return;
+                      }
+                      final db = await DatabaseHelper().database;
+                      await db.insert('suppliers', {
+                        'id': 'SUP_${DateTime.now().millisecondsSinceEpoch}',
+                        'name': nameController.text.trim(),
+                        'contact_info': contactController.text.trim(),
+                        'tax_id': taxIdController.text.trim(),
+                        'balance': 0.0,
+                      });
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح"), backgroundColor: Colors.green));
+                        _loadSuppliers();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryOrange,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("حفظ", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -79,7 +169,7 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
                 ),
               ),
               ElevatedButton.icon(
-                onPressed: _addMockSupplier,
+                onPressed: _showAddSupplierDialog,
                 icon: Icon(Icons.add, color: Colors.black, size: context.iconSize),
                 label: Text(tr('suppliers.new_supplier'), style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: context.bodySize)),
                 style: ElevatedButton.styleFrom(
@@ -136,7 +226,7 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(color: Colors.pink.withOpacity(0.2), shape: BoxShape.circle),
+                                  decoration: BoxDecoration(color: Colors.pink.withValues(alpha: 0.2), shape: BoxShape.circle),
                                   child: Icon(Icons.business, color: Colors.pink, size: context.iconSize),
                                 ),
                                 const SizedBox(width: 8),

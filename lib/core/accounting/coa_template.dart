@@ -6,6 +6,14 @@ class COATemplate {
   static List<Map<String, dynamic>> getTemplateAccounts(IndustryType industry) {
     List<Map<String, dynamic>> accounts = _getBaseAccounts();
 
+    // Ensure that core engine IDs are present in EVERY industry
+    // The engine relies on ACC_INVENTORY, ACC_SALES, ACC_COGS.
+    accounts.addAll([
+      {'id': 'ACC_INVENTORY', 'code': '1140', 'name': 'المخزون السلعي العام', 'type': 'asset'},
+      {'id': 'ACC_SALES', 'code': '4100', 'name': 'إيرادات المبيعات العامة', 'type': 'revenue'},
+      {'id': 'ACC_COGS', 'code': '5100', 'name': 'تكلفة المبيعات العامة', 'type': 'expense'},
+    ]);
+
     switch (industry) {
       case IndustryType.realEstate:
       case IndustryType.propertyMgmt:
@@ -105,9 +113,6 @@ class COATemplate {
       case IndustryType.fruitsVegetables:
       case IndustryType.ecommerce:
         accounts.addAll([
-          {'code': '1140', 'name': 'مخزون بضائع بغرض البيع', 'type': 'asset'},
-          {'code': '4710', 'name': 'مبيعات بضائع', 'type': 'revenue'},
-          {'code': '5810', 'name': 'تكلفة بضاعة مباعة (COGS)', 'type': 'expense'},
           {'code': '5820', 'name': 'مصروفات نقل وشحن مشتريات', 'type': 'expense'},
           {'code': '5830', 'name': 'مصروفات تغليف وتعبئة', 'type': 'expense'},
         ]);
@@ -135,12 +140,7 @@ class COATemplate {
         break;
 
       default:
-        // General fallback
-        accounts.addAll([
-          {'code': '1140', 'name': 'المخزون السلعي', 'type': 'asset'},
-          {'code': '4100', 'name': 'إيرادات النشاط الرئيسي', 'type': 'revenue'},
-          {'code': '5100', 'name': 'تكلفة المبيعات / النشاط', 'type': 'expense'},
-        ]);
+        break;
     }
 
     return accounts;
@@ -149,22 +149,32 @@ class COATemplate {
   static List<Map<String, dynamic>> _getBaseAccounts() {
     return [
       // 1. Assets
-      {'code': '1110', 'name': 'الصندوق (الخزينة العامة)', 'type': 'asset'},
-      {'code': '1120', 'name': 'البنك (حساب جاري)', 'type': 'asset'},
-      {'code': '1130', 'name': 'ذمم العملاء (مدينون)', 'type': 'asset'},
+      {'id': 'ACC_CASH', 'code': '1110', 'name': 'الصندوق (الخزينة العامة)', 'type': 'asset'},
+      {'id': 'ACC_BANK', 'code': '1120', 'name': 'البنك (حساب جاري)', 'type': 'asset'},
+      {'id': 'ACC_RECEIVABLE', 'code': '1130', 'name': 'ذمم العملاء (مدينون)', 'type': 'asset'},
       {'code': '1150', 'name': 'سلف وعهد موظفين', 'type': 'asset'},
+      {'code': '1210', 'name': 'الأراضي', 'type': 'asset'},
+      {'code': '1220', 'name': 'المباني والمنشآت', 'type': 'asset'},
+      {'code': '1230', 'name': 'الآلات والمعدات', 'type': 'asset'},
       {'code': '1250', 'name': 'الأثاث والمعدات المكتبية', 'type': 'asset'},
       {'code': '1260', 'name': 'أجهزة الحاسب والبرمجيات', 'type': 'asset'},
+      {'code': '1299', 'name': 'مجمع إهلاك الأصول الثابتة', 'type': 'asset'}, // Contra-asset
 
       // 2. Liabilities
-      {'code': '2110', 'name': 'ذمم الموردين (دائنون)', 'type': 'liability'},
-      {'code': '2131', 'name': 'ضريبة القيمة المضافة المحصلة', 'type': 'liability'},
-      {'code': '2132', 'name': 'ضريبة القيمة المضافة المدفوعة', 'type': 'liability'},
+      {'id': 'ACC_PAYABLE', 'code': '2110', 'name': 'ذمم الموردين (دائنون)', 'type': 'liability'},
+      {'id': 'ACC_VAT', 'code': '2131', 'name': 'ضريبة القيمة المضافة المحصلة', 'type': 'liability'},
+      {'id': 'ACC_VAT_RECEIVABLE', 'code': '2132', 'name': 'ضريبة القيمة المضافة المدفوعة', 'type': 'liability'},
       {'code': '2140', 'name': 'رواتب وأجور مستحقة', 'type': 'liability'},
 
       // 3. Equity
       {'code': '3100', 'name': 'رأس المال المسموح به', 'type': 'equity'},
-      {'code': '3200', 'name': 'الأرباح والخسائر المدورة', 'type': 'equity'},
+      {'id': 'ACC_RETAINED_EARNINGS', 'code': '3200', 'name': 'الأرباح والخسائر المدورة', 'type': 'equity'},
+      {'code': '3300', 'name': 'رصيد افتتاح المدة (Opening Balance)', 'type': 'equity'},
+
+      // 4. Revenue
+      {'code': '4200', 'name': 'إيرادات أخرى', 'type': 'revenue'},
+      {'code': '4300', 'name': 'أرباح فروق تحويل العملات', 'type': 'revenue'},
+      {'code': '4400', 'name': 'خصومات مكتسبة من المشتريات', 'type': 'revenue'},
 
       // 5. Common Expenses
       {'code': '5210', 'name': 'مصروفات الرواتب والأجور', 'type': 'expense'},
@@ -172,6 +182,9 @@ class COATemplate {
       {'code': '5230', 'name': 'كهرباء ومياه وانترنت', 'type': 'expense'},
       {'code': '5240', 'name': 'مصاريف تسويق وإعلانات', 'type': 'expense'},
       {'code': '5250', 'name': 'مصاريف قرطاسية ومكتبية', 'type': 'expense'},
+      {'code': '5260', 'name': 'خسائر فروق تحويل العملات', 'type': 'expense'},
+      {'code': '5270', 'name': 'خصومات مسموح بها للمبيعات', 'type': 'expense'},
+      {'code': '5280', 'name': 'مصروف الإهلاك الدوري', 'type': 'expense'},
     ];
   }
 }

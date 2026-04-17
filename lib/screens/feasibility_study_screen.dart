@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -526,7 +525,7 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
           pw.SizedBox(height: 20),
           pw.Text('التدفقات النقدية:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 8),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: ['السنة', 'التدفق السنوي', 'التراكمي'],
             data: cashFlows.map((cf) => [
               cf['year'] == 0 ? 'استثمار' : 'السنة ${cf['year']}',

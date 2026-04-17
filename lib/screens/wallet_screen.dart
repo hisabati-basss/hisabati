@@ -330,7 +330,7 @@ class _WalletScreenState extends State<WalletScreen> {
              IconButton(
                icon: Icon(Icons.image, color: Colors.blueAccent, size: context.iconSize - 2), // 📉 Reduced
                onPressed: () {
-                 // Logic to preview attachment
+
                  showDialog(
                    context: context,
                    builder: (c) => Dialog(

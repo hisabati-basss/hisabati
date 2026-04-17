@@ -39,7 +39,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
     final String endDate = DateTime.now().toIso8601String().split('T')[0];
 
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         _cashFlow.forecastLiquidity(30), // Next 30 days
         _taxService.generateVatReturn(startDate, endDate), // VAT for last 30 days
         _reporting.getCostCenterPerformance(startDate, endDate),
@@ -57,7 +57,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
       }
     } catch (e) {
       if (mounted) {
-        print('Dashboard Load Error: $e');
+        debugPrint('Dashboard Load Error: $e');
         setState(() => _isLoading = false); // Hide spinner even on error
       }
     }
@@ -139,7 +139,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // 📉 Reduced from 16/8
           decoration: BoxDecoration(
-            color: _cashForecast['risk_level'] == 'Low' ? Colors.green.withOpacity(0.1) : Colors.redAccent.withOpacity(0.1),
+            color: _cashForecast['risk_level'] == 'Low' ? Colors.green.withValues(alpha: 0.1) : Colors.redAccent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 16
             border: Border.all(color: _cashForecast['risk_level'] == 'Low' ? Colors.green : Colors.redAccent),
           ),
@@ -171,10 +171,10 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
     return Container(
       padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
       decoration: BoxDecoration(
-        color: context.cardSurface.withOpacity(0.6),
+        color: context.cardSurface.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 24
-        border: Border.all(color: highlightColor.withOpacity(0.3), width: 1.0), // 📉 Reduced from 1.5
-        boxShadow: [BoxShadow(color: highlightColor.withOpacity(0.05), blurRadius: 10)], // 📉 Reduced from 20
+        border: Border.all(color: highlightColor.withValues(alpha: 0.3), width: 1.0), // 📉 Reduced from 1.5
+        boxShadow: [BoxShadow(color: highlightColor.withValues(alpha: 0.05), blurRadius: 10)], // 📉 Reduced from 20
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,11 +212,11 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
       padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [context.cardSurface.withOpacity(0.8), context.cardSurface.withOpacity(0.4)],
+          colors: [context.cardSurface.withValues(alpha: 0.8), context.cardSurface.withValues(alpha: 0.4)],
           begin: Alignment.topLeft, end: Alignment.bottomRight
         ),
         borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 32
-        border: Border.all(color: context.cardBorder.withOpacity(0.3)), // 📉 Reduced opacity
+        border: Border.all(color: context.cardBorder.withValues(alpha: 0.3)), // 📉 Reduced opacity
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,7 +242,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
-                        colors: [primaryOrange.withOpacity(0.3), primaryOrange.withOpacity(0.0)],
+                        colors: [primaryOrange.withValues(alpha: 0.3), primaryOrange.withValues(alpha: 0.0)],
                         begin: Alignment.topCenter, end: Alignment.bottomCenter
                       ),
                     ),
@@ -260,7 +260,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
     return Container(
       padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
       decoration: BoxDecoration(
-        color: context.cardSurface.withOpacity(0.5),
+        color: context.cardSurface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 32
         border: Border.all(color: context.cardBorder),
       ),
@@ -271,7 +271,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("الإقرار الضريبي (ZATCA)", style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)), // 📉 Reduced from 18/Shortened
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text("تلقائي", style: TextStyle(color: Colors.purple, fontSize: context.bodySize - 3, fontWeight: FontWeight.bold))), // 📉 Reduced/Shortened
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)), child: Text("تلقائي", style: TextStyle(color: Colors.purple, fontSize: context.bodySize - 3, fontWeight: FontWeight.bold))), // 📉 Reduced/Shortened
             ],
           ),
           const SizedBox(height: 12), // 📉 Reduced from 24
@@ -306,7 +306,7 @@ class _BIDashboardScreenState extends State<BIDashboardScreen> {
     return Container(
       padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
       decoration: BoxDecoration(
-        color: context.cardSurface.withOpacity(0.5),
+        color: context.cardSurface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 32
         border: Border.all(color: context.cardBorder),
       ),

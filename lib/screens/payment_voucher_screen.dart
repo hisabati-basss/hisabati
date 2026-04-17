@@ -41,24 +41,40 @@ class _PaymentVoucherScreenState extends State<PaymentVoucherScreen> with Single
   Future<void> _loadInitialData() async {
     try {
       final db = await _db.database;
-      final suppliers = await db.query('suppliers');
-      final banks = await db.query('accounts', where: "type = 'asset' AND name LIKE '%بنك%'");
+      
+      // Seed default supplier if empty
+      final supCheck = await db.query('suppliers', limit: 1);
+      if (supCheck.isEmpty) {
+        await db.insert('suppliers', {
+          'id': 'SUP_DEFAULT',
+          'name': 'مورد عام / مشتريات نقدية',
+          'contact_info': '-',
+          'balance': 0,
+          'sync_status': 0,
+          'is_deleted': 0,
+        });
+      }
+      
+      final suppliers = await db.query('suppliers', where: 'is_deleted = 0', orderBy: 'name ASC');
+      final banks = await db.query('accounts', where: "type = 'asset'");
       final vouchers = await db.query('payment_vouchers', orderBy: 'created_at DESC');
       
-      final companies = await db.query('companies', limit: 1);
+      final companyContext = await _db.getCurrentCompanyContext();
+      
+      debugPrint('📊 Payment Voucher Data: ${suppliers.length} suppliers, ${banks.length} banks');
       
       if (mounted) {
         setState(() {
           _suppliers = suppliers;
           _banks = banks;
           _vouchers = vouchers;
-          _currency = companies.isNotEmpty ? (companies.first['currency_code']?.toString() ?? 'SAR') : 'SAR';
+          _currency = companyContext['currency']?.toString().toUpperCase() ?? 'SAR';
           if (suppliers.isNotEmpty) _selectedSupplierId = suppliers.first['id']?.toString();
           if (banks.isNotEmpty) _selectedBankId = banks.first['id']?.toString();
         });
       }
     } catch (e) {
-      debugPrint("Error loading payment vouchers: $e");
+      debugPrint("❌ Error loading payment vouchers: $e");
       if (mounted) {
         setState(() {
           _suppliers = [];
@@ -194,22 +210,36 @@ class _PaymentVoucherScreenState extends State<PaymentVoucherScreen> with Single
                   const SizedBox(height: 16),
                   
                   // Supplier
-                  DropdownButtonFormField<String>(
-                    value: _selectedSupplierId,
-                    decoration: InputDecoration(
-                      labelText: tr('vouchers.payment.payee_label'),
-                      labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
-                      filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.business_center_outlined),
-                    ),
-                    dropdownColor: context.bgSurface,
-                    items: _suppliers.map((s) => DropdownMenuItem<String>(
-                      value: s['id']?.toString(),
-                      child: Text(s['name']?.toString() ?? ''),
-                    )).toList(),
-                    onChanged: (v) => setState(() => _selectedSupplierId = v),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedSupplierId,
+                          decoration: InputDecoration(
+                            labelText: tr('vouchers.payment.payee_label'),
+                            labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
+                            filled: true,
+                            fillColor: Colors.black.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            prefixIcon: const Icon(Icons.business_center_outlined),
+                          ),
+                          dropdownColor: context.bgSurface,
+                          items: _suppliers.map((s) => DropdownMenuItem<String>(
+                            value: s['id']?.toString(),
+                            child: Text(s['name']?.toString() ?? ''),
+                          )).toList(),
+                          onChanged: (v) => setState(() => _selectedSupplierId = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          // TODO: Navigate to Supplier Management
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يمكنك إضافة موردين جدد من قسم المشتريات > الموردين")));
+                        },
+                        icon: const Icon(Icons.add_circle_outline, color: Colors.redAccent),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 

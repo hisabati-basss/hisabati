@@ -465,7 +465,7 @@ class AccountingEngine {
       final db = await _db.database;
       
       // Calculate net profit/loss for the period
-      final pnl = await _db.getPNLSummary(startDate, endDate);
+      final pnl = await _db.getNetProfitLoss(startDate, endDate);
       final netProfit = (pnl['net_profit'] as num?)?.toDouble() ?? 0.0;
       
       final fyId = 'FY_${DateTime.now().millisecondsSinceEpoch}';

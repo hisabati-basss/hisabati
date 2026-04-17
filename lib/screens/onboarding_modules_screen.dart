@@ -74,7 +74,7 @@ class _OnboardingModulesScreenState extends State<OnboardingModulesScreen> {
              top: -100, right: -100,
              child: Container(
                width: 400, height: 400, 
-               decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [primaryOrange.withOpacity(0.2), Colors.transparent]))
+               decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [primaryOrange.withValues(alpha: 0.2), Colors.transparent]))
              ),
           ),
           

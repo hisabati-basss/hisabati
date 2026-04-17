@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:intl/intl.dart';
 import '../../theme/app_theme_extension.dart';
 import '../../services/database_helper.dart';
 import '../../services/payroll_service.dart';
@@ -13,6 +12,10 @@ import 'attendance_tab.dart';
 import 'leaves_tab.dart';
 import 'payroll_tab.dart';
 import 'recruitment_tab.dart';
+import 'tabs/contracts_tab.dart';
+import 'tabs/custody_tab.dart';
+import 'tabs/documents_tab.dart';
+import 'tabs/performance_tab.dart';
 
 class HrRootScreen extends StatefulWidget {
   const HrRootScreen({super.key});
@@ -121,6 +124,75 @@ class _HrRootScreenState extends State<HrRootScreen> {
     );
   }
 
+  Future<void> _hireCandidate(Map<String, dynamic> candidate) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: primaryOrange.withValues(alpha: 0.3))),
+        title: Row(
+          children: [
+            Icon(Icons.how_to_reg, color: Colors.greenAccent, size: 28),
+            const SizedBox(width: 12),
+            const Text('تأكيد التوظيف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('هل تريد توظيف "${candidate['name']}" كموظف رسمي؟', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            const SizedBox(height: 12),
+            Text('سيتم تحويل حالته من "مرشح" إلى "نشط" وستُنشأ له بيانات الدخول.', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(tr('common.cancel'), style: const TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.check, color: Colors.black, size: 18),
+            label: Text(tr('hr.form.buttons.hire_confirm'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _payrollService.updateEmployee(
+          candidate['id']?.toString() ?? '',
+          {
+            'status': 'active',
+            'hiring_date': DateTime.now().toIso8601String(),
+            'sync_status': 0,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+        );
+        _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('hr.hire_success', args: [candidate['name'] ?? ''])),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${tr('common.error')}: $e'),
+            backgroundColor: Colors.redAccent,
+          ));
+        }
+      }
+    }
+  }
+
+
   void _viewDetails(Map<String, dynamic> emp) {
     showModalBottomSheet(
       context: context,
@@ -147,11 +219,11 @@ class _HrRootScreenState extends State<HrRootScreen> {
   }
 
   String _getStatusText(DateTime? expiryDate) {
-    if (expiryDate == null) return "ساري";
+    if (expiryDate == null) return tr('hr.status.valid');
     final diff = expiryDate.difference(DateTime.now()).inDays;
-    if (diff < 0) return "منتهي";
-    if (diff < 30) return "ينتهي قريباً";
-    return "ساري";
+    if (diff < 0) return tr('hr.status.expired');
+    if (diff < 30) return tr('hr.status.expiring_soon');
+    return tr('hr.status.valid');
   }
 
   Future<void> _handleAttendanceScan(String barcode, String type) async {
@@ -164,29 +236,19 @@ class _HrRootScreenState extends State<HrRootScreen> {
       return;
     }
 
-    final today = DateTime.now();
-    final timeStr = DateFormat('HH:mm').format(today);
-    final db = await _db.database;
-
-    final existing = await db.query('attendance_logs',
-      where: "employee_id = ? AND date >= ? AND date < ?",
-      whereArgs: [emp['id'], DateTime(today.year, today.month, today.day).toIso8601String(), DateTime(today.year, today.month, today.day + 1).toIso8601String()]);
-
-    if (existing.isEmpty) {
-      await db.insert('attendance_logs', {
-        'id': 'ATT_${DateTime.now().millisecondsSinceEpoch}',
-        'employee_id': emp['id'],
-        'date': today.toIso8601String(),
-        'status': 'present',
-        'check_in_time': type == 'check_in' ? timeStr : null,
-        'check_out_time': type == 'check_out' ? timeStr : null,
-        'sync_status': 0,
-        'updated_at': today.toIso8601String(),
-      });
+    if (type == 'check_in') {
+      await _db.recordCheckIn(emp['id']);
     } else {
-      final updateField = type == 'check_in' ? 'check_in_time' : 'check_out_time';
-      await db.update('attendance_logs', {updateField: timeStr, 'sync_status': 0},
-        where: 'id = ?', whereArgs: [existing.first['id']]);
+      final today = DateTime.now();
+      final dateStr = today.toIso8601String().split('T')[0];
+      final db = await _db.database;
+      final existing = await db.query('attendance_logs',
+        where: "employee_id = ? AND date = ?",
+        whereArgs: [emp['id'], dateStr]);
+      
+      if (existing.isNotEmpty) {
+        await _db.recordCheckOut(existing.first['id'].toString());
+      }
     }
 
     _barcodeController.clear();
@@ -211,12 +273,157 @@ class _HrRootScreenState extends State<HrRootScreen> {
   }
 
   void _viewSlipDetails(Map<String, dynamic> slip) {
-    // Show summary or dialog (Reuse helper from hr_screen or moved)
+    final empName = _employees.firstWhere(
+      (e) => e['id'] == slip['employee_id'],
+      orElse: () => {'name': 'employee'},
+    )['name'] ?? 'employee';
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$empName - ${slip['month'] ?? ''}'.trim()),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _slipRow(tr('hr.payroll.basic'), '${(slip['basic_salary'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency'),
+              _slipRow(tr('hr.payroll.housing'), '${(slip['housing_allowance'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency'),
+              _slipRow(tr('hr.payroll.transport'), '${(slip['transport_allowance'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency'),
+              const Divider(),
+              _slipRow(tr('hr.payroll.insurance'), '${(slip['insurance_deduction'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency'),
+              _slipRow(tr('hr.payroll.absence'), '${(slip['absence_deduction'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency'),
+              const Divider(),
+              _slipRow(tr('hr.payroll.net'), '${(slip['net_salary'] as num?)?.toStringAsFixed(2) ?? '0'} $_currency', isBold: true),
+              _slipRow(tr('hr.payroll.status'), slip['payment_status']?.toString() ?? 'draft'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.close'))),
+        ],
+      ),
+    );
   }
 
-  String _getCCName(String id) {
-    final cc = _costCenters.where((c) => c['code']?.toString() == id).firstOrNull;
-    return cc?['name']?.toString() ?? id;
+  Widget _slipRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+          Text(value, style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontSize: isBold ? 16 : 13,
+            color: isBold ? primaryOrange : null,
+          )),
+        ],
+      ),
+    );
+  }
+
+  String _getCCName(String? id) {
+    if (id == null) return '';
+    final cc = _costCenters.firstWhere((c) => c['id']?.toString() == id.toString(), orElse: () => {});
+    return cc['name']?.toString() ?? id;
+  }
+
+  void _showLeaveForm() {
+    String? selectedEmpId;
+    String leaveType = 'ANNUAL';
+    DateTime startDate = DateTime.now();
+    DateTime endDate = DateTime.now().add(const Duration(days: 1));
+    final reasonCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(tr('hr.leaves.add_request')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedEmpId,
+                  decoration: InputDecoration(
+                    labelText: tr('hr.leaves.employee'),
+                    hintText: tr('hr.leaves.select_employee'),
+                  ),
+                  items: _employees
+                      .where((e) => e['id'] != null)
+                      .map((e) => e['id'].toString())
+                      .toSet() // Ensure unique IDs
+                      .map((id) {
+                        final emp = _employees.firstWhere((e) => e['id'].toString() == id);
+                        return DropdownMenuItem(
+                          value: id,
+                          child: Text(emp['name']?.toString() ?? id),
+                        );
+                      }).toList(),
+                  onChanged: (v) => setDialogState(() => selectedEmpId = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: leaveType,
+                  decoration: InputDecoration(labelText: tr('hr.leaves.type')),
+                  items: [
+                    DropdownMenuItem(value: 'ANNUAL', child: Text(tr('hr.leaves.types.annual'))),
+                    DropdownMenuItem(value: 'SICK', child: Text(tr('hr.leaves.types.sick'))),
+                    DropdownMenuItem(value: 'EMERGENCY', child: Text(tr('hr.leaves.types.emergency'))),
+                    DropdownMenuItem(value: 'UNPAID', child: Text(tr('hr.leaves.types.unpaid'))),
+                  ],
+                  onChanged: (v) => setDialogState(() => leaveType = v ?? 'ANNUAL'),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: Text(tr('hr.leaves.from')),
+                  subtitle: Text(startDate.toIso8601String().split('T').first),
+                  trailing: const Icon(Icons.calendar_today, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(context: context, initialDate: startDate, firstDate: DateTime(2020), lastDate: DateTime(2030));
+                    if (picked != null) setDialogState(() => startDate = picked);
+                  },
+                ),
+                ListTile(
+                  title: Text(tr('hr.leaves.to')),
+                  subtitle: Text(endDate.toIso8601String().split('T').first),
+                  trailing: const Icon(Icons.calendar_today, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(context: context, initialDate: endDate, firstDate: startDate, lastDate: DateTime(2030));
+                    if (picked != null) setDialogState(() => endDate = picked);
+                  },
+                ),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: InputDecoration(labelText: tr('hr.leaves.reason')),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedEmpId == null) return;
+                await _payrollService.submitLeaveRequest({
+                  'employee_id': selectedEmpId,
+                  'type': leaveType,
+                  'start_date': startDate.toIso8601String(),
+                  'end_date': endDate.toIso8601String(),
+                  'reason': reasonCtrl.text,
+                });
+                if (mounted) Navigator.pop(ctx);
+                _loadData();
+              },
+              child: Text(tr('common.submit')),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -261,7 +468,7 @@ class _HrRootScreenState extends State<HrRootScreen> {
                         ),
                         LeavesTab(
                           leaveRequests: _leaveRequests,
-                          onAddRequest: () {}, // To be implemented
+                          onAddRequest: _showLeaveForm,
                           onUpdateStatus: (id, status) async {
                             await _payrollService.updateLeaveStatus(id, status);
                             _loadData();
@@ -277,7 +484,7 @@ class _HrRootScreenState extends State<HrRootScreen> {
                         RecruitmentTab(
                           candidates: _candidates,
                           onAddCandidate: () => _showEmployeeForm(asCandidate: true),
-                          onHire: (c) => _showEmployeeForm(employee: c),
+                          onHire: (c) => _hireCandidate(c),
                         ),
                       ],
                     ),

@@ -24,13 +24,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
   }
 
   Future<void> _loadReviews() async {
-    final db = await _db.database;
-    final res = await db.query(
-      'performance_reviews',
-      where: 'employee_id = ? AND is_deleted = 0',
-      whereArgs: [widget.employeeId],
-      orderBy: 'review_date ASC',
-    );
+    final res = await _db.getPerformanceReviews(employeeId: widget.employeeId);
     setState(() {
       _reviews = res;
       _isLoading = false;
@@ -76,18 +70,12 @@ class _PerformanceTabState extends State<PerformanceTab> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
             ElevatedButton(
               onPressed: () async {
-                final db = await _db.database;
                 final nowStr = DateTime.now().toIso8601String();
-                await db.insert('performance_reviews', {
-                  'id': const Uuid().v4(),
+                await _db.addPerformanceReview({
                   'employee_id': widget.employeeId,
                   'review_date': nowStr,
                   'rating': rating,
                   'manager_feedback': feedback,
-                  'created_at': nowStr,
-                  'updated_at': nowStr,
-                  'sync_status': 0,
-                  'is_deleted': 0,
                 });
                 Navigator.pop(ctx);
                 _loadReviews();
@@ -117,7 +105,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
                 onPressed: _addReview,
                 icon: const Icon(Icons.add_chart, size: 18),
                 label: const Text("تقييم جديد"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.withOpacity(0.8)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.withValues(alpha: 0.8)),
               ),
             ],
           ),
@@ -139,7 +127,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
     if (_reviews.length < 2) {
       return Container(
         height: 150,
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(16)),
         child: const Center(child: Text("هناك حاجة لتقييمين على الأقل لرسم المخطط", style: TextStyle(color: Colors.white24, fontSize: 12))),
       );
     }
@@ -163,7 +151,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
               dotData: const FlDotData(show: true),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.amber.withOpacity(0.1),
+                color: Colors.amber.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -178,7 +166,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),

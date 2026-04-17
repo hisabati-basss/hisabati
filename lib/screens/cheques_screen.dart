@@ -188,7 +188,7 @@ class _ChequesScreenState extends State<ChequesScreen> {
                     color: cheque['type'] == ChequeService.TYPE_RECEIVABLE ? Colors.green.withValues(alpha: 0.05) : Colors.orange.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(2), // 📉 Sharper
                   ),
-                  child: Text(cheque['type'] == ChequeService.TYPE_RECEIVABLE ? "IN" : "OUT", style: TextStyle(fontSize: context.bodySize - 5, color: cheque['type'] == ChequeService.TYPE_RECEIVABLE ? Colors.green : Colors.orange)), // 📉 Shortened
+                  child: Text(cheque['type'] == ChequeService.TYPE_RECEIVABLE ? "وارد" : "صادر", style: TextStyle(fontSize: context.bodySize - 5, color: cheque['type'] == ChequeService.TYPE_RECEIVABLE ? Colors.green : Colors.orange)), // 📉 Shortened
                 )),
                 DataCell(Text(cheque['bank_name'] ?? '', style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 4))), // 📉 Reduced
                 DataCell(Text(cheque['partner_name'] ?? '', style: TextStyle(color: context.textColor, fontSize: context.bodySize - 4))), // 📉 Reduced
@@ -197,9 +197,15 @@ class _ChequesScreenState extends State<ChequesScreen> {
                 DataCell(Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(width: 2, height: 2, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)), // 📉 Reduced
-                    const SizedBox(width: 2),
-                    Text(isPastDue ? 'Overdue' : (cheque['status'] ?? ''), style: TextStyle(color: statusColor, fontSize: context.bodySize - 5)), // 📉 Reduced/Shortened
+                    Container(width: 4, height: 4, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)), // 📉 Reduced
+                    const SizedBox(width: 4),
+                    Text(
+                      isPastDue ? 'متأخر' : 
+                      (cheque['status'] == ChequeService.STATUS_PENDING ? 'قيد الانتظار' :
+                       cheque['status'] == ChequeService.STATUS_CLEARED ? 'مُحصّل' :
+                       cheque['status'] == ChequeService.STATUS_BOUNCED ? 'مرتجع' : (cheque['status'] ?? '')),
+                      style: TextStyle(color: statusColor, fontSize: context.bodySize - 4)
+                    ),
                   ],
                 )),
                 DataCell(Row(
@@ -245,17 +251,21 @@ class _ChequesScreenState extends State<ChequesScreen> {
   }
 
   void _showAddChequeDialog(BuildContext context) async {
-    final clients = await DatabaseHelper().getClients();
-    final suppliers = await DatabaseHelper().getSuppliers();
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+    final clients = await dbHelper.getClients();
+    final suppliers = await dbHelper.getSuppliers();
+    final accounts = await db.query('accounts', where: "type = 'asset'");
 
     final numberCtrl = TextEditingController();
-    final bankCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     DateTime dueDate = DateTime.now().add(const Duration(days: 30));
     String type = ChequeService.TYPE_RECEIVABLE;
     
-    String? selectedPartnerId = clients.isNotEmpty ? clients.first['id'] : null;
-    String? selectedPartnerName = clients.isNotEmpty ? clients.first['name'] : 'عميل غير معروف';
+    String? selectedPartnerId = clients.isNotEmpty ? clients.first['id']?.toString() : null;
+    String? selectedPartnerName = clients.isNotEmpty ? clients.first['name']?.toString() : 'عميل غير معروف';
+    String? selectedAccountId = accounts.isNotEmpty ? accounts.first['id']?.toString() : null;
+    String? selectedAccountName = accounts.isNotEmpty ? accounts.first['name']?.toString() : '';
 
     showDialog(
       context: context,
@@ -302,7 +312,7 @@ class _ChequesScreenState extends State<ChequesScreen> {
                       onChanged: (val) {
                         setDialogState(() {
                           selectedPartnerId = val;
-                          selectedPartnerName = currentPartners.firstWhere((p) => p['id'] == val)['name'];
+                          selectedPartnerName = currentPartners.firstWhere((p) => p['id']?.toString() == val)['name']?.toString();
                         });
                       },
                     ),
@@ -312,9 +322,17 @@ class _ChequesScreenState extends State<ChequesScreen> {
                       decoration: const InputDecoration(labelText: "رقم الشيك (Cheque No)", border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: bankCtrl,
+                    DropdownButtonFormField<String>(
+                      value: selectedAccountId,
                       decoration: const InputDecoration(labelText: "البنك المسحوب عليه/له", border: OutlineInputBorder()),
+                      items: accounts.map((a) => DropdownMenuItem(value: a['id']?.toString(), child: Text(a['name']?.toString() ?? ''))).toList(),
+                      hint: const Text("اختر حساب البنك"),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedAccountId = val;
+                          selectedAccountName = accounts.firstWhere((a) => a['id']?.toString() == val)['name']?.toString();
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -347,14 +365,14 @@ class _ChequesScreenState extends State<ChequesScreen> {
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
               ElevatedButton(
                 onPressed: () async {
-                  if (numberCtrl.text.isEmpty || amountCtrl.text.isEmpty || selectedPartnerId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى ملء كافة الحقول واختيار الطرف الثاني")));
+                  if (numberCtrl.text.isEmpty || amountCtrl.text.isEmpty || selectedPartnerId == null || selectedAccountId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى ملء كافة الحقول واختيار الطرف الثاني والبنك")));
                     return;
                   }
                   
                   await _chequeService.addCheque(
                     chequeNumber: numberCtrl.text,
-                    bankName: bankCtrl.text,
+                    bankName: selectedAccountName ?? 'غير معروف',
                     amount: double.tryParse(amountCtrl.text) ?? 0,
                     issueDate: DateTime.now(),
                     dueDate: dueDate,

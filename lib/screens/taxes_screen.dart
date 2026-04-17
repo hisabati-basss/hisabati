@@ -64,7 +64,7 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final config = TaxEngine.getConfigForCountry(_country);
-    final currency = _country == "USA" ? "\$" : (_country == "Saudi Arabia" ? "ر.س" : "AED"); // Simplified for demo; should be dynamic
+    final currency = config.countryCode == 'SA' ? 'ر.س' : (config.countryCode == 'AE' ? 'AED' : (config.countryCode == 'EG' ? 'EGP' : '\$'));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -346,24 +346,30 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
     final quarterStart = DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1, 1);
     final quarterEnd = DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 4, 0);
     
-    await _db.saveTaxFiling({
-      'id': const Uuid().v4(),
-      'period_label': 'Q${((now.month - 1) ~/ 3) + 1} ${now.year}',
-      'start_date': quarterStart.toIso8601String().substring(0, 10),
-      'end_date': quarterEnd.toIso8601String().substring(0, 10),
-      'country': _country,
-      'tax_rate': _taxRate,
-      'total_sales_tax': salesTax,
-      'total_purchase_tax': purchaseTax,
-      'net_tax_due': netTax,
-      'status': 'filed',
-      'filed_at': now.toIso8601String(),
-    });
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم تقديم الإقرار الضريبي بنجاح"), backgroundColor: Colors.green));
+    try {
+      await _db.saveTaxFiling({
+        'id': const Uuid().v4(),
+        'period_label': 'Q${((now.month - 1) ~/ 3) + 1} ${now.year}',
+        'start_date': quarterStart.toIso8601String().substring(0, 10),
+        'end_date': quarterEnd.toIso8601String().substring(0, 10),
+        'country': _country,
+        'tax_rate': _taxRate,
+        'total_sales_tax': salesTax,
+        'total_purchase_tax': purchaseTax,
+        'net_tax_due': netTax,
+        'status': 'filed',
+        'filed_at': now.toIso8601String(),
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم تقديم الإقرار الضريبي بنجاح"), backgroundColor: Colors.green));
+      }
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ خطأ أثناء تقديم الإقرار: $e"), backgroundColor: Colors.red));
+      }
     }
-    _loadData();
   }
 
   Future<void> _exportTaxPDF(double salesTax, double purchaseTax, double netTax) async {

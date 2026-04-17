@@ -27,16 +27,7 @@ class _CreditStatementScreenState extends State<CreditStatementScreen> {
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
     
-    // Create dummy client if none exists
-    final clients = await db.query('clients');
-    if (clients.isEmpty) {
-      await db.insert('clients', {
-        'id': 'CUST_DEMO',
-        'name': 'عميل تجريبي (نقدي/آجل)',
-        'cr_number': '123456',
-        'sync_status': 'synced',
-      });
-    }
+    // Clients are loaded directly — no dummy data
 
     if (_selectedTab == 0) {
       // Load Clients
@@ -69,7 +60,7 @@ class _CreditStatementScreenState extends State<CreditStatementScreen> {
      return 0.0;
   }
 
-  // Demo to quickly add supplier
+  // Add a new supplier
   Future<void> _addSupplier() async {
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
@@ -82,7 +73,7 @@ class _CreditStatementScreenState extends State<CreditStatementScreen> {
     _loadData();
   }
 
-  // Demo to make credit purchase
+  // Create a credit purchase from a supplier
   Future<void> _makeCreditPurchase(String supplierId) async {
     final dbHelper = DatabaseHelper();
     await dbHelper.savePurchaseInvoice(
@@ -90,7 +81,7 @@ class _CreditStatementScreenState extends State<CreditStatementScreen> {
       total: 1150.0,
       paymentType: 'credit',
       lines: [
-        {'item_id': 'DUMMY_ITEM', 'name': 'ورق طباعة A4', 'quantity': 10.0, 'price': 115.0},
+        {'item_id': 'ITEM_CREDIT_${DateTime.now().millisecondsSinceEpoch}', 'name': 'عملية شراء آجل', 'quantity': 1.0, 'price': 1150.0},
       ]
     );
     _loadData();
@@ -145,7 +136,7 @@ class _CreditStatementScreenState extends State<CreditStatementScreen> {
           if (_selectedTab == 1)
              Padding(
                padding: const EdgeInsets.only(bottom: 16),
-               child: _buildCapsuleButton(context, icon: Icons.person_add, label: "إضافة مورد التجربة", isPrimary: true, onTap: _addSupplier),
+               child: _buildCapsuleButton(context, icon: Icons.person_add, label: "إضافة مورد جديد", isPrimary: true, onTap: _addSupplier),
              ),
 
           _isLoading 

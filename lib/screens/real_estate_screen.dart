@@ -24,9 +24,8 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
 
   Future<void> _loadData() async {
     try {
-      final db = await _db.database;
-      final units = await db.query('real_estate_units', where: 'is_deleted = 0');
-      final contracts = await db.query('real_estate_contracts', where: 'is_deleted = 0');
+      final units = await _db.getRealEstateUnits();
+      final contracts = await _db.getRealEstateContracts();
 
       if (mounted) {
         setState(() {
@@ -38,7 +37,7 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("جاري معالجة بيانات العقارات.. : $e")));
+        debugPrint("Real Estate Error: $e");
       }
     }
   }
@@ -215,7 +214,16 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
         leading: const Icon(Icons.history_edu_rounded, color: Color(0xFFFF8C00)),
         title: Text(contract['tenant_name'] ?? "مستأجر"),
         subtitle: Text("ينتهي في: ${contract['end_date']} | المبلغ السنوي: ${contract['annual_rent']} ر.س"),
-        trailing: _buildActionButton(Icons.payments_rounded, "تحصيل", onPressed: () {}, isPrimary: true),
+        trailing: _buildActionButton(Icons.payments_rounded, "تحصيل", onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('سيتم تسجيل تحصيل إيجار ${contract['tenant_name'] ?? "المستأجر"} — قادم في التحديث القادم'),
+              backgroundColor: const Color(0xFFFF8C00),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }, isPrimary: true),
       ),
     );
   }
@@ -236,10 +244,134 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
   }
 
   void _showUnitForm() {
-    // Logic to add new unit
+    final nameCtrl = TextEditingController();
+    final addressCtrl = TextEditingController();
+    final rentCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('إضافة وحدة سكنية جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'اسم الوحدة',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: addressCtrl,
+              decoration: InputDecoration(
+                labelText: 'العنوان',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: rentCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'قيمة الإيجار الشهري',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameCtrl.text.isEmpty) return;
+              try {
+                await _db.addRealEstateUnit({
+                  'name': nameCtrl.text,
+                  'address': addressCtrl.text,
+                  'rent_amount': double.tryParse(rentCtrl.text) ?? 0,
+                  'status': 'AVAILABLE',
+                });
+                Navigator.pop(ctx);
+                _loadData();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00)),
+            child: const Text('حفظ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showContractForm() {
-    // Logic to add new contract
+    final tenantCtrl = TextEditingController();
+    final rentCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('إنشاء عقد إيجار جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: tenantCtrl,
+              decoration: InputDecoration(
+                labelText: 'اسم المستأجر',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: rentCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'الإيجار السنوي',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () async {
+              if (tenantCtrl.text.isEmpty) return;
+              try {
+                final now = DateTime.now();
+                await _db.addRealEstateContract({
+                  'tenant_name': tenantCtrl.text,
+                  'annual_rent': double.tryParse(rentCtrl.text) ?? 0,
+                  'start_date': now.toIso8601String().split('T')[0],
+                  'end_date': DateTime(now.year + 1, now.month, now.day).toIso8601String().split('T')[0],
+                });
+                Navigator.pop(ctx);
+                _loadData();
+              } catch (e) {
+                if (mounted) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00)),
+            child: const Text('حفظ العقد', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }

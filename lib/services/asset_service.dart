@@ -124,4 +124,21 @@ class AssetService {
       );
     });
   }
+
+  /// Creates a new asset/vehicle in the database.
+  Future<void> createAsset(Map<String, dynamic> assetData) async {
+    final db = await _dbHelper.database;
+    final String nowStr = DateTime.now().toIso8601String();
+    final deviceId = await _dbHelper.getDeviceFingerprint();
+
+    final Map<String, dynamic> data = Map<String, dynamic>.from(assetData);
+    data['id'] ??= 'ASSET_${DateTime.now().millisecondsSinceEpoch}';
+    data['sync_status'] = 0;
+    data['updated_at'] = nowStr;
+    data['device_id'] = deviceId;
+    data['is_deleted'] = 0;
+    data['status'] ??= 'available';
+
+    await db.insert('assets', data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 }

@@ -40,52 +40,47 @@ export const Footer = () => {
             </div>
             <span className="text-xl font-extrabold tracking-tight">Hisabati</span>
           </div>
-          <p className="text-foreground/60 max-w-xs mb-6">
+          <p className="text-foreground/60 max-w-sm mb-6 text-sm leading-relaxed">
             {t("footer.desc")}
           </p>
-          <div className="flex gap-4">
-            <a href="https://www.linkedin.com/in/hisabati-undefined-0a9b9a402/?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BLp5IunXXT3KAVwYUpbY0dA%3D%3D" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
-              <LinkedinIcon className="w-5 h-5" />
+          <div className="flex gap-3">
+            <a href="https://www.linkedin.com/in/hisabati-undefined-0a9b9a402/" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
+              <LinkedinIcon className="w-4 h-4" />
             </a>
-            <a href="https://www.instagram.com/hisabati.basss?utm_source=qr" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
-              <InstagramIcon className="w-5 h-5" />
+            <a href="https://www.instagram.com/hisabati.basss" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
+              <InstagramIcon className="w-4 h-4" />
             </a>
             <a href="https://www.facebook.com/share/1BPvxD3aAr/" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
-              <FacebookIcon className="w-5 h-5" />
+              <FacebookIcon className="w-4 h-4" />
             </a>
             <a href="https://www.tiktok.com/@hisabati.app" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-brand hover:text-white transition-colors">
-              <TiktokIcon className="w-5 h-5" />
+              <TiktokIcon className="w-4 h-4" />
             </a>
           </div>
-
-
         </div>
 
         <div>
-          <h4 className="font-bold mb-4 uppercase text-sm tracking-wider">{t("footer.product")}</h4>
-          <ul className="space-y-3 text-foreground/70">
-            <li><a href="#" className="hover:text-brand">{t("footer.link1")}</a></li>
-            <li><a href="#" className="hover:text-brand">{t("footer.link2")}</a></li>
-            <li><a href="#" className="hover:text-brand">{t("footer.link3")}</a></li>
-            <li><a href="#" className="hover:text-brand">{t("footer.link4")}</a></li>
+          <h4 className="font-bold mb-4 uppercase text-xs tracking-wider text-foreground/50">{t("footer.product")}</h4>
+          <ul className="space-y-3 text-foreground/70 text-sm">
+            <li><a href="#features" className="hover:text-brand transition-colors">{t("footer.features")}</a></li>
+            <li><a href="#solutions" className="hover:text-brand transition-colors">{t("footer.solutions")}</a></li>
+            <li><a href="#pricing" className="hover:text-brand transition-colors">{t("footer.link3")}</a></li>
+            <li><a href="#affiliate" className="hover:text-brand transition-colors">{t("footer.link4")}</a></li>
           </ul>
         </div>
 
         <div>
-          <h4 className="font-bold mb-4 uppercase text-sm tracking-wider">{t("footer.developer")}</h4>
-          <ul className="space-y-3 text-foreground/70">
-            <li className="flex items-center gap-2">
-              <img src="/dev-logo.svg" alt="Developer Logo" className="w-5 h-5 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300" />
-              <a href="https://github.com/hbasss" target="_blank" rel="noreferrer" className="hover:text-brand">{t("footer.sys1")}</a>
-            </li>
-            <li><a href="#" className="hover:text-brand">{t("footer.sys2")}</a></li>
-            <li><a href="#" className="hover:text-brand">{t("footer.sys3")}</a></li>
-            <li><a href="mailto:bassemsabri@outlook.sa" className="hover:text-brand">{t("footer.sys4")}</a></li>
+          <h4 className="font-bold mb-4 uppercase text-xs tracking-wider text-foreground/50">{t("footer.developer")}</h4>
+          <ul className="space-y-3 text-foreground/70 text-sm">
+            <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys1")}</a></li>
+            <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys2")}</a></li>
+            <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys3")}</a></li>
+            <li><a href="mailto:bassemsabri@outlook.sa" className="hover:text-brand transition-colors">{t("footer.sys4")}</a></li>
           </ul>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-8 border-t border-foreground/10 text-center text-foreground/50 text-sm">
+      <div className="max-w-7xl mx-auto pt-8 border-t border-foreground/10 text-center text-foreground/40 text-xs">
         {t("footer.rights")}
       </div>
     </footer>

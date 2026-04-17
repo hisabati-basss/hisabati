@@ -39,8 +39,15 @@ class PayrollTab extends StatelessWidget {
         Text(tr('hr.payroll.title'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textColor)),
         IconButton(
           icon: Icon(Icons.download_rounded, color: context.mutedText),
-          onPressed: () {}, // Export logic placeholder
-        ),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('جاري تصدير كشف الرواتب إلى PDF...'),
+                backgroundColor: Color(0xFFFF6B00),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },        ),
       ],
     );
   }

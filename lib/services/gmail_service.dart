@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -20,7 +21,7 @@ class GmailService {
       _currentUser = await _googleSignIn.signIn();
       return _currentUser != null;
     } catch (e) {
-      print("Gmail Sign In Error: $e");
+      debugPrint("Gmail Sign In Error: $e");
       return false;
     }
   }
@@ -68,26 +69,5 @@ class GmailService {
     await _googleSignIn.signOut();
     _currentUser = null;
   }
-  
-  // For Demonstration - Mock Sync
-  Future<List<Map<String, dynamic>>> getMockDrafts() async {
-     return [
-       {
-         'id': 'MOCK_1',
-         'date': '2026-04-01',
-         'supplier_name': 'شركة التوريدات الحديثة',
-         'total_amount': 1250.75,
-         'status': 'pending',
-         'attachment_path': '',
-       },
-       {
-         'id': 'MOCK_2',
-         'date': '2026-04-03',
-         'supplier_name': 'مورد الخليج للورق',
-         'total_amount': 450.00,
-         'status': 'pending',
-         'attachment_path': '',
-       }
-     ];
-  }
 }
+

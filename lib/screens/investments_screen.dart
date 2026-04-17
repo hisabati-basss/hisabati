@@ -28,8 +28,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      _investments = await _db.getInvestments();
       final db = await _db.database;
-      _investments = (await db.query('investments', orderBy: 'created_at DESC')).map((i) => Map<String, dynamic>.from(i)).toList();
       _transactions = (await db.rawQuery('''
         SELECT it.*, inv.name as investment_name FROM investment_transactions it
         LEFT JOIN investments inv ON it.investment_id = inv.id
@@ -47,16 +47,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
 
     showDialog(context: context, builder: (ctx) => StatefulBuilder(
       builder: (ctx, setDialogState) => AlertDialog(
-        backgroundColor: context.cardSurface.withValues(alpha: 0.95),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("استثمار جديد", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: context.obsidianGlass,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: context.cardBorder, width: 1.5)),
+        title: Text("استثمار جديد", style: TextStyle(fontWeight: FontWeight.bold, color: context.textColor)),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           _input(nameCtrl, "اسم الاستثمار *"),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _input(amountCtrl, "المبلغ المستثمر", isNum: true)),
             const SizedBox(width: 8),
-            Expanded(child: _input(returnCtrl, "العائد المتوقع %", isNum: true)),
+            // Expanded(child: _input(returnCtrl, "العائد المتوقع %", isNum: true)), // Removed to prevent DB Schema Error
           ]),
           const SizedBox(height: 10),
           Row(children: [
@@ -74,23 +74,28 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              final db = await _db.database;
               final amount = double.tryParse(amountCtrl.text) ?? 0;
-              await db.insert('investments', {
-                'id': 'INV_${DateTime.now().millisecondsSinceEpoch}',
-                'name': nameCtrl.text.trim(),
-                'type': type,
-                'initial_amount': amount,
-                'current_value': amount,
-                'expected_return': (double.tryParse(returnCtrl.text) ?? 8) / 100,
-                'status': 'active',
-                'created_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-              });
-              if (mounted) { Navigator.pop(ctx); _loadData(); }
+              try {
+                await _db.addInvestment({
+                  'name': nameCtrl.text.trim(),
+                  'type': type,
+                  'initial_amount': amount,
+                  'current_value': amount,
+                  'status': 'active',
+                });
+                if (mounted) { 
+                  Navigator.pop(ctx); 
+                  _loadData(); 
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح"), backgroundColor: Colors.green));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحفظ: $e"), backgroundColor: Colors.red));
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black87),
-            child: const Text("حفظ"),
+            child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -215,7 +220,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
 
   Widget _input(TextEditingController c, String h, {bool isNum = false}) => TextField(
     controller: c, keyboardType: isNum ? TextInputType.number : TextInputType.text, style: TextStyle(color: context.textColor, fontSize: 13),
-    decoration: InputDecoration(hintText: h, hintStyle: TextStyle(color: context.mutedText, fontSize: 12), filled: true, fillColor: context.cardSurface.withValues(alpha: 0.3),
+    decoration: InputDecoration(hintText: h, hintStyle: TextStyle(color: context.mutedText, fontSize: 12), filled: true, fillColor: Colors.black.withValues(alpha: 0.2),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
   );
 
