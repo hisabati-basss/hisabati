@@ -44,6 +44,10 @@ export const Navbar = () => {
   ];
 
   const scrollTo = (id: string) => {
+    if (window.location.pathname !== "/") {
+      window.location.href = `/#${id}`;
+      return;
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setMobileOpen(false);
   };
@@ -64,7 +68,7 @@ export const Navbar = () => {
           <div className="w-full h-full rounded-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-black/5 dark:border-white/10 shadow-2xl transition-all duration-300">
             <div className="px-6 h-20 flex items-center justify-between">
               {/* Logo */}
-              <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { if(window.location.pathname !== "/") { window.location.href = "/"; } else { window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
                 <div className="w-12 h-12 flex-shrink-0">
                   <img src="/hisabatilogo.png" alt="Hisabati Logo" className="w-full h-full object-contain" />
                 </div>

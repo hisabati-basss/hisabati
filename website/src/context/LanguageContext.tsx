@@ -739,7 +739,7 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
 
   return (
     <LanguageContext.Provider value={{ language, toggleLanguage, dir, t }}>
-      <div dir={dir}>{children}</div>
+      <div dir={dir} suppressHydrationWarning>{children}</div>
     </LanguageContext.Provider>
   );
 };

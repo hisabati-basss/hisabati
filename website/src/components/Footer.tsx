@@ -73,15 +73,18 @@ export const Footer = () => {
           <h4 className="font-bold mb-4 uppercase text-xs tracking-wider text-foreground/50">{t("footer.developer")}</h4>
           <ul className="space-y-3 text-foreground/70 text-sm">
             <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys1")}</a></li>
-            <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys2")}</a></li>
+            <li><a href="/privacy" className="hover:text-brand transition-colors">{t("footer.sys2")}</a></li>
             <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys3")}</a></li>
             <li><a href="mailto:bassemsabri@outlook.sa" className="hover:text-brand transition-colors">{t("footer.sys4")}</a></li>
           </ul>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-8 border-t border-foreground/10 text-center text-foreground/40 text-xs">
-        {t("footer.rights")}
+      <div className="max-w-7xl mx-auto pt-8 border-t border-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4 text-foreground/40 text-xs">
+        <div>{t("footer.rights")}</div>
+        <div className="flex gap-6">
+          <a href="/privacy" className="hover:text-brand transition-colors">{t("footer.sys2")}</a>
+        </div>
       </div>
     </footer>
   );
