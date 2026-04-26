@@ -58,3 +58,4 @@ website/out/
 *.zip
 *.msi
 *.exe
+!website/public/*.exe
