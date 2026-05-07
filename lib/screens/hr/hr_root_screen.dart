@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../theme/app_theme_extension.dart';
@@ -12,10 +13,8 @@ import 'attendance_tab.dart';
 import 'leaves_tab.dart';
 import 'payroll_tab.dart';
 import 'recruitment_tab.dart';
-import 'tabs/contracts_tab.dart';
-import 'tabs/custody_tab.dart';
-import 'tabs/documents_tab.dart';
-import 'tabs/performance_tab.dart';
+import 'tabs/shift_management_tab.dart';
+import '../../services/attendance_service.dart';
 
 class HrRootScreen extends StatefulWidget {
   const HrRootScreen({super.key});
@@ -27,6 +26,7 @@ class HrRootScreen extends StatefulWidget {
 class _HrRootScreenState extends State<HrRootScreen> {
   final DatabaseHelper _db = DatabaseHelper();
   final PayrollService _payrollService = PayrollService();
+  final AttendanceService _attendanceService = AttendanceService();
   
   List<Map<String, dynamic>> _employees = [];
   List<Map<String, dynamic>> _candidates = [];
@@ -134,16 +134,16 @@ class _HrRootScreenState extends State<HrRootScreen> {
           children: [
             Icon(Icons.how_to_reg, color: Colors.greenAccent, size: 28),
             const SizedBox(width: 12),
-            const Text('تأكيد التوظيف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(tr('hr.hire_confirm_title'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('هل تريد توظيف "${candidate['name']}" كموظف رسمي؟', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            Text(tr('hr.hire_confirm_msg', args: [candidate['name']]), style: const TextStyle(color: Colors.white70, fontSize: 14)),
             const SizedBox(height: 12),
-            Text('سيتم تحويل حالته من "مرشح" إلى "نشط" وستُنشأ له بيانات الدخول.', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(tr('hr.hire_confirm_note'), style: const TextStyle(color: Colors.white38, fontSize: 12)),
           ],
         ),
         actions: [
@@ -426,23 +426,83 @@ class _HrRootScreenState extends State<HrRootScreen> {
     );
   }
 
+  Future<void> _handleGenerateAttendanceReport() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: primaryOrange)),
+    );
+
+    final report = await _attendanceService.generateDailyReport(DateTime.now());
+    
+    if (mounted) Navigator.pop(context); // Close loading
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(tr('hr.attendance.report_title'), style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildReportStatRow(tr('common.all'), report['total_employees'].toString(), Colors.blueAccent),
+                _buildReportStatRow(tr('hr.attendance.on_time'), report['on_time'].length.toString(), Colors.greenAccent),
+                _buildReportStatRow(tr('hr.attendance.late'), report['late_count'].toString(), Colors.orangeAccent),
+                _buildReportStatRow(tr('hr.attendance.absent'), report['absent_count'].toString(), Colors.redAccent),
+                const Divider(color: Colors.white10),
+                const Text("المتأخرون:", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ... (report['latecomers'] as List).map((l) => ListTile(
+                  dense: true,
+                  title: Text(l['name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  subtitle: Text("تأخير ${l['delay_minutes']} دقيقة", style: const TextStyle(color: Colors.orangeAccent, fontSize: 10)),
+                )),
+                if ((report['latecomers'] as List).isEmpty) const Text("لا يوجد متأخرون", style: TextStyle(color: Colors.white38, fontSize: 10)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.close'))),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildReportStatRow(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 800;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: primaryOrange))
         : DefaultTabController(
-            length: 6,
+            length: 7,
             child: Column(
               children: [
-                _buildScreenHeader(isMobile),
-                _buildTabBar(),
+                _buildSlimGlassHeader(isMobile, isDark),
+                _buildGlassTabBar(isDark),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: TabBarView(
                       children: [
                         HRDashboardTab(
@@ -465,6 +525,7 @@ class _HrRootScreenState extends State<HrRootScreen> {
                           barcodeController: _barcodeController,
                           barcodeFocusNode: _barcodeFocusNode,
                           onScan: _handleAttendanceScan,
+                          onGenerateReport: _handleGenerateAttendanceReport,
                         ),
                         LeavesTab(
                           leaveRequests: _leaveRequests,
@@ -481,12 +542,13 @@ class _HrRootScreenState extends State<HrRootScreen> {
                           onViewSlip: _viewSlipDetails,
                           getCCName: _getCCName,
                         ),
-                        RecruitmentTab(
-                          candidates: _candidates,
-                          onAddCandidate: () => _showEmployeeForm(asCandidate: true),
-                          onHire: (c) => _hireCandidate(c),
-                        ),
-                      ],
+                          RecruitmentTab(
+                            candidates: _candidates,
+                            onAddCandidate: () => _showEmployeeForm(asCandidate: true),
+                            onHire: (c) => _hireCandidate(c),
+                          ),
+                          const ShiftManagementTab(),
+                        ],
                     ),
                   ),
                 ),
@@ -496,50 +558,91 @@ class _HrRootScreenState extends State<HrRootScreen> {
     );
   }
 
-  Widget _buildScreenHeader(bool isMobile) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+  Widget _buildSlimGlassHeader(bool isMobile, bool isDark) {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.02),
+            border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05))),
+          ),
+          child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.people_alt_rounded, color: primaryOrange, size: 28),
+              Expanded(
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Icon(Icons.arrow_back_ios_new, size: 18, color: context.textColor),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.people_alt_rounded, color: primaryOrange, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(tr('hr.header.module_title'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
+                          Text(tr('hr.header.module_subtitle'), style: TextStyle(color: context.mutedText, fontSize: 9), overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr('hr.header.module_title'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text(tr('hr.header.module_subtitle'), style: TextStyle(color: context.mutedText, fontSize: 13)),
-                ],
-              ),
+              const SizedBox(width: 8),
+              if (!isMobile)
+                GestureDetector(
+                  onTap: () => _showEmployeeForm(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: primaryOrange,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [BoxShadow(color: primaryOrange.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.add, color: Colors.black, size: 14),
+                        const SizedBox(width: 4),
+                        Text(tr('hr.header.add_employee_btn'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                )
             ],
           ),
-          if (!isMobile)
-            ElevatedButton.icon(
-              onPressed: () => _showEmployeeForm(),
-              icon: const Icon(Icons.add, color: Colors.black, size: 20),
-              label: Text(tr('hr.header.add_employee_btn'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            )
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildGlassTabBar(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: TabBar(
         isScrollable: true,
-        indicator: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: primaryOrange.withValues(alpha: 0.3))),
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
+        ),
         labelColor: primaryOrange,
-        unselectedLabelColor: Colors.white30,
-        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        unselectedLabelColor: context.mutedText,
+        labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontSize: 11),
+        tabAlignment: TabAlignment.start,
         tabs: [
           Tab(text: tr('hr.tabs.general')),
           Tab(text: tr('hr.tabs.employees')),
@@ -547,6 +650,7 @@ class _HrRootScreenState extends State<HrRootScreen> {
           Tab(text: tr('hr.tabs.leaves')),
           Tab(text: tr('hr.tabs.payroll')),
           Tab(text: tr('hr.tabs.recruitment')),
+          Tab(text: tr('hr.tabs.shifts')),
         ],
       ),
     );

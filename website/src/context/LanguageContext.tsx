@@ -352,7 +352,7 @@ const translations: Record<Language, Record<string, string>> = {
     "footer.sys1": "About Us",
     "footer.sys2": "Privacy Policy",
     "footer.sys3": "Terms of Service",
-    "footer.sys4": "bassemsabri@outlook.sa",
+    "footer.sys4": "hisabati.basss@gmail.com",
     "footer.rights": "© 2026 Hisabati. All rights reserved.",
   },
   ar: {
@@ -695,7 +695,7 @@ const translations: Record<Language, Record<string, string>> = {
     "footer.sys1": "من نحن",
     "footer.sys2": "سياسة الخصوصية",
     "footer.sys3": "شروط الخدمة",
-    "footer.sys4": "bassemsabri@outlook.sa",
+    "footer.sys4": "hisabati.basss@gmail.com",
     "footer.rights": "© 2026 حساباتي. جميع الحقوق محفوظة.",
   }
 };

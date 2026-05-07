@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/pdf_service.dart';
+import '../services/industry_provider.dart';
 import 'invoice_entry_screen.dart';
 import 'purchase_invoice_screen.dart';
 import 'manual_journal_screen.dart';
@@ -15,7 +16,12 @@ import 'bank_reconciliation_screen.dart';
 import '../core/accounting/accounting_engine.dart';
 
 class AccountingOperationsScreen extends StatefulWidget {
-  const AccountingOperationsScreen({super.key});
+  final int initialIndex;
+  
+  const AccountingOperationsScreen({
+    super.key,
+    this.initialIndex = 0,
+  });
 
   @override
   State<AccountingOperationsScreen> createState() =>
@@ -51,9 +57,18 @@ class _AccountingOperationsScreenState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4, 
+      vsync: this, 
+      initialIndex: widget.initialIndex,
+    );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _loadTabData(_tabController.index);
+      }
+    });
     _loadInitialConfig();
-    _loadTabData(0);
+    _loadTabData(widget.initialIndex);
   }
 
   Future<void> _loadInitialConfig() async {
@@ -139,15 +154,22 @@ class _AccountingOperationsScreenState
         children: [
           // Header
           Padding(
-            padding: EdgeInsets.fromLTRB(context.sectionPadding, 8, context.sectionPadding, 0),
+            padding: EdgeInsets.fromLTRB(context.sectionPadding, 4, context.sectionPadding, 0),
             child: Row(
               children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('accounting_module.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
-                      Text(tr('accounting_module.subtitle'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 2)),
+                      Text(tr('accounting_module.title'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(tr('accounting_module.subtitle'), style: TextStyle(color: context.mutedText, fontSize: 9)),
                     ],
                   ),
                 ),
@@ -155,12 +177,12 @@ class _AccountingOperationsScreenState
                   await showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const ManualJournalScreen());
                   _loadTabData(_tabController.index);
                 }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildActionButton(context, tr('accounting_module.actions.quotation'), Icons.description_outlined, () async {
                   await showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const QuotationScreen());
                   _loadTabData(_tabController.index);
                 }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildActionButton(context, tr('accounting_module.actions.invoice'), Icons.receipt_long, () async {
                   await showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const InvoiceEntryScreen());
                   _loadTabData(_tabController.index);
@@ -169,10 +191,10 @@ class _AccountingOperationsScreenState
             ),
           ),
           
-          // Row 2 of Actions (QuickBooks style Quick-Bar)
+          // Row 2 of Actions (Quick-Bar)
           Container(
-            height: 50,
-            margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 8),
+            height: 40,
+            margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 4),
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -194,7 +216,8 @@ class _AccountingOperationsScreenState
           ),
           // Tabs
           Container(
-            margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 8),
+            height: 38,
+            margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 4),
             decoration: BoxDecoration(
               color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(8),
@@ -202,11 +225,11 @@ class _AccountingOperationsScreenState
             child: TabBar(
               controller: _tabController,
               isScrollable: false,
-              labelColor: Colors.black87,
+              labelColor: isDark ? Colors.black87 : Colors.white,
               unselectedLabelColor: context.mutedText,
               indicator: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)),
               indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1),
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
               dividerColor: Colors.transparent,
               tabs: [
                 Tab(text: tr('accounting_module.tabs.journal')),
@@ -259,7 +282,88 @@ class _AccountingOperationsScreenState
   // Tab 1: شجرة الحسابات
   // ═══════════════════════════════════════════════════
   Widget _buildCOATab() {
-    if (_accounts.isEmpty) return _buildEmptyState(tr('accounting_module.messages.no_accounts'), Icons.account_tree);
+    if (_accounts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.account_tree_outlined, size: 80, color: context.mutedText.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(
+              "شجرة الحسابات فارغة",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "اضغط على الزر أدناه لإنشاء الحسابات المحاسبية الأساسية تلقائياً",
+              style: TextStyle(color: context.mutedText, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () async {
+                setState(() => _isLoading = true);
+                try {
+                  await _db.seedIndustryAccounts(IndustryType.general);
+                  await _loadCOA();
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تهيئة شجرة الحسابات بنجاح")));
+                } catch (e) {
+                  if (e.toString().contains('TRANSACTIONS_EXIST')) {
+                    if (mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: AlertDialog(
+                            backgroundColor: context.obsidianGlass,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                            title: const Text("تأكيد إعادة التهيئة", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            content: const Text(
+                              "يوجد معاملات مالية مسجلة بالفعل. تهيئة الشجرة ستؤدي إلى مسح كافة القيود والفواتير الحالية لبدء النظام من الصفر. هل أنت متأكد؟",
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء", style: TextStyle(color: Colors.white54))),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                                onPressed: () async {
+                                  Navigator.pop(ctx);
+                                  setState(() => _isLoading = true);
+                                  try {
+                                    await _db.seedIndustryAccounts(IndustryType.general, force: true);
+                                    await _loadCOA();
+                                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تمت إعادة تهيئة النظام بنجاح")));
+                                  } catch (err) {
+                                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في التهيئة الإجبارية: $err")));
+                                  }
+                                  if (mounted) setState(() => _isLoading = false);
+                                },
+                                child: const Text("نعم، مسح وابدأ من جديد"),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في التهيئة: $e")));
+                  }
+                }
+                if (mounted) setState(() => _isLoading = false);
+              },
+              icon: const Icon(Icons.auto_fix_high),
+              label: const Text("تهيئة شجرة الحسابات الآن"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryOrange,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     
     final types = {
       'asset': tr('accounting_module.account_types.asset'), 
@@ -307,15 +411,16 @@ class _AccountingOperationsScreenState
           
           // Accounts grouped by type
           ...types.entries.map((entry) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
             final typeAccounts = _accounts.where((a) => a['type'] == entry.key).toList();
             if (typeAccounts.isEmpty) return const SizedBox.shrink();
             
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: context.cardSurface.withValues(alpha: 0.5),
+                color: isDark ? Colors.black.withValues(alpha: 0.4) : context.cardSurface.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.cardBorder.withValues(alpha: 0.2)),
+                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : context.cardBorder.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,58 +744,241 @@ class _AccountingOperationsScreenState
   void _showAddAccountDialog() {
     final codeCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
+    final openingBalanceCtrl = TextEditingController(text: "0.0");
+    final taxRateCtrl = TextEditingController(text: "0.0");
+    final descriptionCtrl = TextEditingController();
     String selectedType = 'asset';
+    String? selectedParentId;
     
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: context.cardSurface,
-      title: Text(tr('accounting_module.dialogs.add_account_title')),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: codeCtrl, decoration: InputDecoration(labelText: tr('accounting_module.dialogs.account_code'), hintText: "e.g. 107")),
-        const SizedBox(height: 8),
-        TextField(controller: nameCtrl, decoration: InputDecoration(labelText: tr('accounting_module.dialogs.account_name'))),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: selectedType,
-          decoration: InputDecoration(labelText: tr('accounting_module.dialogs.account_type')),
-          items: [
-            DropdownMenuItem(value: 'asset', child: Text(tr('accounting_module.account_types.asset'))),
-            DropdownMenuItem(value: 'liability', child: Text(tr('accounting_module.account_types.liability'))),
-            DropdownMenuItem(value: 'revenue', child: Text(tr('accounting_module.account_types.revenue'))),
-            DropdownMenuItem(value: 'expense', child: Text(tr('accounting_module.account_types.expense'))),
-            DropdownMenuItem(value: 'equity', child: Text(tr('accounting_module.account_types.equity'))),
-          ],
-          onChanged: (v) { if (v != null) selectedType = v; },
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.55,
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.account_tree_rounded, color: primaryOrange),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text("إضافة حساب محاسبي متطور", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFieldLabel("كود الحساب (رقمي)"),
+                                const SizedBox(height: 8),
+                                _buildDialogField(codeCtrl, "مثل: 1110"),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFieldLabel("نوع الحساب"),
+                                const SizedBox(height: 8),
+                                _buildDropdownField(
+                                  value: selectedType,
+                                  items: [
+                                    DropdownMenuItem(value: 'asset', child: Text(tr('accounting_module.account_types.asset'))),
+                                    DropdownMenuItem(value: 'liability', child: Text(tr('accounting_module.account_types.liability'))),
+                                    DropdownMenuItem(value: 'revenue', child: Text(tr('accounting_module.account_types.revenue'))),
+                                    DropdownMenuItem(value: 'expense', child: Text(tr('accounting_module.account_types.expense'))),
+                                    DropdownMenuItem(value: 'equity', child: Text(tr('accounting_module.account_types.equity'))),
+                                  ],
+                                  onChanged: (v) { if (v != null) setDialogState(() => selectedType = v); },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      _buildFieldLabel("اسم الحساب"),
+                      const SizedBox(height: 8),
+                      _buildDialogField(nameCtrl, "أدخل الاسم الرسمي للحساب"),
+                      
+                      const SizedBox(height: 16),
+                      _buildFieldLabel("الحساب الأب (للهيكل الهرمي)"),
+                      const SizedBox(height: 8),
+                      _buildDropdownField(
+                        value: selectedParentId,
+                        hint: "اختر الحساب الرئيسي (اختياري)",
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text("بدون (حساب رئيسي)")),
+                          ..._accounts.where((a) => a['id'] != null).map((acc) => DropdownMenuItem(
+                            value: acc['id'] as String,
+                            child: Text("${acc['code'] ?? ''} - ${acc['name'] ?? ''}"),
+                          )),
+                        ],
+                        onChanged: (v) => setDialogState(() => selectedParentId = v),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFieldLabel("الرصيد الافتتاحي"),
+                                const SizedBox(height: 8),
+                                _buildDialogField(openingBalanceCtrl, "0.0", isNumeric: true),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFieldLabel("معدل الضريبة التلقائي %"),
+                                const SizedBox(height: 8),
+                                _buildDialogField(taxRateCtrl, "15", isNumeric: true),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      _buildFieldLabel("وصف الحساب"),
+                      const SizedBox(height: 8),
+                      _buildDialogField(descriptionCtrl, "ملاحظات إضافية حول هذا الحساب...", maxLines: 2),
+                      
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text("إلغاء", style: TextStyle(color: Colors.white54)),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryOrange,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                            ),
+                            onPressed: () async {
+                              if (codeCtrl.text.isEmpty || nameCtrl.text.isEmpty) return;
+                              final openBal = double.tryParse(openingBalanceCtrl.text) ?? 0.0;
+                              
+                              await _db.addAccount({
+                                'id': 'ACC_${const Uuid().v4().substring(0, 8).toUpperCase()}',
+                                'code': codeCtrl.text,
+                                'name': nameCtrl.text,
+                                'type': selectedType,
+                                'parent_id': selectedParentId,
+                                'balance': openBal,
+                                'opening_balance': openBal,
+                                'tax_rate': double.tryParse(taxRateCtrl.text) ?? 0.0,
+                                'description': descriptionCtrl.text,
+                                'currency': _currency,
+                                'is_active': 1,
+                              });
+                              Navigator.pop(ctx);
+                              _loadTabData(1);
+                            },
+                            child: const Text("حفظ الحساب الآن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('accounting_module.invoice_entry.cancel'))),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: primaryOrange),
-          onPressed: () async {
-            if (codeCtrl.text.isEmpty || nameCtrl.text.isEmpty) return;
-            await _db.addAccount({
-              'id': 'ACC_${const Uuid().v4().substring(0, 8).toUpperCase()}',
-              'code': codeCtrl.text,
-              'name': nameCtrl.text,
-              'type': selectedType,
-              'balance': 0,
-            });
-            Navigator.pop(ctx);
-            _loadTabData(1);
-          },
-          child: Text(tr('hr.form.buttons.save'), style: const TextStyle(color: Colors.black87)),
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500));
+  }
+
+  Widget _buildDialogField(TextEditingController ctrl, String hint, {bool isNumeric = false, int maxLines = 1}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: isNumeric ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryOrange, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField({required dynamic value, required List<DropdownMenuItem<dynamic>> items, required Function(dynamic) onChanged, String? hint}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05), 
+        borderRadius: BorderRadius.circular(12), 
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1))
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<dynamic>(
+          value: value,
+          hint: hint != null ? Text(hint, style: const TextStyle(color: Colors.white24, fontSize: 13)) : null,
+          isExpanded: true,
+          dropdownColor: Colors.grey.shade900,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          items: items,
+          onChanged: onChanged,
         ),
-      ],
-    ));
+      ),
+    );
   }
 
   Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 36, padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.5),
+        color: isDark ? Colors.black.withValues(alpha: 0.3) : context.cardSurface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : context.cardBorder.withValues(alpha: 0.1)),
       ),
       child: TextField(
         controller: _searchController,
@@ -708,18 +996,19 @@ class _AccountingOperationsScreenState
   }
 
   Widget _buildRecordCard(Map<String, dynamic> record) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final type = record['type'];
     final color = type == 'sales' ? primaryOrange : type == 'purchase' ? Colors.blueAccent : Colors.purpleAccent;
     final icon = type == 'sales' ? Icons.receipt_long : type == 'purchase' ? Icons.shopping_bag : Icons.article;
     final label = type == 'sales' ? tr('accounting_module.actions.invoice') : type == 'purchase' ? tr('inventory.purchase_orders') : tr('accounting_module.actions.entry');
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: EdgeInsets.all(context.cardPadding),
       decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.3),
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : context.cardSurface.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(context.cardRadius),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : context.cardBorder.withValues(alpha: 0.1)),
       ),
       child: InkWell(
         onTap: () => _handleRecordTap(record),
@@ -873,35 +1162,89 @@ class _AccountingOperationsScreenState
 
   void _showClosePeriodDialog() {
     final yearCtrl = TextEditingController(text: "${tr('accounting.year_prefix')} ${DateTime.now().year}");
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: context.cardSurface,
-      title: Text(tr('accounting.close_period_title')),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(tr('accounting.close_period_desc')),
-          const SizedBox(height: 16),
-          TextField(controller: yearCtrl, decoration: InputDecoration(labelText: tr('accounting.period_name_label'))),
-        ],
+    showDialog(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.4,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade900.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 30)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_clock, color: sunsetStart, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    tr('accounting.close_period_title'),
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    tr('accounting.close_period_desc'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: yearCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: tr('accounting.period_name_label'),
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: Colors.black.withValues(alpha: 0.2),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text(tr('common.cancel'), style: const TextStyle(color: Colors.white54)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: sunsetStart,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () async {
+                            final start = "${DateTime.now().year}-01-01";
+                            final end = "${DateTime.now().year}-12-31";
+                            final success = await _engine.closeFiscalYear(yearCtrl.text, start, end);
+                            Navigator.pop(ctx);
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('accounting.close_success')), backgroundColor: Colors.green));
+                              _loadTabData(0);
+                            }
+                          },
+                          child: Text(tr('accounting.close_rotate_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-          onPressed: () async {
-            final start = "${DateTime.now().year}-01-01";
-            final end = "${DateTime.now().year}-12-31";
-            final success = await _engine.closeFiscalYear(yearCtrl.text, start, end);
-            Navigator.pop(ctx);
-            if (success) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('accounting.close_success')), backgroundColor: Colors.green));
-              _loadTabData(0);
-            }
-          },
-          child: Text(tr('accounting.close_rotate_btn'), style: const TextStyle(color: Colors.black)),
-        )
-      ],
-    ));
+    );
   }
 
   Widget _buildActionButton(BuildContext context, String label, IconData icon, VoidCallback onTap, {bool isPrimary = false}) {

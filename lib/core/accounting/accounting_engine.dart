@@ -149,14 +149,16 @@ class AccountingEngine {
       }
 
       await _db.savePurchaseInvoice(
-        supplierId: supplierId,
-        total: total,
-        paymentType: paymentType,
-        lines: lines,
-        paymentAccountId: paymentAccountId,
-        projectId: projectId,
-        costCenterId: costCenterId,
-        attachmentPath: attachmentPath,
+        {
+          'supplier_id': supplierId,
+          'total': total,
+          'payment_type': paymentType,
+          'payment_account_id': paymentAccountId,
+          'project_id': projectId,
+          'cost_center_id': costCenterId,
+          'attachment_path': attachmentPath,
+        },
+        lines,
       );
 
       // --- INVENTORY & COSTING (QuickBooks Style) ---
@@ -210,21 +212,6 @@ class AccountingEngine {
     }
   }
 
-  /// Process manufacturing order - deduct raw materials, add finished goods
-  Future<bool> processManufacturing({
-    required String bomId,
-    required double qtyToProduce,
-  }) async {
-    try {
-      await _db.executeManufacturingOrder(
-        bomId: bomId,
-        qtyToProduce: qtyToProduce,
-      );
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
 
   // ═══════════════════════════════════════════════════
   // 📄 Quotations (عروض الأسعار)

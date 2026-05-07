@@ -26,6 +26,21 @@ class CodegenLoader extends AssetLoader{
   "common.locked": "مقفل",
   "common.save": "حفظ",
   "common.cancel": "إلغاء",
+  "common.thinking": "جاري التفكير...",
+  "common.expiring_soon": "تنتهي قريباً",
+  "common.phone": "الجوال",
+  "common.regular": "عادي",
+  "common.coming_soon": "قريباً",
+  "common.no_name": "بدون اسم",
+  "common.no_phone": "بدون هاتف",
+  "common.add": "إضافة",
+  "common.revenue": "الإيرادات",
+  "common.expenses": "المصروفات",
+  "common.total_revenue": "إجمالي الإيرادات",
+  "common.total_expenses": "إجمالي المصروفات",
+  "common.total": "الإجمالي",
+  "accounts.cash": "الخزينة النقدية",
+  "accounts.bank": "الحساب البنكي",
   "inventory": "المخازن",
   "accounting.cash": "نقدي",
   "accounting.no_ledger_entries": "لا توجد حركات لهذا الحساب",
@@ -33,6 +48,7 @@ class CodegenLoader extends AssetLoader{
   "accounting.entry_details": "تفاصيل القيد",
   "accounting.entry_label": "القيد",
   "accounting.memo_label": "البيان",
+  "accounting.code": "كود الحساب",
   "accounting.account_header": "الحساب",
   "accounting.debit_header": "مدين",
   "accounting.credit_header": "دائن",
@@ -75,12 +91,32 @@ class CodegenLoader extends AssetLoader{
   "sidebar.joint_ventures": "المشاريع المشتركة",
   "sidebar.expenses": "إدارة المصروفات",
   "sidebar.cost_accounting": "محاسبة التكاليف",
+  "sidebar.file_manager": "مدير الملفات",
+  "sidebar.subscriptions": "الاشتراكات",
+  "sidebar.settings": "الإعدادات",
+  "sidebar_categories": {
+    "core": "الأنظمة الرئيسية",
+    "finance": "المالية والمحاسبية",
+    "support": "الدعم والرقابة",
+    "hr": "الموارد البشرية",
+    "operations": "العمليات والتجارة",
+    "entities": "القطاعات والكيانات",
+    "industries": "الصناعة والخدمات",
+    "extensions": "الإضافات الذكية",
+    "admin": "إدارة النظام"
+  },
   "months.jan": "يناير",
   "months.feb": "فبراير",
   "months.mar": "مارس",
   "months.apr": "أبريل",
   "months.may": "مايو",
   "months.jun": "يونيو",
+  "months.jul": "يوليو",
+  "months.aug": "أغسطس",
+  "months.sep": "سبتمبر",
+  "months.oct": "أكتوبر",
+  "months.nov": "نوفمبر",
+  "months.dec": "ديسمبر",
   "header.quick_reports": "التقارير السريعة",
   "header.change_branch": "تغيير الفرع",
   "branches.riyadh": "فرع الرياض",
@@ -122,6 +158,38 @@ class CodegenLoader extends AssetLoader{
   "hub.tiles.cheques": "حافظة الشيكات",
   "hub.tiles.trial_balance": "ميزان المراجعة",
   "hub.tiles.ai_chat": "الدردشة الذكية",
+  "hub.tiles.dashboard": "لوحة القيادة",
+  "hub.tiles.invoices": "الفواتير والمبيعات",
+  "hub.tiles.purchases": "المشتريات",
+  "hub.tiles.accounting": "المحاسبة والقيود",
+  "hub.tiles.reports": "التقارير المالية",
+  "hub.tiles.inventory": "المخزون والمنتجات",
+  "hub.tiles.zakat": "تقدير الزكاة",
+  "hub.tiles.zatca": "الربط التقني",
+  "currency.title": "مركز العملات",
+  "currency.subtitle": "إدارة أسعار الصرف العالمية",
+  "currency.add_rate": "إضافة سعر صرف",
+  "currency.from": "من عملة",
+  "currency.to": "إلى عملة",
+  "currency.rate": "سعر الصرف",
+  "currency.last_update": "آخر تحديث",
+  "currency.no_rates": "لا يوجد أسعار صرف مسجلة",
+  "currency.success": "تم حفظ سعر الصرف بنجاح",
+  "currency.delete_confirm": "هل أنت متأكد من حذف سعر الصرف هذا؟",
+  "recurring.title": "الفواتير المتكررة",
+  "recurring.subtitle": "جدولة وأتمتة العمليات المالية",
+  "recurring.add": "إضافة جدولة جديدة",
+  "recurring.next_run": "التشغيل القادم",
+  "recurring.last_run": "آخر تشغيل",
+  "recurring.frequency": "التكرار",
+  "recurring.daily": "يومياً",
+  "recurring.weekly": "أسبوعياً",
+  "recurring.monthly": "شهرياً",
+  "recurring.yearly": "سنوياً",
+  "recurring.status": "الحالة",
+  "recurring.active": "نشط",
+  "recurring.paused": "متوقف مؤقتاً",
+  "recurring.processed_success": "تمت معالجة المعاملات المجدولة بنجاح",
   "login.welcome_back": "أهلاً بك مجدداً",
   "login.subtitle": "سجل دخولك للنظام العالمي",
   "login.email": "البريد الوظيفي",
@@ -286,7 +354,7 @@ class CodegenLoader extends AssetLoader{
   "hr.direct_manager": "المدير المباشر",
   "hr.no_manager": "بدون مدير مباشر",
   "hr.entitlements": "المستحقات",
-  "hr.basic_salary": "أساسي",
+  "hr.basic_salary": "الأساسي",
   "hr.housing": "سكن",
   "hr.transport": "انتقال",
   "hr.insurance": "تأمين",
@@ -315,12 +383,12 @@ class CodegenLoader extends AssetLoader{
   "hr.end_service_confirm": "هل أنت متأكد من بدء إجراءات المخالصة النهائية للموظف {}؟ سيتم احتساب مكافأة نهاية الخدمة ورواتب الإجازات المتبقية.",
   "hr.start_settlement": "بدء التصفية",
   "hr.staff_list": "قائمة الموظفين النشطين",
-  "hr.attendance_today": "سجل حضور اليوم",
+  "hr.attendance_today": "حضور اليوم",
   "hr.no_attendance": "لا توجد تحركات مسجلة اليوم",
   "hr.barcode_hint": "قم بمسح باركود الموظف (ليزر)...",
   "hr.check_in": "دخول مجمع",
   "hr.check_out": "خروج مجمع",
-  "hr.invalid_barcode": "عذراً، الباركود غير مسجل!",
+  "hr.invalid_barcode": "الباركود غير صحيح أو الموظف غير موجود",
   "hr.stats.total_payroll": "إجمالي الرواتب",
   "hr.stats.attendance_rate": "نسبة الحضور",
   "hr.stats.expiring_docs": "وثائق منتهية",
@@ -419,13 +487,21 @@ class CodegenLoader extends AssetLoader{
   "hr.leaves.types.sick": "مرضية",
   "hr.leaves.types.emergency": "اضطرارية",
   "hr.leaves.types.unpaid": "بدون راتب",
-  "hr.payroll.title": "سجل مسيرات الرواتب",
-  "hr.payroll.process_btn": "بدء معالجة المسير الذكي",
-  "hr.payroll.processing": "جاري المعالجة...",
-  "hr.payroll.no_records": "لا توجد سجلات رواتب حالياً",
-  "hr.payroll.net_label": "صافي الراتب",
   "hr.payroll.cost_center_label": "مركز التكلفة",
   "hr.success_msg": "تمت معالجة الرواتب بنجاح",
+  "hr.payroll_title": "إدارة الرواتب الاحترافية",
+  "hr.payroll_subtitle": "معالجة المسيرات وإدارة هيكلة الرواتب",
+  "hr.process_payroll": "معالجة الرواتب",
+  "hr.salary_slips": "قسائم الرواتب",
+  "hr.salary_structure": "هيكل الرواتب",
+  "hr.process_for_month": "بدء معالجة مسير شهر {}",
+  "hr.employees_ready": "موظفين جاهزين للاحتساب",
+  "hr.run_payroll_btn": "تشغيل احتساب الرواتب",
+  "hr.payroll_already_processed": "تمت معالجة رواتب هذا الشهر",
+  "hr.no_slips_yet": "لا توجد قسائم رواتب لهذا الشهر بعد",
+  "hr.payroll_success": "تمت معالجة رواتب {} موظفين بنجاح",
+  "hr.basic": "الراتب الأساسي",
+  "hr.allowances": "إجمالي البدلات",
   "inventory_module.title": "إدارة المخزون",
   "inventory_module.subtitle": "المخزون",
   "inventory_module.add_item": "إضافة صنف",
@@ -510,7 +586,38 @@ class CodegenLoader extends AssetLoader{
   "sales_module.invoice_entry.agent_optional": "مندوب المبيعات (اختياري)",
   "sales_module.invoice_entry.no_agent": "بدون مندوب",
   "sales_module.invoice_entry.more": "المزيد",
+  "sales_module.invoice_entry.select_account": "الرجاء اختيار حساب الدفع",
+  "sales_module.invoice_entry.select_client": "الرجاء اختيار العميل",
   "sales_module.invoice_entry.custom_item": "صنف مخصص",
+  "pos.title": "المبيعات السريعة (POS)",
+  "pos.subtitle": "نقطة بيع سريعة ومرنة",
+  "pos.search_hint": "ابحث عن منتج بالاسم أو الباركود...",
+  "pos.low_stock": "مخزون منخفض: {}",
+  "pos.barcode_error": "منتج غير معرف: {}",
+  "pos.open_shift_title": "فتح وردية كاشير جديدة",
+  "pos.opening_balance_msg": "الرجاء إدخال رصيد الدرج الافتتاحي (Opening Balance):",
+  "pos.start_selling": "بدء البيع",
+  "pos.qty_not_available": "الكمية غير متوفرة في المستودع! (المتاح: {})",
+  "pos.receipt_header": "شركة التكنولوجيا الحديثة",
+  "pos.main_showroom": "فرع المعرض الرئيسي",
+  "pos.tax_number": "الرقم الضريبي: {}",
+  "pos.subtotal_no_tax": "المجموع (غير شامل الضريبة)",
+  "pos.vat_label": "ضريبة القيمة المضافة {}%",
+  "pos.total_due": "الإجمالي المستحق",
+  "pos.print_and_pass": "طباعة وتمرير",
+  "pos.camera_scanner_hint": "وجّه الكاميرا نحو باركود المنتج",
+  "pos.scan_tooltip": "مسح بالكاميرا",
+  "pos.shift_open": "وردية ({})",
+  "pos.shift_closed": "مغلق",
+  "pos.cart_title": "السلة",
+  "pos.cart_empty": "السلة فارغة",
+  "pos.checkout_btn": "دفع وطباعة",
+  "pos.subtotal": "المجموع",
+  "pos.tax_amount": "الضريبة ({}%)",
+  "pos.partner_walkin": "عميل نقدي",
+  "pos.z_report_title": "تقرير نهاية الوردية (Z-Report)",
+  "pos.close_shift_btn": "إغلاق الوردية وتصفية الصندوق",
+  "pos.checkout_error": "خطأ في إتمام العملية",
   "accounting_module.title": "برنامج الحسابات الشامل",
   "accounting_module.subtitle": "النظام المحاسبي المتكامل",
   "accounting_module.tabs.journal": "اليومية",
@@ -629,36 +736,24 @@ class CodegenLoader extends AssetLoader{
   "bank_reconciliation.match_btn": "مطابقة (Match)",
   "bank_reconciliation.need_match": "بحاجة لمطابقة",
   "bank_reconciliation.account_label": "اختر الحساب البنكي",
-  "custody.title": "العهد",
-  "custody.subtitle": "إدارة الموجودات",
-  "custody.financial_tab": "نقدية",
-  "custody.asset_tab": "عينية",
-  "custody.metric_financial": "العهد النقدية",
-  "custody.metric_assets": "أصول مع موظفين",
-  "custody.btn_issue_fin": "صرف",
-  "custody.btn_issue_asset": "تسليم",
-  "custody.btn_clear": "تصفية",
-  "custody.btn_return": "استرجاع",
-  "custody.dialog_issue_fin_title": "صرف عهدة نقدية جديدة",
-  "custody.dialog_issue_asset_title": "تسليم أصل (عهدة عينية)",
-  "custody.dialog_clear_fin_title": "تصفية عهدة {}",
-  "custody.dialog_return_asset_title": "استرجاع عهدة ({})",
+  "custody.header_title": "إدارة العهد والممتلكات",
+  "custody.header_subtitle": "تتبع العهد النقدية والعينية للموظفين",
+  "custody.stats_total_assets": "إجمالي العهد العينية",
+  "custody.stats_total_financial": "إجمالي العهد النقدية",
+  "custody.tab_financial": "العهد النقدية",
+  "custody.tab_assets": "العهد العينية",
+  "custody.no_financial": "لا توجد عهد نقدية مسجلة",
+  "custody.no_assets": "لا توجد عهد عينية حالياً",
+  "custody.btn_issue_financial": "صرف عهدة نقدية",
+  "custody.btn_issue_asset": "تسليم عهدة عينية",
+  "custody.no_emp_or_assets": "عذراً، يجب توفر موظفين وأصول مسجلة أولاً",
   "custody.select_employee": "اختر الموظف",
   "custody.select_asset": "اختر الأصل",
-  "custody.amount": "المبلغ",
-  "custody.reason": "سبب العهدة (مشتريات/سفر/الخ)",
-  "custody.clearance_notes": "ملاحظات التصفية / أرقام فواتير",
-  "custody.asset_condition": "حالة الأصل عند التسليم",
-  "custody.return_condition": "حالة الأصل عند الاسترجاع",
-  "custody.is_damaged": "الصنف تالف / يحتاج صيانة؟",
-  "custody.confirm_issue": "صرف وتحويل القيد",
-  "custody.confirm_clear": "تصفية وترحيل يومية",
-  "custody.confirm_asset_issue": "تسليم العهدة",
-  "custody.confirm_return": "تأكيد الاسترجاع",
-  "custody.clearance_msg": "بمجرد التصفية سيتم نقل المبلغ كمصروف وإغلاق حساب العهدة في شجرة الحسابات.",
-  "custody.error_no_employees": "يرجى إضافة موظفين أولاً!",
-  "custody.error_no_assets": "لا توجد أصول متاحة للعهد!",
-  "custody.previous_condition": "الحالة السابقة: {}",
+  "hr.no_employees_found": "لم يتم العثور على موظفين في النظام",
+  "common.amount": "المبلغ",
+  "common.reason": "السبب / البيان",
+  "common.error": "حدث خطأ",
+  "common.save_success": "تم الحفظ بنجاح",
   "assets_module.title": "الأصول",
   "assets_module.subtitle": "إدارة الأصول الثابتة",
   "assets_module.total_value": "القيمة الإجمالية",
@@ -694,6 +789,8 @@ class CodegenLoader extends AssetLoader{
   "assets_module.disposal_success": "تم تنفيذ عملية التخريد وإصدار القيود المحاسبية بنجاح.",
   "assets_module.no_assets_found": "لا توجد أصول مطابقة للبحث.",
   "assets_module.error_load": "خطأ في قراءة البيانات: {}",
+  "assets_module.assets_count": "إجمالي الأصول",
+  "assets_module.dep_btn": "بدء الإهلاك الذكي",
   "taxes_module.title": "الإدارة الضريبية",
   "taxes_module.subtitle": "الإقرارات الضريبية الذكية",
   "taxes_module.extract_btn": "استخراج",
@@ -709,6 +806,62 @@ class CodegenLoader extends AssetLoader{
   "taxes_module.due_by": "بحلول {}",
   "taxes_module.quarter_3": "الربع الثالث (يوليو - سبتمبر ٢٠٢٦)",
   "taxes_module.quarter_2": "الربع الثاني (أبريل - يونيو ٢٠٢٦)",
+  "zatca.status": "حالة الربط",
+  "zatca.subtitle": "إدارة التكامل مع الفاتورة الإلكترونية - المرحلة الثانية",
+  "zatca.config_title": "إعدادات الربط التقني",
+  "zatca.phase_label": "المرحلة الحالية",
+  "zatca.vat_number": "الرقم الضريبي للمنشأة",
+  "zatca.cert_status": "حالة الشهادة الرقمية",
+  "zatca.cert_active": "نشطة وصالحة",
+  "zatca.reconnect_btn": "إعادة فحص الاتصال بالبوابة",
+  "zatca.status_connected": "متصل بالبوابة بنجاح",
+  "zatca.status_disconnected": "غير متصل - مطلوب إعادة الربط",
+  "zatca.last_sync": "آخر فحص: {}",
+  "zatca.troubleshoot": "إصلاح المشكلات",
+  "zatca.phase2": "المرحلة الثانية",
+  "zakat.title": "تقدير الزكاة الشرعية",
+  "zakat.subtitle": "حساب الوعاء والزكاة بناءً على القوائم المالية",
+  "zakat.estimated_amount": "مبلغ الزكاة التقديري",
+  "zakat.breakdown": "تفاصيل احتساب الوعاء",
+  "zakat.assets_note": "الأصول الزكوية",
+  "zakat.assets_desc": "تشمل النقدية والديون المرجوة التحصيل والمخزون",
+  "zakat.liabilities_note": "الخصوم المتداولة",
+  "zakat.liabilities_desc": "تشمل الديون والمصاريف المستحقة المسموح بحسمها",
+  "zakat.generate_report_btn": "توليد تقرير الزكاة الرسمي",
+  "zakat.pool": "وعاء الزكاة",
+  "zakat.due": "الزكاة المستحقة",
+  "zakat.rate": "نسبة الزكاة",
+  "zakat.base": "إجمالي الوعاء",
+  "risk.title": "إدارة المخاطر والأزمات",
+  "risk.subtitle": "رصد وتحليل المخاطر التشغيلية والمالية",
+  "risk.report_incident": "بلاغ عن حادثة",
+  "risk.total": "إجمالي المخاطر",
+  "risk.high_priority": "مخاطر عالية",
+  "risk.resolved": "تمت معالجتها",
+  "risk.recent_incidents": "أحدث الحوادث المسجلة",
+  "risk.no_incidents": "لا توجد بلاغات مخاطر مسجلة",
+  "risk.report_new": "بلاغ جديد عن خطر/أزمة",
+  "risk.title_label": "عنوان الحادثة",
+  "risk.description_label": "وصف مفصل",
+  "risk.impact_label": "مستوى الأثر",
+  "risk.impact_low": "منخفض",
+  "risk.impact_medium": "متوسط",
+  "risk.impact_high": "مرتفع (حرج)",
+  "risk.tabs.incidents": "الحوادث",
+  "risk.tabs.assessment": "التقييم",
+  "risk.tabs.plan": "خطة الاستجابة",
+  "risk.action_plan": "خطة العمل",
+  "risk.status_pending": "قيد الانتظار",
+  "risk.status_investigating": "جاري التحقيق",
+  "risk.status_mitigated": "تم التخفيف",
+  "risk.status_resolved": "تم الحل",
+  "compliance.title": "الامتثال والحوكمة والرقابة",
+  "compliance.subtitle": "مراقبة سجلات الحوكمة وتتبع العمليات الحساسة",
+  "compliance.governance": "سجلات الحوكمة",
+  "compliance.audit_trail": "سجل المراجعة",
+  "compliance.summary": "ملخص الامتثال",
+  "compliance.no_records": "لا توجد سجلات حوكمة",
+  "compliance.no_audit": "لا توجد سجلات مراجعة حالياً",
   "settings_module.title": "الإعدادات العامة",
   "settings_module.subtitle": "تهيئة النظام",
   "settings_module.org_pdf_group": "المنشأة والـ PDF",
@@ -744,6 +897,9 @@ class CodegenLoader extends AssetLoader{
   "settings_module.group_notifications": "الإشعارات",
   "settings_module.group_modules": "الوحدات والأقسام",
   "settings_module.customize_subtitle": "تخصيص الأقسام المفعّلة",
+  "settings_module.group_general": "الإعدادات العامة والمتقدمة",
+  "settings_module.email_setup": "إعدادات البريد (SMTP)",
+  "settings_module.onboarding_restart": "إعادة تشغيل تهيئة النظام",
   "settings_module.group_ui": "الواجهة والأداء",
   "settings_module.animations": "الحركات والتأثيرات",
   "settings_module.password_dialog.current_pass": "كلمة المرور الحالية",
@@ -773,45 +929,24 @@ class CodegenLoader extends AssetLoader{
   "accounting_operations.credit_col": "دائن",
   "accounting_operations.empty_msg": "لم يتم العثور على أي حركات مالية",
   "accounting_operations.view_details": "عرض تفاصيل {}: {}",
-  "financial_reports.title": "التحليلات والميزانية",
-  "financial_reports.subtitle": "مركز التقارير المتقدمة",
-  "financial_reports.tab_profit": "الأرباح",
-  "financial_reports.tab_centers": "المراكز",
+  "financial_reports.title": "المركز المالي",
+  "financial_reports.subtitle": "التقارير الذكية",
+  "financial_reports.tab_profit": "قائمة الدخل",
+  "financial_reports.tab_centers": "مراكز التكلفة",
   "financial_reports.tab_balance": "الميزانية",
   "financial_reports.cost_centers_performance": "أداء مراكز التكلفة",
   "financial_reports.open_trial_balance": "فتح ميزان المراجعة (Trial Balance)",
-  "financial_reports.revenue_stat": "الإيرادات",
-  "financial_reports.expenses_stat": "المصروفات",
+  "financial_reports.revenue_stat": "إجمالي الإيرادات",
+  "financial_reports.expenses_stat": "إجمالي المصروفات",
   "financial_reports.profit_stat": "صافي الربح",
-  "financial_reports.center_net": "م.ت: {} (صافي)",
-  "financial_reports.export_pdf_title": "تقرير الأداء المالي المتقدم",
-  "financial_reports.export_period": "الفترة: {} إلى {}",
+  "financial_reports.center_net": "صافي {}",
+  "financial_reports.export_pdf_title": "التقرير المالي",
+  "financial_reports.export_period": "من {} إلى {}",
   "financial_reports.filter_period": "الفترة",
   "financial_reports.balance_sheet_summary": "الميزانية العمومية والتقارير الختامية",
   "financial_reports.expense_trend": "تطور المصروفات",
-  "pos.title": "المبيعات السريعة (POS)",
-  "pos.barcode_error": "منتج غير معرف: {}",
-  "pos.open_shift_title": "فتح وردية كاشير جديدة",
-  "pos.opening_balance_msg": "الرجاء إدخال رصيد الدرج الافتتاحي (Opening Balance):",
-  "pos.start_selling": "بدء البيع",
-  "pos.qty_not_available": "الكمية غير متوفرة في المستودع! (المتاح: {})",
-  "pos.receipt_header": "شركة التكنولوجيا الحديثة",
-  "pos.main_showroom": "فرع المعرض الرئيسي",
-  "pos.tax_number": "الرقم الضريبي: {}",
-  "pos.subtotal_no_tax": "المجموع (غير شامل الضريبة)",
-  "pos.vat_label": "ضريبة القيمة المضافة {}%",
-  "pos.total_due": "الإجمالي المستحق",
-  "pos.print_and_pass": "طباعة وتمرير",
-  "pos.camera_scanner_hint": "وجّه الكاميرا نحو باركود المنتج",
-  "pos.scan_tooltip": "مسح بالكاميرا",
-  "pos.shift_open": "وردية ({})",
-  "pos.shift_closed": "مغلق",
-  "pos.cart_title": "السلة",
-  "pos.cart_empty": "السلة فارغة",
-  "pos.checkout_btn": "دفع وطباعة",
-  "pos.subtotal": "المجموع",
-  "pos.tax_amount": "الضريبة ({}%)",
-  "pos.partner_walkin": "عميل نقدي",
+  "financial_reports.manage_cost_centers": "إدارة مراكز التكلفة",
+  "financial_reports.budget_performance": "أداء الميزانيات",
   "commercial.title": "إدارة المبيعات والتسويق",
   "commercial.subtitle": "العمولات المباشرة والحملات الترويجية",
   "commercial.new_target": "تارجت جديد",
@@ -852,6 +987,7 @@ class CodegenLoader extends AssetLoader{
   "suppliers.supplier_balance": "الرصيد الدائن",
   "suppliers.contact_label": "للتواصل",
   "suppliers.details.account_statement": "كشف حساب",
+  "suppliers.details.statement": "كشف الحساب",
   "suppliers.details.journal_entry": "قيد يومية",
   "suppliers.details.pdf.vat_number": "الرقم الضريبي",
   "suppliers.details.pdf.invoice_number": "رقم الفاتورة",
@@ -895,6 +1031,23 @@ class CodegenLoader extends AssetLoader{
   "suppliers.details.payment_error": "خطأ في تسجيل الدفعة",
   "suppliers.details.new_purchase": "فاتورة مشتريات",
   "suppliers.details.no_transactions": "لا توجد حركات مالية",
+  "suppliers.details.tax_id": "الرقم الضريبي",
+  "suppliers.details.contact": "بيانات الاتصال",
+  "suppliers.details.last_payment": "آخر دفعة",
+  "suppliers.details.overdue_alert": "تنبيه: يوجد مبالغ متأخرة السداد!",
+  "suppliers.details.id": "رقم الحركة",
+  "suppliers.details.total_paid_title": "إجمالي المدفوعات",
+  "suppliers.details.payment_account": "حساب الدفع",
+  "modules.customers.name": "إدارة علاقات العملاء (CRM)",
+  "modules.customers.tabs.directory": "دليل العملاء",
+  "modules.customers.tabs.receivables": "التحصيل والمديونيات",
+  "modules.customers.tabs.insights": "تحليل السلوك",
+  "modules.customers.fields.customer": "العميل",
+  "modules.customers.fields.total_receivables": "إجمالي المديونيات",
+  "modules.customers.fields.vip": "عملاء VIP",
+  "modules.customers.fields.credit_limit": "الحد الائتماني",
+  "modules.customers.fields.classification": "التصنيف",
+  "modules.no_records": "لا توجد سجلات حالياً",
   "commissions.title": "فريق المبيعات والعمولات",
   "commissions.subtitle": "إدارة المناديب وتتبع الأهداف",
   "commissions.team_achievement": "الإنجاز الإجمالي للفريق (هذا الشهر)",
@@ -950,7 +1103,7 @@ class CodegenLoader extends AssetLoader{
   "ai_hud.cat_taxes": "الضرائب",
   "ai_hud.cat_hr": "الموارد",
   "ai_hud.cat_inventory": "المخازن",
-  "ai_hud.input_hint": "أخبر HBASSS بما تريد تنفيذه...",
+  "ai_hud.input_hint": "أخبرني بما تريد تنفيذه...",
   "ai_hud.btn_invoices": "فواتير",
   "ai_hud.btn_taxes": "ضرائب",
   "ai_hud.btn_hr": "موارد",
@@ -1014,11 +1167,9 @@ class CodegenLoader extends AssetLoader{
   "internal_hub.online_now": "متصل الآن",
   "chat.type_message": "اكتب رسالة...",
   "chat.online_staff": "الموظفون المتصلون",
-  "common.error": "حدث خطأ",
   "common.all": "الكل",
   "common.delete": "حذف",
   "common.edit": "تعديل",
-  "common.add": "إضافة",
   "common.search": "بحث",
   "common.loading": "جاري التحميل...",
   "common.no_data": "لا توجد بيانات",
@@ -1072,13 +1223,13 @@ class CodegenLoader extends AssetLoader{
   "affiliate.code_label": "كود",
   "affiliate.commission_label": "عمولة",
   "affiliate.no_referrals": "لا توجد إحالات",
-  "ai.title": "HBASSS - وكيلك المالي الذكي",
+  "ai.title": "وكيلك المالي الذكي",
   "ai.reset_tooltip": "تصفير المحادثة",
   "ai.analyzing": "جاري التحليل المالي...",
   "ai.listening": "أسمعك يا سيدي...",
   "ai.speaking": "تفضل، أنا أتحدث...",
   "ai.greeting": "كيف يمكنني مساعدتك اليوم؟",
-  "ai.input_hint": "تحدث مع HBASSS...",
+  "ai.input_hint": "تحدث مع المساعد الذكي...",
   "ai.barcode_scanned": "تم مسح الباركود",
   "ai.sector_switched": "تم تحويل الأنظمة للقطاع",
   "ai.smart_assistant": "المساعد الذكي",
@@ -1109,7 +1260,7 @@ class CodegenLoader extends AssetLoader{
   "wallet.transfer_between_btn": "تحويل بين الحسابات",
   "wallet.recent_transfers": "آخر التحويلات المالية",
   "wallet.no_history": "لا توجد تحويلات سابقة",
-  "wallet.fee_label": "رسوم",
+  "wallet.fee_label": "عمولة بنكية",
   "wallet.matched": "تمت المطابقة",
   "wallet.pending_match": "بانتظار المطابقة البنكية",
   "users.title": "المستخدمين والفروع",
@@ -1147,7 +1298,7 @@ class CodegenLoader extends AssetLoader{
   "accounts.types.expense": "مصروفات",
   "accounts.types.equity": "حقوق ملكية",
   "reports.p_l": "قائمة الدخل",
-  "reports.vat_summary": "ملخص الضريبة",
+  "reports.vat_summary": "ملخص ضريبة القيمة المضافة (VAT)",
   "reports.critical_stock": "مخزون حرج",
   "purchases_module.title": "فاتورة مشتريات",
   "purchases_module.add_items_stock": "إضافة أصناف للمخزن",
@@ -1164,12 +1315,17 @@ class CodegenLoader extends AssetLoader{
   "purchases_module.credit": "آجل",
   "purchases_module.selected_items": "الأصناف المختارة للمخزن",
   "purchases_module.no_items_selected": "لم يتم اختيار أصناف لتحديث الكمية",
-  "hr.tabs.employees": "دليل الموظفين",
-  "hr.tabs.attendance": "الحضور والانصراف",
+  "hr.tabs.employees": "الموظفون",
+  "hr.tabs.attendance": "الحضور",
   "hr.tabs.leaves": "الإجازات والسلف",
-  "hr.tabs.payroll": "تحليلات الرواتب",
+  "hr.tabs.payroll": "الرواتب",
   "hr.tabs.recruitment": "مركز التوظيف",
   "hr.form.buttons.hire_confirm": "توظيف الآن",
+  "hr.hire_success": "✅ تم توظيف {} بنجاح",
+  "hr.status.valid": "ساري",
+  "hr.status.expired": "منتهي",
+  "hr.status.expiring_soon": "ينتهي قريباً",
+  "hr.payroll.success_msg": "تم معالجة مسيرات الرواتب لهذا الشهر بنجاح",
   "reports.trial_balance": "ميزان المراجعة",
   "sidebar.group.main": "الرئيسية",
   "sidebar.group.finance": "المالية والمحاسبة",
@@ -1199,7 +1355,938 @@ class CodegenLoader extends AssetLoader{
   "sidebar.aging_report": "أعمار الديون",
   "sidebar.fiscal_year": "إقفال السنة",
   "sidebar.hub": "مركز الخدمات",
-  "sidebar.settings_general": "الإعدادات العامة"
+  "sidebar.settings_general": "الإعدادات العامة",
+  "hr.payroll.basic": "أساسي",
+  "hr.payroll.housing": "سكن",
+  "hr.payroll.transport": "انتقال",
+  "hr.payroll.insurance": "تأمين",
+  "hr.payroll.absence": "غياب/خصم",
+  "hr.payroll.net": "صافي الراتب",
+  "hr.payroll.status": "حالة السداد",
+  "hr.payroll.other": "إضافات أخرى",
+  "hr.payroll.deductions": "استقطاعات",
+  "recurring.new_template": "قالب تكرار جديد",
+  "recurring.Weekly": "أسبوعياً",
+  "recurring.Daily": "يومياً",
+  "recurring.Monthly": "شهرياً",
+  "recurring.Yearly": "سنوياً",
+  "recurring.start_btn": "بدء التكرار",
+  "recurring.description": "الوصف",
+  "recurring.amount": "المبلغ",
+  "recurring.save_success": "تم إنشاء قالب التكرار بنجاح",
+  "aging.title": "تقرير أعمار الديون",
+  "aging.clients": "أعمار ديون العملاء",
+  "aging.suppliers": "أعمار ديون الموردين",
+  "aging.total_receivable": "إجمالي المستحقات",
+  "aging.total_payable": "إجمالي المطالبات",
+  "aging.0_30": "0 - 30 يوم",
+  "aging.31_60": "31 - 60 يوم",
+  "aging.61_90": "61 - 90 يوم",
+  "aging.90_plus": "أكثر من 90 يوم",
+  "aging.recalculate": "إعادة حساب الأرصدة",
+  "aging.recalculate_msg": "جاري تحديث أرصدة الشركاء بناءً على كافة الفواتير والمدفوعات...",
+  "sales_module.payment_type": "نوع الفاتورة",
+  "sales_module.client": "العميل",
+  "common": {
+    "name": "الاسم",
+    "location": "الموقع",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "add": "إضافة",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "search": "بحث...",
+    "total": "الإجمالي",
+    "coming_soon": "قريباً",
+    "no_phone": "بدون هاتف"
+  },
+  "support": {
+    "title": "الدعم الفني",
+    "approvals_title": "طلبات الموافقة",
+    "no_approvals": "لا توجد طلبات موافقة معلقة",
+    "audit_trail": "سجل المراجعة",
+    "kpi_mgmt": "إدارة مؤشرات الأداء",
+    "meetings_title": "إدارة الاجتماعات",
+    "workflow_mgmt": "أتمتة سير العمل",
+    "kanban_title": "لوحة المهام",
+    "no_tickets": "لا توجد تذاكر دعم بعد",
+    "new_ticket": "تذكرة جديدة",
+    "subject": "الموضوع",
+    "priority": "الأولوية",
+    "description": "الوصف",
+    "tasks.todo": "قيد الانتظار",
+    "tasks.in_progress": "قيد التنفيذ",
+    "tasks.done": "مكتمل",
+    "tasks.no_tasks": "لا توجد مهام حالياً",
+    "tasks.add_task": "إضافة مهمة جديدة",
+    "tasks.title_label": "عنوان المهمة",
+    "tasks.desc_label": "الوصف",
+    "tasks.priority_label": "الأولوية",
+    "tasks.high": "عالية",
+    "tasks.medium": "متوسطة",
+    "tasks.low": "منخفضة"
+  },
+  "branch.status_active": "نشط",
+  "ceo.bi_insights": "تحليلات الذكاء الأعمال",
+  "ceo.top_agent": "أفضل وكيل",
+  "ceo.top_supplier": "أفضل مورد",
+  "ceo.cross_industry": "عبر الصناعات",
+  "ceo.medical": "طبي",
+  "ceo.hospitality": "ضيافة",
+  "ceo.manufacturing": "تصنيع",
+  "ceo.real_estate": "عقارات",
+  "manufacturing.production_analysis": "تحليل الإنتاج",
+  "pharmacy": {
+    "scientific_name": "الاسم العلمي",
+    "requires_prescription": "يتطلب وصفة طبية",
+    "shelf_location": "موقع الرف",
+    "expiry_warning": "تحذير انتهاء الصلاحية",
+    "batch_number": "رقم التشغيلة",
+    "drug_registry": "سجل الأدوية"
+  },
+  "cars": {
+    "vin": "رقم الهيكل",
+    "make": "الماركة",
+    "model": "الموديل",
+    "year": "السنة",
+    "mileage": "الممشى",
+    "inspection": "الفحص",
+    "test_drive": "تجربة القيادة"
+  },
+  "gas": {
+    "pump_reading": "قراءة المضخة",
+    "tank_level": "مستوى الخزان",
+    "liters_sold": "اللترات المباعة",
+    "shift_reconciliation": "تسوية الوردية",
+    "nozzle": "الفوهة"
+  },
+  "agriculture": {
+    "crop_cycle": "دورة المحصول",
+    "harvest_date": "تاريخ الحصاد",
+    "livestock_count": "عدد المواشي",
+    "vaccination": "التطعيمات",
+    "farm_yield": "إنتاجية المزرعة"
+  },
+  "furniture": {
+    "wood_type": "نوع الخشب",
+    "thickness": "السماكة",
+    "assembly": "التجميع",
+    "cut_list": "قائمة التقطيع",
+    "produced_pieces": "القطع المنتجة"
+  },
+  "electronics": {
+    "serial_number": "الرقم التسلسلي",
+    "warranty": "الضمان",
+    "rma_claim": "مطالبة صيانة",
+    "fault_desc": "وصف العطل",
+    "brand": "الماركة"
+  },
+  "chemicals": {
+    "concentration": "التركيز",
+    "hazard_level": "درجة الخطورة",
+    "mixing_batch": "تشغيلة خلط",
+    "ingredients": "المكونات",
+    "expiry": "تاريخ الانتهاء"
+  },
+  "sanitary": {
+    "plumbing_set": "طقم صحي",
+    "model_color": "الموديل / اللون",
+    "is_set": "هل هو طقم؟",
+    "components": "المكونات"
+  },
+  "office_services": {
+    "pricing_type": "نوع التسعير",
+    "booking": "الحجوزات",
+    "print_pos": "نقطة بيع الطباعة",
+    "start_end": "وقت البدء / الانتهاء"
+  },
+  "branches": {
+    "title": "مواقع الفروع",
+    "add_branch": "إضافة فرع جديد",
+    "branch_name": "اسم الفرع",
+    "branch_code": "كود الفرع",
+    "manager": "مدير الفرع",
+    "status": "الحالة التشغيلية",
+    "target": "الإيراد المستهدف"
+  },
+  "subsidiaries": {
+    "title": "الشركات التابعة",
+    "add_subsidiary": "إضافة شركة تابعة",
+    "company_name": "اسم الشركة",
+    "sector": "قطاع الأعمال",
+    "ownership": "نسبة الملكية %",
+    "capital": "رأس المال",
+    "ceo": "المدير التنفيذي"
+  },
+  "ecommerce": {
+    "title": "التجارة الرقمية",
+    "add_platform": "إضافة منصة بيع",
+    "platform_name": "اسم المنصة",
+    "store_url": "رابط المتجر",
+    "api_key": "مفتاح API",
+    "last_sync": "آخر مزامنة",
+    "total_orders": "إجمالي الطلبات"
+  },
+  "shipments": {
+    "title": "تتبع سلاسل الإمداد",
+    "add_shipment": "إضافة شحنة",
+    "tracking_no": "رقم التتبع",
+    "carrier": "شركة الشحن",
+    "origin": "المصدر",
+    "destination": "الوجهة",
+    "expected_arrival": "الوصول المتوقع",
+    "status": "حالة الشحنة"
+  },
+  "trade_contracts": {
+    "title": "إدارة العقود التجارية",
+    "contract_title": "عنوان العقد",
+    "second_party": "الطرف الثاني",
+    "start_date": "تاريخ البدء",
+    "end_date": "تاريخ الانتهاء",
+    "contract_value": "قيمة العقد",
+    "status": "حالة العقد"
+  },
+  "stock_waste": {
+    "title": "إدارة الهالك والتالف",
+    "item_name": "اسم الصنف",
+    "reason": "سبب التلف",
+    "quantity": "الكمية التالفة",
+    "financial_loss": "الخسارة المالية",
+    "date_reported": "تاريخ التبليغ"
+  },
+  "barcode_mgmt": {
+    "title": "إدارة الباركود والترميز",
+    "product_name": "اسم المنتج",
+    "barcode_format": "صيغة الباركود",
+    "barcode_value": "قيمة الباركود",
+    "is_printed": "تمت الطباعة",
+    "generate": "توليد باركود"
+  },
+  "recruitment": {
+    "title": "إدارة التوظيف والمتقدمين",
+    "candidate_name": "اسم المتقدم",
+    "job_position": "الوظيفة المستهدفة",
+    "stage": "مرحلة التوظيف",
+    "rating": "تقييم المقابلة",
+    "interview_date": "موعد المقابلة"
+  },
+  "performance": {
+    "title": "تقييم أداء الموظفين",
+    "employee_name": "اسم الموظف",
+    "review_period": "فترة التقييم",
+    "score": "الدرجة النهائية",
+    "feedback": "ملاحظات المدير",
+    "status": "حالة التقييم"
+  },
+  "crm_leads": {
+    "title": "إدارة العملاء المحتملين",
+    "lead_name": "اسم العميل المحتمل",
+    "value": "القيمة المتوقعة",
+    "stage": "مرحلة البيع",
+    "source": "مصدر العميل",
+    "contact": "وسيلة الاتصال"
+  },
+  "legal_cases": {
+    "title": "الشؤون القانونية والقضايا",
+    "case_number": "رقم القضية",
+    "court": "المحكمة المختصة",
+    "type": "نوع القضية",
+    "next_session": "موعد الجلسة",
+    "status": "الموقف القانوني"
+  },
+  "quality_mgmt": {
+    "title": "إدارة ورقابة الجودة",
+    "item_name": "اسم المادة / المنتج",
+    "batch": "رقم التشغيلة",
+    "test_type": "نوع الفحص",
+    "result": "النتيجة النهائية",
+    "inspector": "المفتش المسؤول",
+    "date": "تاريخ الفحص"
+  },
+  "maintenance": {
+    "title": "إدارة الصيانة الدورية",
+    "machine": "اسم الآلة / المعدة",
+    "type": "نوع الصيانة",
+    "frequency": "التكرار (دوري)",
+    "last_service": "آخر صيانة",
+    "next_service": "الصيانة القادمة",
+    "status": "حالة الجدول"
+  },
+  "medical": {
+    "title": "منظومة الرعاية الصحية",
+    "patients": "المرضى المسجلين",
+    "appointments": "جدول المواعيد",
+    "pharmacy": "الصيدلية والمخزون",
+    "new_patient": "إضافة مريض جديد",
+    "phone": "رقم الجوال",
+    "history": "التاريخ الطبي"
+  },
+  "hotel": {
+    "title": "إدارة الفنادق والضيافة",
+    "rooms": "الوحدات السكنية",
+    "bookings": "الحجوزات النشطة",
+    "services": "خدمات النزلاء",
+    "new_room": "إضافة غرفة",
+    "guest": "اسم النزيل",
+    "check_in": "تسجيل وصول",
+    "check_out": "تسجيل مغادرة"
+  },
+  "labs": {
+    "title": "إدارة المختبرات والتحاليل",
+    "test_name": "اسم التحليل",
+    "sample_id": "رقم العينة",
+    "result": "نتيجة التحليل",
+    "status": "حالة العينة"
+  },
+  "pdf": {
+    "vat_number": "الرقم الضريبي",
+    "page": "صفحة",
+    "of": "من",
+    "tax_invoice": "فاتورة ضريبية",
+    "purchase_invoice": "فاتورة مشتريات",
+    "quotation": "عرض سعر",
+    "settlement": "تسوية مالية",
+    "invoice_number": "رقم الفاتورة",
+    "issue_date": "تاريخ الإصدار",
+    "item_desc": "البند / الوصف",
+    "quantity": "الكمية",
+    "price": "السعر",
+    "total": "الإجمالي",
+    "subtotal": "المجموع",
+    "vat_amount": "ضريبة القيمة المضافة",
+    "total_due": "الإجمالي المستحق",
+    "scan_to_verify": "امسح للتحقق",
+    "cash": "نقدي",
+    "credit": "آجل"
+  },
+  "modules": {
+    "add_record": "إضافة سجل جديد",
+    "customers": {
+      "name": "إدارة علاقات العملاء (CRM)",
+      "desc": "إدارة العملاء والديون والتحصيل",
+      "tabs": {
+        "directory": "دليل العملاء",
+        "receivables": "التحصيل والمديونيات",
+        "insights": "تحليل السلوك"
+      },
+      "fields": {
+        "classification": "تصنيف العميل",
+        "credit_limit": "الحد الائتماني",
+        "vip": "عملاء VIP",
+        "total_receivables": "إجمالي المديونيات"
+      }
+    },
+    "contracts": {
+      "name": "إدارة العقود القانونية",
+      "desc": "العقود التجارية والعمالية والإيجارية",
+      "fields": {
+        "title": "عنوان العقد",
+        "value": "قيمة العقد",
+        "start_date": "تاريخ البدء",
+        "end_date": "تاريخ الانتهاء",
+        "status": "حالة العقد"
+      }
+    },
+    "cheques": {
+      "name": "محفظة الشيكات الذكية",
+      "desc": "إدارة الشيكات الصادرة والواردة",
+      "reports": {
+        "collection": "تقرير التحصيل"
+      }
+    },
+    "no_records": "لا توجد سجلات حالياً",
+    "tabs": {
+      "records": "السجلات",
+      "reports": "التقارير",
+      "settings": "الإعدادات"
+    },
+    "records_count": "عدد السجلات",
+    "reports": {
+      "title": "مركز التقارير",
+      "summary_pdf": "ملخص شامل (PDF)",
+      "data_excel": "تصدير بيانات (Excel)",
+      "summary_filtered": "ملخص السجلات المصفاة",
+      "filtered_count": "عدد السجلات المختارة",
+      "filtered_amount": "إجمالي المبالغ المختارة",
+      "percent_of_total": "النسبة من الإجمالي"
+    },
+    "settings": {
+      "title": "إعدادات المديول",
+      "enable_tax": "تفعيل الضريبة",
+      "enable_tax_desc": "تطبيق الضريبة المضافة على العمليات في هذا المديول",
+      "currency": "العملة المفضلة",
+      "currency_desc": "العملة التي سيتم استخدامها في التقارير والمعاملات"
+    },
+    "quick_statements": {
+      "name": "القوائم المالية السريعة",
+      "desc": "عرض الميزانية وقائمة الدخل"
+    },
+    "compliance_governance": {
+      "name": "الامتثال والحوكمة",
+      "desc": "إدارة السياسات والرقابة"
+    },
+    "internal_audit": {
+      "name": "التدقيق الداخلي",
+      "desc": "فحص العمليات والقيود"
+    },
+    "invoice_audit": {
+      "name": "تدقيق الفواتير",
+      "desc": "مراجعة فواتير البيع والشراء"
+    },
+    "taxes_global": {
+      "name": "الضرائب العالمية",
+      "desc": "إدارة القيمة المضافة الدولية"
+    },
+    "risk_crisis_mgmt": {
+      "name": "إدارة المخاطر والأزمات",
+      "desc": "التنبؤ والتعامل مع المخاطر"
+    },
+    "financial_analysis": {
+      "name": "التحليل المالي",
+      "desc": "مؤشرات الأداء والنسب المالية"
+    },
+    "financial_reports": {
+      "revenue_analysis": "تحليل الإيرادات"
+    },
+    "zakat_estimate": {
+      "name": "تقدير الزكاة",
+      "desc": "حساب الزكاة الشرعية"
+    },
+    "zatca_integration": {
+      "name": "الربط مع زاتكا",
+      "desc": "التكامل مع بوابة فاتورة"
+    },
+    "tech_support": {
+      "name": "الدعم الفني",
+      "desc": "تذاكر الدعم والمساعدة"
+    },
+    "business_ops": {
+      "name": "العمليات التجارية",
+      "desc": "إدارة الأنشطة الميدانية"
+    },
+    "cloud_inbox": {
+      "name": "الوارد السحابي",
+      "desc": "أرشفة المستندات والملفات"
+    },
+    "meeting_mgmt": {
+      "name": "إدارة الاجتماعات",
+      "desc": "تنظيم المواعيد والمحاضر"
+    },
+    "workflow_mgmt": {
+      "name": "إدارة سير العمل",
+      "desc": "أتمتة المسارات الإجرائية"
+    },
+    "multi_task_mgmt": {
+      "name": "إدارة المهام المتعددة",
+      "desc": "توزيع ومتابعة المهام"
+    },
+    "branch_mgmt": {
+      "name": "إدارة الفروع",
+      "desc": "تنسيق العمليات بين الفروع"
+    },
+    "ceo_dashboard": {
+      "name": "لوحة المدير التنفيزي",
+      "desc": "نظرة عامة شاملة للقائد"
+    },
+    "bi_reports": {
+      "name": "تقارير ذكاء الأعمال",
+      "desc": "لوحات بيانية تفاعلية"
+    },
+    "smart_reports": {
+      "name": "التقارير الذكية",
+      "desc": "توليد تقارير بذكاء اصطناعي"
+    },
+    "monitoring": {
+      "name": "الرقابة والتحكم",
+      "desc": "مراقبة الأنظمة والعمليات"
+    },
+    "smart_notifications": {
+      "name": "التنبيهات الذكية",
+      "desc": "إشعارات النظام التلقائية"
+    },
+    "reminders_tasks": {
+      "name": "التذكيرات والمهام",
+      "desc": "إدارة المواعيد الشخصية"
+    },
+    "user_management": {
+      "name": "إدارة المستخدمين",
+      "desc": "الصلاحيات والأدوار"
+    },
+    "approval_system": {
+      "name": "نظام الاعتمادات",
+      "desc": "مسارات الموافقة الرقمية"
+    },
+    "audit_trail": {
+      "name": "سجل الأحداث",
+      "desc": "تتبع حركات المستخدمين"
+    },
+    "kpi_mgmt": {
+      "name": "إدارة مؤشرات الأداء",
+      "desc": "تتبع الأهداف والنتائج"
+    },
+    "security_monitoring": {
+      "name": "المراقبة الأمنية",
+      "desc": "حماية البيانات والوصول"
+    },
+    "ai_core": {
+      "name": "نواة الذكاء الاصطناعي",
+      "desc": "المحرك الذكي للنظام"
+    },
+    "hr": {
+      "name": "الموارد البشرية",
+      "desc": "شؤون الموظفين والرواتب"
+    },
+    "invoices": {
+      "name": "المبيعات والفواتير",
+      "desc": "إدارة الفواتير والعملاء"
+    },
+    "purchases": {
+      "name": "المشتريات",
+      "desc": "إدارة الموردين والطلبات"
+    },
+    "pos": {
+      "name": "نقاط البيع",
+      "desc": "البيع السريع والباركود"
+    },
+    "ecommerce": {
+      "name": "التجارة الإلكترونية",
+      "desc": "إدارة المتجر والطلبات"
+    },
+    "commercial_hub": {
+      "name": "المحور التجاري",
+      "desc": "مركز العمليات التجارية"
+    },
+    "crm": {
+      "name": "إدارة العملاء (CRM)",
+      "desc": "متابعة العملاء والفرص"
+    },
+    "commissions_ops": {
+      "name": "العمولات والتحفيز",
+      "desc": "حساب عمولات المناديب"
+    },
+    "inventory": {
+      "name": "المخزون",
+      "desc": "إدارة المنتجات والكميات"
+    },
+    "warehouse": {
+      "name": "المستودعات",
+      "desc": "إدارة التخزين والحركة"
+    },
+    "barcode_mgmt": {
+      "name": "إدارة الباركود",
+      "desc": "طباعة وتوليد الباركود"
+    },
+    "expiry": {
+      "name": "إدارة الصلاحية",
+      "desc": "تتبع تواريخ الانتهاء"
+    },
+    "stock_waste": {
+      "name": "الهالك والفاقد",
+      "desc": "تسوية فاقد المخزون"
+    },
+    "supply_chain": {
+      "name": "سلاسل الإمداد",
+      "desc": "اللوجستيات والتوريد"
+    },
+    "trade_contracts": {
+      "name": "عقود التجارة",
+      "desc": "إدارة اتفاقيات التوريد"
+    },
+    "shop_accounts": {
+      "name": "حسابات المتاجر",
+      "desc": "التسويات المالية للمحلات"
+    },
+    "general_companies": {
+      "name": "الشركات العامة",
+      "desc": "إدارة الشركات القابضة"
+    },
+    "factories_industrial": {
+      "name": "المصانع والمنشآت",
+      "desc": "الإنتاج الصناعي"
+    },
+    "professional_offices": {
+      "name": "المكاتب المهنية",
+      "desc": "إدارة المكاتب الاستشارية"
+    },
+    "shops_stores": {
+      "name": "المحلات والمتاجر",
+      "desc": "إدارة منافذ البيع"
+    },
+    "branch_chains": {
+      "name": "سلاسل الفروع",
+      "desc": "إدارة الفروع المتعددة"
+    },
+    "holding_groups": {
+      "name": "المجموعات القابضة",
+      "desc": "تجميع القوائم المالية"
+    },
+    "import_export": {
+      "name": "الاستيراد والتصدير",
+      "desc": "الشحن الدولي والجمارك"
+    },
+    "shipping_logistics": {
+      "name": "الشحن واللوجستيات",
+      "desc": "إدارة حركة الشحن"
+    },
+    "delivery_uber": {
+      "name": "التوصيل والتطبيقات",
+      "desc": "إدارة أسطول التوصيل"
+    },
+    "digital_ecommerce": {
+      "name": "التجارة الرقمية",
+      "desc": "المنتجات الرقمية والاشتراكات"
+    },
+    "corp_contracts": {
+      "name": "عقود الشركات",
+      "desc": "إدارة الاتفاقيات الكبرى"
+    },
+    "unified_accounts": {
+      "name": "الحسابات الموحدة",
+      "desc": "ربط الحسابات المالية"
+    },
+    "manufacturing_industrial": {
+      "name": "التصنيع الصناعي",
+      "desc": "خطوط الإنتاج الآلية"
+    },
+    "projects": {
+      "name": "إدارة المشاريع",
+      "desc": "مشاريع المقاولات والهندسة"
+    },
+    "joint_ventures": {
+      "name": "المشاريع المشتركة",
+      "desc": "الشراكات والاتفاقيات"
+    },
+    "contracting_maintenance": {
+      "name": "المقاولات والصيانة",
+      "desc": "إدارة الأعمال الإنشائية"
+    },
+    "manufacturing": {
+      "name": "التصنيع",
+      "desc": "عمليات الإنتاج والتحويل",
+      "production_analysis": "تحليل الإنتاج"
+    },
+    "mrp": {
+      "name": "تخطيط الاحتياجات (MRP)",
+      "desc": "إدارة المواد الخام"
+    },
+    "cost_accounting": {
+      "name": "محاسبة التكاليف",
+      "desc": "تحليل تكلفة المنتج"
+    },
+    "quality_mgmt": {
+      "name": "إدارة الجودة",
+      "desc": "فحص وضبط الجودة"
+    },
+    "maintenance": {
+      "name": "الصيانة",
+      "desc": "الصيانة الوقائية والدورية"
+    },
+    "periodic_maintenance": {
+      "name": "الصيانة الدورية",
+      "desc": "جدولة المواعيد الدورية"
+    },
+    "hotels_apartments": {
+      "name": "الفنادق والشقق",
+      "desc": "إدارة الحجوزات والسكن"
+    },
+    "hospitals_medical": {
+      "name": "المستشفيات والطب",
+      "desc": "إدارة العيادات والمرضى"
+    },
+    "livestock_agriculture": {
+      "name": "الزراعة والثروة الحيوانية",
+      "desc": "الإنتاج الحيواني والزراعي"
+    },
+    "pharmacies_medicine": {
+      "name": "الصيدليات والأدوية",
+      "desc": "إدارة الدواء والصيدليات"
+    },
+    "gas_stations": {
+      "name": "محطات الوقود",
+      "desc": "إدارة المضخات والمخزون"
+    },
+    "laboratories": {
+      "name": "المختبرات والتحاليل",
+      "desc": "إدارة الفحوصات المخبرية"
+    },
+    "car_trading": {
+      "name": "تجارة السيارات",
+      "desc": "بيع وشراء وتأجير السيارات"
+    },
+    "real_estate": {
+      "name": "العقارات",
+      "desc": "إدارة الأملاك والإيجارات"
+    },
+    "furniture_wood": {
+      "name": "الأثاث والأخشاب",
+      "desc": "تصنيع وبيع الأثاث"
+    },
+    "electronics_appliances": {
+      "name": "الإلكترونيات",
+      "desc": "الأجهزة والأدوات الكهربائية"
+    },
+    "cleaning_materials": {
+      "name": "مواد التنظيف",
+      "desc": "تجارة المنظفات"
+    },
+    "sanitary_ware": {
+      "name": "الأدوات الصحية",
+      "desc": "تجارة مستلزمات السباكة"
+    },
+    "office_services": {
+      "name": "الخدمات المكتبية",
+      "desc": "توريد المستلزمات المكتبية"
+    },
+    "ai_robot_industries": {
+      "name": "صناعات الروبوت (AI)",
+      "desc": "الأتمتة والذكاء الاصطناعي"
+    },
+    "financial_risk_mgmt": {
+      "name": "إدارة المخاطر المالية",
+      "desc": "تحليل التعرض للمخاطر"
+    },
+    "fraud_detection": {
+      "name": "كشف الاحتيال",
+      "desc": "الرقابة الذكية على التلاعب"
+    },
+    "ops_audit": {
+      "name": "التدقيق التشغيلي",
+      "desc": "مراجعة كفاءة العمليات"
+    },
+    "kpi_mgmt_ext": {
+      "name": "مؤشرات الأداء المطورة",
+      "desc": "تحليل الأداء العميق"
+    },
+    "approvals_ext": {
+      "name": "الاعتمادات المتقدمة",
+      "desc": "توسعة مسارات الموافقة"
+    },
+    "ai_insights": {
+      "name": "رؤى الذكاء الاصطناعي",
+      "desc": "تحليلات تنبؤية متقدمة"
+    },
+    "accounting": {
+      "name": "المحاسبة",
+      "desc": "القيود والتقارير المالية"
+    },
+    "auditing": {
+      "name": "التدقيق",
+      "desc": "المراجعة المالية الشاملة"
+    },
+    "feasibility": {
+      "name": "دراسات الجدوى",
+      "desc": "تحليل المشاريع الجديدة"
+    },
+    "taxes": {
+      "name": "الضرائب والزكاة",
+      "desc": "الإقرارات والربط الضريبي"
+    },
+    "custody": {
+      "name": "إدارة العهد",
+      "desc": "تتبع عهد الموظفين"
+    },
+    "loans_installments": {
+      "name": "القروض والأقساط",
+      "desc": "إدارة التمويل والتحصيل"
+    },
+    "cash_flow": {
+      "name": "التدفقات النقدية",
+      "desc": "تتبع السيولة الداخلة والخارجة"
+    },
+    "revenue_mgmt": {
+      "name": "إدارة الإيرادات",
+      "desc": "تحليل وتحصيل الدخل"
+    },
+    "expenses": {
+      "name": "المصروفات",
+      "desc": "إدارة الإنفاق والمصارف"
+    },
+    "budgeting": {
+      "name": "الموازنات",
+      "desc": "تخطيط ومراقبة الميزانية"
+    },
+    "assets": {
+      "name": "الأصول",
+      "desc": "إدارة الأصول الثابتة وإهلاكها"
+    },
+    "bank_reconciliation": {
+      "name": "التسوية البنكية",
+      "desc": "مطابقة كشوف الحسابات"
+    },
+    "suppliers": {
+      "name": "الموردين",
+      "desc": "دليل الموردين والمطالبات"
+    },
+    "wallet": {
+      "name": "المحفظة المالية",
+      "desc": "إدارة النقد والبنوك"
+    },
+    "hr_payroll_mgmt": {
+      "name": "إدارة الرواتب",
+      "desc": "معالجة مسيرات الرواتب"
+    },
+    "sales_commissions": {
+      "name": "عمولات المبيعات",
+      "desc": "حساب حوافز المناديب"
+    },
+    "fleet_mgmt": {
+      "name": "إدارة الأسطول",
+      "desc": "إدارة المركبات والوقود والسائقين"
+    }
+  },
+  "modules.financial_reports.revenue_analysis": "تحليل الإيرادات",
+  "modules.financial_reports.monthly_trend": "اتجاه الإيرادات الشهري",
+  "modules.financial_reports.cost_center_performance": "أداء مراكز التكلفة",
+  "modules.customers.classification_dist": "توزيع تصنيف العملاء",
+  "budgeting.add_budget": "إضافة ميزانية تقديرية",
+  "budgeting.account": "الحساب",
+  "budgeting.allocated_amount": "المبلغ المعتمد",
+  "budgeting.title": "الميزانيات والرقابة الذكية",
+  "budgeting.spent": "المنصرف",
+  "budgeting.remaining": "المتبقي",
+  "budgeting.approved_budget": "الميزانية المعتمدة",
+  "budgeting.no_budgets_yet": "لم يتم تحديد ميزانيات تقديرية بعد",
+  "budgeting.start_now": "ابدأ الآن",
+  "budgeting.total_allocated": "إجمالي المعتمد",
+  "budgeting.total_spent": "إجمالي المنصرف",
+  "budgeting.overall_utilization": "نسبة الاستهلاك الإجمالية",
+  "budgeting.over_limit": "تجاوز الميزانية",
+  "budgeting.critical": "وضع حرج",
+  "budgeting.start_now_desc": "ابدأ بإضافة ميزانيات تقديرية لحسابات المصروفات لمراقبة الأداء المالي.",
+  "zatca.dashboard_title": "لوحة تحكم الربط والتكامل (ZATCA)",
+  "zatca.status.label": "الحالة الحالية",
+  "zatca.status.phase1": "المرحلة الأولى: مفعلة",
+  "zatca.stats.reported": "الفواتير المبلغة",
+  "zatca.stats.pending": "الفواتير المعلقة",
+  "zatca.stats.errors": "أخطاء الربط",
+  "zatca.phase2.title": "تفعيل الربط المباشر (Phase 2)",
+  "zatca.phase2.desc": "يتطلب الربط مع هيئة الزكاة والضريبة والجمارك إصدار شهادة اعتماد (CSID) وتثبيتها في النظام.",
+  "zatca.phase2.button": "بدء إجراءات الربط والتكامل",
+  "zatca.history.title": "سجل الإرسال الأخير",
+  "zatca.history.empty": "لا توجد فواتير مرسلة حالياً",
+  "zatca.status.waiting": "قيد الانتظار",
+  "zatca.dialog.link_device": "ربط الجهاز بالهيئة",
+  "zatca.dialog.otp_label": "OTP (من منصة فاتورة)",
+  "zatca.dialog.csr_info": "سيقوم النظام بتوليد CSR وإرساله للهيئة للحصول على شهادة CSID.",
+  "zatca.dialog.cancel": "إلغاء",
+  "zatca.dialog.confirm": "تأكيد الربط",
+  "zatca.tabs.overview": "نظرة عامة",
+  "zatca.tabs.compliance": "التوافق",
+  "zatca.tabs.technical": "الإعدادات الفنية",
+  "zatca.compliance.title": "اختبارات التوافق (Compliance Check)",
+  "zatca.compliance.xml": "هيكلة XML (UBL 2.1)",
+  "zatca.compliance.xml_desc": "تم التحقق من تطابق العناصر الإلزامية",
+  "zatca.compliance.qr": "تشفير QR (TLV)",
+  "zatca.compliance.qr_desc": "مطابق لمواصفات الهيئة",
+  "zatca.compliance.run_scan": "تشغيل فحص شامل",
+  "zatca.compliance.scan_msg": "جاري فحص جميع الفواتير الصادرة للتحقق من سلامة البيانات...",
+  "zatca.technical.title": "إعدادات الربط الفني (Sandbox/Production)",
+  "zatca.technical.otp": "رمز OTP من بوابة فاتورة",
+  "zatca.technical.otp_hint": "أدخل الرمز المكون من 6 أرقام",
+  "zatca.technical.gen_csr": "توليد CSR",
+  "zatca.technical.req_csid": "طلب شهادة CSID",
+  "zatca.technical.warning": "تنبيه: يجب استخدام رمز OTP صالح لمرة واحدة من منصة ZATCA لإتمام عملية الربط الأولية لكل جهاز.",
+  "reports.tax_zakat_title": "تقارير الزكاة والضرائب",
+  "reports.zakat_estimate": "تقدير الزكاة الشرعية (Zakat)",
+  "reports.view_zakat_details": "عرض تفاصيل وعاء الزكاة",
+  "reports.manage_zatca": "إدارة الربط والتكامل الفني",
+  "reports.sales_tax": "ضريبة المبيعات",
+  "reports.purchase_tax": "ضريبة المشتريات",
+  "reports.net_tax": "صافي الضريبة المستحقة",
+  "reports.liquid_assets": "الأصول الزكوية (سيولة، مخزون، ديون)",
+  "reports.liabilities": "الالتزامات المتداولة (خصم)",
+  "reports.zakat_pool": "وعاء الزكاة (الصافي)",
+  "reports.zakat_due_est": "مقدار الزكاة المستحقة (2.5%)",
+  "reports.zatca_compliance_msg": "النظام متوافق مع متطلبات الربط والتكامل",
+  "reports.print_report": "طباعة التقرير",
+  "reports.zakat_pool_calc": "حساب وعاء الزكاة التقريبي",
+  "reports.zakat_pool_desc": "بناءً على الأرصدة الحالية في الحسابات المالية",
+  "reports.zakat_important_note_title": "تنبيه هام",
+  "reports.zakat_important_note_desc": "هذا التقدير مبني على البيانات المدخلة في النظام فقط. يرجى مراجعة محاسب قانوني أو جهة شرعية للتأكد من وجوب الزكاة وحسابها بدقة وفقاً للحول والأنصبة الشرعية.",
+  "zatca.authority_name": "هيئة الزكاة والضريبة والجمارك (ZATCA)",
+  "zatca.phase2_subtitle": "الفاتورة الإلكترونية - المرحلة الثانية",
+  "currency.sar": "ر.س",
+  "hr.total_payroll": "إجمالي مسير الرواتب",
+  "hr.deductions": "إجمالي الاستقطاعات والخصم",
+  "hr.total_employees": "إجمالي الموظفين",
+  "hr.pending_requests": "طلبات معلقة",
+  "hr.monthly_payroll": "رواتب الشهر",
+  "hr.bonuses": "البدلات",
+  "hr.title": "إدارة الموارد البشرية الاحترافية",
+  "hr.tabs.stats": "الإحصائيات",
+  "wallet.link_bank_title": "ربط حساب بنكي جديد",
+  "wallet.bank_name": "اسم البنك",
+  "wallet.acc_number": "رقم الحساب",
+  "wallet.iban": "رقم الـ IBAN",
+  "hr.edit_structure_title": "تحديث هيكل الراتب",
+  "hr.housing_allowance": "بدل سكن",
+  "hr.transport_allowance": "بدل نقل",
+  "hr.other_allowance": "بدلات أخرى",
+  "hr.nationality": "الجنسية (لقوانين التأمينات)",
+  "pdf.salary_slip": "قسيمة راتب",
+  "pdf.earnings": "المستحقات",
+  "pdf.deductions": "الاستقطاعات",
+  "hr.employee": "الموظف",
+  "hr.id": "الرقم الوظيفي",
+  "hr.social_insurance": "التأمينات الاجتماعية",
+  "hr.tax": "الضريبة",
+  "hr.loans": "سداد القروض",
+  "hr.employer_sig": "توقيع صاحب العمل",
+  "hr.employee_sig": "توقيع الموظف",
+  "pdf.issue_date": "تاريخ الإصدار",
+  "hr.total_net": "إجمالي الصافي المستحق",
+  "accounting.total_balance": "إجمالي الرصيد",
+  "compliance.total_logs": "إجمالي السجلات",
+  "compliance.critical_events": "أحداث حرجة",
+  "compliance.gov_status": "حالة الحوكمة",
+  "compliance.active": "نشط",
+  "compliance.risk_assessment": "تقييم المخاطر",
+  "compliance.liquidity_risk": "مخاطر السيولة",
+  "compliance.operational_risk": "مخاطر التشغيل",
+  "compliance.tax_compliance": "الامتثال الضريبي",
+  "compliance.system_health": "سلامة النظام",
+  "compliance.data_integrity": "سلامة البيانات",
+  "compliance.optimal": "ممتاز",
+  "compliance.sync_status": "حالة المزامنة",
+  "compliance.connected": "متصل",
+  "compliance.security_protocol": "بروتوكول الحماية",
+  "compliance.footer_info": "يتم تحديث التقارير آلياً بناءً على حركات المستخدمين والمعاملات المالية.",
+  "tax.global_title": "مركز الضرائب والزكاة",
+  "zatca.title": "الربط مع هيئة الزكاة والضريبة والجمارك (ZATCA)",
+  "zatca.recent_submissions": "آخر الفواتير المرسلة (Submissions)",
+  "zatca.no_submissions": "لا توجد سجلات إرسال حالياً",
+  "tax.vat_summary": "ملخص ضريبة القيمة المضافة",
+  "tax.zakat_estimate": "تقدير الزكاة الشرعية",
+  "support.tasks.todo": "قيد الانتظار",
+  "support.tasks.in_progress": "قيد التنفيذ",
+  "support.tasks.done": "مكتمل",
+  "support.tasks.no_tasks": "لا توجد مهام حالياً",
+  "support.tasks.add_task": "إضافة مهمة جديدة",
+  "support.tasks.title_label": "عنوان المهمة",
+  "support.tasks.desc_label": "الوصف",
+  "support.tasks.priority_label": "الأولوية",
+  "support.tasks.high": "عالية",
+  "support.tasks.medium": "متوسطة",
+  "support.tasks.low": "منخفضة",
+  "branch.new_branch": "فرع جديد",
+  "branch.edit_branch": "تعديل الفرع",
+  "branch.name_label": "اسم الفرع",
+  "branch.location_label": "الموقع",
+  "branch.phone_label": "رقم الهاتف",
+  "branch.status_inactive": "غير نشط",
+  "branch.save_btn": "حفظ البيانات",
+  "branch.no_branches": "لا توجد فروع مسجلة",
+  "branch.add_first": "أضف أول فرع الآن",
+  "financial_reports.liquidity": "السيولة النقدية",
+  "support.workflow.create_title": "إنشاء أتمتة سير العمل",
+  "support.workflow.name_label": "اسم سير العمل",
+  "support.workflow.trigger_label": "حدث التشغيل (Trigger)",
+  "support.workflow.on_invoice": "عند إنشاء فاتورة",
+  "support.workflow.on_stock_low": "عند انخفاض المخزون",
+  "support.workflow.on_new_employee": "عند إضافة موظف جديد",
+  "support.workflow.activate": "تفعيل الآن",
+  "support.workflow.trigger_prefix": "المشغل: ",
+  "support.workflow.no_workflows": "لا توجد عمليات أتمتة حالياً"
 };
 static const Map<String,dynamic> _en = {
   "app_name": "Hisabati ERP",
@@ -1214,6 +2301,21 @@ static const Map<String,dynamic> _en = {
   "common.save": "Save",
   "common.submit": "Submit Request",
   "common.cancel": "Cancel",
+  "common.thinking": "Thinking...",
+  "common.expiring_soon": "Expiring Soon",
+  "common.phone": "Phone",
+  "common.regular": "Regular",
+  "common.coming_soon": "Coming Soon",
+  "common.no_name": "No Name",
+  "common.no_phone": "No Phone",
+  "common.add": "Add",
+  "common.revenue": "Revenue",
+  "common.expenses": "Expenses",
+  "common.total_revenue": "Total Revenue",
+  "common.total_expenses": "Total Expenses",
+  "common.total": "Total",
+  "accounts.cash": "Cash Box",
+  "accounts.bank": "Bank Account",
   "inventory": "Inventory",
   "accounting.cash": "Cash",
   "accounting.no_ledger_entries": "No movements for this account",
@@ -1221,6 +2323,7 @@ static const Map<String,dynamic> _en = {
   "accounting.entry_details": "Journal Entry Details",
   "accounting.entry_label": "Entry",
   "accounting.memo_label": "Memo",
+  "accounting.code": "Account Code",
   "accounting.account_header": "Account",
   "accounting.debit_header": "Debit",
   "accounting.credit_header": "Credit",
@@ -1263,12 +2366,32 @@ static const Map<String,dynamic> _en = {
   "sidebar.joint_ventures": "Joint Ventures",
   "sidebar.expenses": "Expense Management",
   "sidebar.cost_accounting": "Cost Accounting",
+  "sidebar.file_manager": "File Manager",
+  "sidebar.subscriptions": "Subscriptions",
+  "sidebar.settings": "Settings",
+  "sidebar_categories": {
+    "core": "Core Systems",
+    "finance": "Finance & Accounting",
+    "support": "Support & Control",
+    "hr": "Human Resources",
+    "operations": "Operations & Trade",
+    "entities": "Business Entities",
+    "industries": "Industries & Services",
+    "extensions": "Smart Extensions",
+    "admin": "System Administration"
+  },
   "months.jan": "Jan",
   "months.feb": "Feb",
   "months.mar": "Mar",
   "months.apr": "Apr",
   "months.may": "May",
   "months.jun": "Jun",
+  "months.jul": "Jul",
+  "months.aug": "Aug",
+  "months.sep": "Sep",
+  "months.oct": "Oct",
+  "months.nov": "Nov",
+  "months.dec": "Dec",
   "header.quick_reports": "Quick Reports",
   "header.change_branch": "Change Branch",
   "branches.riyadh": "Riyadh Branch",
@@ -1310,6 +2433,42 @@ static const Map<String,dynamic> _en = {
   "hub.tiles.cheques": "Cheques Portfolio",
   "hub.tiles.trial_balance": "Trial Balance",
   "hub.tiles.ai_chat": "Smart Chat",
+  "hub.tiles.dashboard": "Dashboard",
+  "hub.tiles.invoices": "Invoices & Sales",
+  "hub.tiles.purchases": "Purchases",
+  "hub.tiles.accounting": "Accounting & Entries",
+  "hub.tiles.reports": "Financial Reports",
+  "hub.tiles.inventory": "Inventory & Products",
+  "hub.tiles.zakat": "Zakat Estimate",
+  "hub.tiles.zatca": "ZATCA Compliance",
+  "currency.title": "Currency Center",
+  "currency.subtitle": "Global Exchange Rates Management",
+  "currency.add_rate": "Add Exchange Rate",
+  "currency.from": "From Currency",
+  "currency.to": "To Currency",
+  "currency.rate": "Exchange Rate",
+  "currency.last_update": "Last Update",
+  "currency.no_rates": "No exchange rates recorded",
+  "currency.success": "Exchange rate saved successfully",
+  "currency.delete_confirm": "Are you sure you want to delete this exchange rate?",
+  "recurring.title": "Recurring Invoices",
+  "recurring.subtitle": "Schedule and Automate Financial Operations",
+  "recurring.add": "Add New Schedule",
+  "recurring.next_run": "Next Run",
+  "recurring.last_run": "Last Run",
+  "recurring.frequency": "Frequency",
+  "recurring.weekly": "Weekly",
+  "recurring.Weekly": "Weekly",
+  "recurring.daily": "Daily",
+  "recurring.Daily": "Daily",
+  "recurring.monthly": "Monthly",
+  "recurring.Monthly": "Monthly",
+  "recurring.yearly": "Yearly",
+  "recurring.Yearly": "Yearly",
+  "recurring.status": "Status",
+  "recurring.active": "Active",
+  "recurring.paused": "Paused",
+  "recurring.processed_success": "Scheduled transactions processed successfully",
   "login.welcome_back": "Welcome Back",
   "login.subtitle": "Sign in to your Global System",
   "login.email": "Work Email",
@@ -1473,7 +2632,7 @@ static const Map<String,dynamic> _en = {
   "hr.direct_manager": "Direct Manager",
   "hr.no_manager": "No Direct Manager",
   "hr.entitlements": "Entitlements",
-  "hr.basic_salary": "Basic",
+  "hr.basic_salary": "Basic Salary",
   "hr.housing": "Housing",
   "hr.transport": "Transport",
   "hr.insurance": "Insurance",
@@ -1502,12 +2661,12 @@ static const Map<String,dynamic> _en = {
   "hr.end_service_confirm": "Are you sure you want to start final settlement for employee {}? End-of-service benefits and remaining leave balances will be calculated.",
   "hr.start_settlement": "Start Settlement",
   "hr.staff_list": "Active Employee List",
-  "hr.attendance_today": "Today's Attendance Log",
+  "hr.attendance_today": "Attendance Today",
   "hr.no_attendance": "No attendance logs for today",
   "hr.barcode_hint": "Scan employee barcode (Laser)...",
   "hr.check_in": "Bulk Check-In",
   "hr.check_out": "Bulk Check-Out",
-  "hr.invalid_barcode": "Sorry, barcode not registered!",
+  "hr.invalid_barcode": "Invalid barcode or employee not found",
   "hr.stats.total_payroll": "Total Payroll",
   "hr.stats.attendance_rate": "Attendance Rate",
   "hr.stats.expiring_docs": "Expiring Docs",
@@ -1565,7 +2724,7 @@ static const Map<String,dynamic> _en = {
   "hr.tabs.contracts": "Contracts",
   "hr.tabs.financial": "Financial",
   "hr.tabs.custody": "Custody",
-  "hr.tabs.performance": "Performance",
+  "hr.tabs.performance": "Reviews",
   "hr.tabs.documents": "Documents",
   "hr.tabs.health": "Health",
   "hr.performance.chart_title": "Performance Growth Chart",
@@ -1585,13 +2744,21 @@ static const Map<String,dynamic> _en = {
   "hr.leaves.types.sick": "Sick",
   "hr.leaves.types.emergency": "Emergency",
   "hr.leaves.types.unpaid": "Unpaid",
-  "hr.payroll.title": "Payroll Records",
-  "hr.payroll.process_btn": "Process Smart Payroll",
-  "hr.payroll.processing": "Processing...",
-  "hr.payroll.no_records": "No payroll records found",
-  "hr.payroll.net_label": "Net Salary",
   "hr.payroll.cost_center_label": "Cost Center",
   "hr.success_msg": "Payroll processed successfully",
+  "hr.payroll_title": "Professional Payroll Management",
+  "hr.payroll_subtitle": "Process payroll and manage salary structures",
+  "hr.process_payroll": "Process Payroll",
+  "hr.salary_slips": "Salary Slips",
+  "hr.salary_structure": "Salary Structure",
+  "hr.process_for_month": "Processing for Month {}",
+  "hr.employees_ready": "Employees Ready",
+  "hr.run_payroll_btn": "Run Payroll Process",
+  "hr.payroll_already_processed": "Payroll already processed for this month",
+  "hr.no_slips_yet": "No salary slips generated for this month yet",
+  "hr.payroll_success": "Successfully processed payroll for {} employees",
+  "hr.basic": "Basic Salary",
+  "hr.allowances": "Total Allowances",
   "inventory_module.title": "Inventory Management",
   "inventory_module.subtitle": "Stock",
   "inventory_module.add_item": "Add Item",
@@ -1676,6 +2843,8 @@ static const Map<String,dynamic> _en = {
   "sales_module.invoice_entry.agent_optional": "Sales Agent (Optional)",
   "sales_module.invoice_entry.no_agent": "No Agent",
   "sales_module.invoice_entry.more": "More",
+  "sales_module.invoice_entry.select_account": "Please select a payment account",
+  "sales_module.invoice_entry.select_client": "Please select a client",
   "sales_module.invoice_entry.custom_item": "Custom Item",
   "accounting_module.title": "Comprehensive Accounting Program",
   "accounting_module.subtitle": "Integrated Accounting System",
@@ -1859,6 +3028,8 @@ static const Map<String,dynamic> _en = {
   "assets_module.disposal_success": "Disposal process and entries completed successfully.",
   "assets_module.no_assets_found": "No assets match your search.",
   "assets_module.error_load": "Data loading error: {}",
+  "assets_module.assets_count": "Total Assets",
+  "assets_module.dep_btn": "Start Smart Depreciation",
   "taxes_module.title": "Tax Management",
   "taxes_module.subtitle": "Smart Tax Returns",
   "taxes_module.extract_btn": "Extract",
@@ -1874,6 +3045,62 @@ static const Map<String,dynamic> _en = {
   "taxes_module.due_by": "Due by {}",
   "taxes_module.quarter_3": "Q3 (July - September 2026)",
   "taxes_module.quarter_2": "Q2 (April - June 2026)",
+  "zatca.status": "Integration Status",
+  "zatca.subtitle": "Electronic Invoicing Integration Management - Phase 2",
+  "zatca.config_title": "Technical Integration Settings",
+  "zatca.phase_label": "Current Phase",
+  "zatca.vat_number": "VAT Number",
+  "zatca.cert_status": "Digital Certificate Status",
+  "zatca.cert_active": "Active and Valid",
+  "zatca.reconnect_btn": "Check Connection with Gateway",
+  "zatca.status_connected": "Successfully connected to gateway",
+  "zatca.status_disconnected": "Disconnected - Re-linking required",
+  "zatca.last_sync": "Last scan: {}",
+  "zatca.troubleshoot": "Troubleshoot Issues",
+  "zatca.phase2": "Phase 2 (Integration)",
+  "zakat.title": "Zakat Estimation",
+  "zakat.subtitle": "Calculate Pool and Zakat based on Financials",
+  "zakat.estimated_amount": "Estimated Zakat Amount",
+  "zakat.breakdown": "Pool Calculation Details",
+  "zakat.assets_note": "Zakat-eligible Assets",
+  "zakat.assets_desc": "Includes cash, receivables, and inventory",
+  "zakat.liabilities_note": "Current Liabilities",
+  "zakat.liabilities_desc": "Includes debts and allowed deductible expenses",
+  "zakat.generate_report_btn": "Generate Official Zakat Report",
+  "zakat.pool": "Zakat Pool",
+  "zakat.due": "Zakat Due",
+  "zakat.rate": "Zakat Rate",
+  "zakat.base": "Total Pool Base",
+  "risk.title": "Risk & Crisis Management",
+  "risk.subtitle": "Monitor and Analyze Operational & Financial Risks",
+  "risk.report_incident": "Report Incident",
+  "risk.total": "Total Risks",
+  "risk.high_priority": "High Priority",
+  "risk.resolved": "Resolved",
+  "risk.recent_incidents": "Recent Incidents",
+  "risk.no_incidents": "No incidents reported",
+  "risk.report_new": "Report New Risk/Crisis",
+  "risk.title_label": "Incident Title",
+  "risk.description_label": "Detailed Description",
+  "risk.impact_label": "Impact Level",
+  "risk.impact_low": "Low",
+  "risk.impact_medium": "Medium",
+  "risk.impact_high": "High (Critical)",
+  "risk.tabs.incidents": "Incidents",
+  "risk.tabs.assessment": "Assessment",
+  "risk.tabs.plan": "Response Plan",
+  "risk.action_plan": "Action Plan",
+  "risk.status_pending": "Pending",
+  "risk.status_investigating": "Investigating",
+  "risk.status_mitigated": "Mitigated",
+  "risk.status_resolved": "Resolved",
+  "compliance.title": "Compliance, Governance & Audit",
+  "compliance.subtitle": "Monitoring governance records and tracking sensitive operations",
+  "compliance.governance": "Governance Logs",
+  "compliance.audit_trail": "Audit Trail",
+  "compliance.summary": "Compliance Summary",
+  "compliance.no_records": "No governance records found",
+  "compliance.no_audit": "No audit records found",
   "settings_module.title": "General Settings",
   "settings_module.subtitle": "System Config",
   "settings_module.org_pdf_group": "Organization & PDF",
@@ -1919,6 +3146,9 @@ static const Map<String,dynamic> _en = {
   "settings_module.password_dialog.success": "✅ Password changed successfully",
   "settings_module.password_dialog.change_btn": "Change",
   "settings_module.password_dialog.cancel_btn": "Cancel",
+  "settings_module.group_general": "General & Advanced Settings",
+  "settings_module.email_setup": "Email Setup (SMTP)",
+  "settings_module.onboarding_restart": "Restart System Onboarding",
   "settings_module.logout_confirm.title": "Logout",
   "settings_module.logout_confirm.content": "Are you sure you want to logout?\nYour session will be closed and you will need to sign in again.",
   "settings_module.logout_confirm.cancel": "Cancel",
@@ -1938,22 +3168,24 @@ static const Map<String,dynamic> _en = {
   "accounting_operations.credit_col": "Credit",
   "accounting_operations.empty_msg": "No financial transactions found",
   "accounting_operations.view_details": "View details for {}: {}",
-  "financial_reports.title": "Analytics & Budget",
-  "financial_reports.subtitle": "Advanced Reporting Center",
-  "financial_reports.tab_profit": "Profits",
-  "financial_reports.tab_centers": "Centers",
+  "financial_reports.title": "Financial Position",
+  "financial_reports.subtitle": "Smart Reports",
+  "financial_reports.tab_profit": "Income Stmt",
+  "financial_reports.tab_centers": "Cost Centers",
   "financial_reports.tab_balance": "Balance Sheet",
   "financial_reports.cost_centers_performance": "Cost Centers Performance",
   "financial_reports.open_trial_balance": "Open Trial Balance",
-  "financial_reports.revenue_stat": "Revenue",
-  "financial_reports.expenses_stat": "Expenses",
+  "financial_reports.revenue_stat": "Total Revenue",
+  "financial_reports.expenses_stat": "Total Expenses",
   "financial_reports.profit_stat": "Net Profit",
-  "financial_reports.center_net": "CC: {} (Net)",
-  "financial_reports.export_pdf_title": "Advanced Financial Performance Report",
-  "financial_reports.export_period": "Period: {} to {}",
+  "financial_reports.center_net": "Net {}",
+  "financial_reports.export_pdf_title": "Financial Report",
+  "financial_reports.export_period": "From {} To {}",
   "financial_reports.filter_period": "Period",
   "financial_reports.balance_sheet_summary": "Balance Sheet & Final Reports",
   "financial_reports.expense_trend": "Expense Trend",
+  "financial_reports.manage_cost_centers": "Manage Cost Centers",
+  "financial_reports.budget_performance": "Budget Performance",
   "pos.title": "Quick Sales (POS)",
   "pos.barcode_error": "Unknown product: {}",
   "pos.open_shift_title": "Open New Cashier Shift",
@@ -2060,6 +3292,24 @@ static const Map<String,dynamic> _en = {
   "suppliers.details.payment_error": "Payment error",
   "suppliers.details.new_purchase": "Purchase Invoice",
   "suppliers.details.no_transactions": "No transactions found",
+  "suppliers.details.tax_id": "Tax ID",
+  "suppliers.details.contact": "Contact Info",
+  "suppliers.details.last_payment": "Last Payment",
+  "suppliers.details.overdue_alert": "Alert: There are overdue payments!",
+  "suppliers.details.id": "Transaction ID",
+  "suppliers.details.total_paid_title": "Total Paid",
+  "suppliers.details.payment_account": "Payment Account",
+  "modules.customers.name": "Customer Relationship Management (CRM)",
+  "modules.customers.tabs.directory": "Customer Directory",
+  "modules.customers.tabs.receivables": "Receivables & Collection",
+  "modules.customers.tabs.insights": "Behavior Analysis",
+  "modules.customers.fields.customer": "Customer",
+  "modules.customers.fields.total_receivables": "Total Receivables",
+  "modules.customers.fields.vip": "VIP Customers",
+  "modules.customers.fields.credit_limit": "Credit Limit",
+  "modules.customers.fields.classification": "Classification",
+  "modules.no_records": "No records found",
+  "suppliers.details.statement": "Account Statement",
   "commissions.title": "Sales Team & Commissions",
   "commissions.subtitle": "Agent Management & Target Tracking",
   "commissions.team_achievement": "Team Achievement (This Month)",
@@ -2113,7 +3363,7 @@ static const Map<String,dynamic> _en = {
   "ai_hud.cat_taxes": "Taxes",
   "ai_hud.cat_hr": "Human Res.",
   "ai_hud.cat_inventory": "Inventory",
-  "ai_hud.input_hint": "Tell HBASSS what to execute...",
+  "ai_hud.input_hint": "Tell me what to execute...",
   "ai_hud.btn_invoices": "Invoices",
   "ai_hud.btn_taxes": "Taxes",
   "ai_hud.btn_hr": "HR",
@@ -2181,7 +3431,6 @@ static const Map<String,dynamic> _en = {
   "common.all": "All",
   "common.delete": "Delete",
   "common.edit": "Edit",
-  "common.add": "Add",
   "common.search": "Search",
   "common.loading": "Loading...",
   "common.no_data": "No Data",
@@ -2235,13 +3484,13 @@ static const Map<String,dynamic> _en = {
   "affiliate.code_label": "Code",
   "affiliate.commission_label": "Comm.",
   "affiliate.no_referrals": "No referrals found",
-  "ai.title": "HBASSS - Your Smart Financial Agent",
+  "ai.title": "Your Smart Financial Agent",
   "ai.reset_tooltip": "Reset Conversation",
   "ai.analyzing": "Financial analysis in progress...",
   "ai.listening": "I'm listening, sir...",
   "ai.speaking": "I'm speaking...",
   "ai.greeting": "How can I help you today?",
-  "ai.input_hint": "Chat with HBASSS...",
+  "ai.input_hint": "Chat with Smart Assistant...",
   "ai.barcode_scanned": "Barcode scanned",
   "ai.sector_switched": "Systems switched to sector",
   "ai.smart_assistant": "Smart Assistant",
@@ -2272,7 +3521,7 @@ static const Map<String,dynamic> _en = {
   "wallet.transfer_between_btn": "Transfer Between Accounts",
   "wallet.recent_transfers": "Recent Financial Transfers",
   "wallet.no_history": "No transfer history",
-  "wallet.fee_label": "Fee",
+  "wallet.fee_label": "Bank Fee",
   "wallet.matched": "Matched",
   "wallet.pending_match": "Pending Bank Matching",
   "users.title": "Users & Branches",
@@ -2329,10 +3578,10 @@ static const Map<String,dynamic> _en = {
   "purchases_module.no_items_selected": "No items selected for quantity update",
   "purchases_module.save_approve": "Save & Approve 💾",
   "hr.tabs.general": "General Overview",
-  "hr.tabs.employees": "Employee Directory",
-  "hr.tabs.attendance": "Time & Attendance",
+  "hr.tabs.employees": "Employees",
+  "hr.tabs.attendance": "Attendance",
   "hr.tabs.leaves": "Leaves & Loans",
-  "hr.tabs.payroll": "Payroll Analytics",
+  "hr.tabs.payroll": "Payroll",
   "hr.tabs.recruitment": "Recruitment Hub",
   "hr.custody": "Custody & Property",
   "hr.expiring_soon": "Expiring Soon!",
@@ -2358,6 +3607,11 @@ static const Map<String,dynamic> _en = {
   "hr.job_tab": "Job Data",
   "hr.emergency_name": "Emergency Contact",
   "hr.form.buttons.hire_confirm": "Hire Now",
+  "hr.hire_success": "✅ {} hired successfully",
+  "hr.status.valid": "Valid",
+  "hr.status.expired": "Expired",
+  "hr.status.expiring_soon": "Expiring Soon",
+  "hr.payroll.success_msg": "Payroll for this month processed successfully",
   "reports.trial_balance": "Trial Balance",
   "sidebar.group.main": "Main",
   "sidebar.group.finance": "Finance & Accounting",
@@ -2387,7 +3641,954 @@ static const Map<String,dynamic> _en = {
   "sidebar.aging_report": "Aging Report",
   "sidebar.fiscal_year": "Fiscal Year Close",
   "sidebar.hub": "Service Hub",
-  "sidebar.settings_general": "General Settings"
+  "sidebar.settings_general": "General Settings",
+  "common.save_success": "Saved successfully",
+  "hr.payroll.basic": "Basic",
+  "hr.payroll.housing": "Housing",
+  "hr.payroll.transport": "Transport",
+  "hr.payroll.insurance": "Insurance",
+  "hr.payroll.absence": "Absence/Deduction",
+  "hr.payroll.net": "Net Salary",
+  "hr.payroll.status": "Payment Status",
+  "hr.payroll.other": "Other Additions",
+  "hr.payroll.deductions": "Deductions",
+  "recurring.new_template": "New Recurring Template",
+  "recurring.start_btn": "Start Repeating",
+  "recurring.description": "Description",
+  "recurring.amount": "Amount",
+  "recurring.save_success": "Recurring template created successfully",
+  "aging.title": "Aging Report",
+  "aging.clients": "Client Aging",
+  "aging.suppliers": "Supplier Aging",
+  "aging.total_receivable": "Total Receivable",
+  "aging.total_payable": "Total Payable",
+  "aging.0_30": "0 - 30 Days",
+  "aging.31_60": "31 - 60 Days",
+  "aging.61_90": "61 - 90 Days",
+  "aging.90_plus": "90+ Days",
+  "aging.recalculate": "Recalculate Balances",
+  "aging.recalculate_msg": "Updating partner balances based on all invoices and payments...",
+  "sales_module.payment_type": "Invoice Type",
+  "sales_module.client": "Client",
+  "common": {
+    "name": "Name",
+    "location": "Location",
+    "save": "Save",
+    "cancel": "Cancel",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "search": "Search...",
+    "total": "Total",
+    "coming_soon": "Coming Soon",
+    "no_phone": "No Phone"
+  },
+  "modules.fields.amount": "Amount",
+  "modules.fields.date": "Date",
+  "modules.fields.title": "Title/Description",
+  "modules.fields.dept": "Department",
+  "modules.fields.risk_level": "Risk Level",
+  "modules.fields.findings": "Findings",
+  "modules.fields.type": "Type",
+  "modules.fields.error_type": "Error Type",
+  "modules.fields.jurisdiction": "Jurisdiction",
+  "modules.fields.tax_type": "Tax Type",
+  "modules.fields.customer": "Customer",
+  "modules.fields.category": "Category",
+  "modules.fields.priority": "Priority",
+  "modules.fields.bom": "BOM",
+  "modules.fields.quantity": "Quantity",
+  "modules.fields.stage": "Stage",
+  "modules.fields.expiry": "Expiry Date",
+  "modules.fields.status": "Status",
+  "modules.fields.asset": "Asset/Machine",
+  "support": {
+    "title": "Technical Support",
+    "approvals_title": "Approval Requests",
+    "no_approvals": "No pending approval requests",
+    "audit_trail": "Audit Trail",
+    "kpi_mgmt": "KPI Management",
+    "meetings_title": "Meetings Management",
+    "workflow_mgmt": "Workflow Automation",
+    "kanban_title": "Task Board",
+    "no_tickets": "No support tickets yet",
+    "new_ticket": "New Ticket",
+    "subject": "Subject",
+    "priority": "Priority",
+    "description": "Description",
+    "tasks.todo": "Todo",
+    "tasks.in_progress": "In Progress",
+    "tasks.done": "Done",
+    "tasks.no_tasks": "No tasks currently",
+    "tasks.add_task": "Add New Task",
+    "tasks.title_label": "Task Title",
+    "tasks.desc_label": "Description",
+    "tasks.priority_label": "Priority",
+    "tasks.high": "High",
+    "tasks.medium": "Medium",
+    "tasks.low": "Low"
+  },
+  "branch.status_active": "Active",
+  "ceo.bi_insights": "BI Insights",
+  "ceo.top_agent": "Top Agent",
+  "ceo.top_supplier": "Top Supplier",
+  "ceo.cross_industry": "Cross Industry",
+  "ceo.medical": "Medical",
+  "ceo.hospitality": "Hospitality",
+  "ceo.manufacturing": "Manufacturing",
+  "ceo.real_estate": "Real Estate",
+  "manufacturing.production_analysis": "Production Analysis",
+  "pharmacy": {
+    "scientific_name": "Scientific Name",
+    "requires_prescription": "Requires Prescription",
+    "shelf_location": "Shelf Location",
+    "expiry_warning": "Expiry Warning",
+    "batch_number": "Batch Number",
+    "drug_registry": "Drug Registry"
+  },
+  "cars": {
+    "vin": "VIN Number",
+    "make": "Make",
+    "model": "Model",
+    "year": "Year",
+    "mileage": "Mileage",
+    "inspection": "Inspection",
+    "test_drive": "Test Drive"
+  },
+  "gas": {
+    "pump_reading": "Pump Reading",
+    "tank_level": "Tank Level",
+    "liters_sold": "Liters Sold",
+    "shift_reconciliation": "Shift Reconciliation",
+    "nozzle": "Nozzle"
+  },
+  "agriculture": {
+    "crop_cycle": "Crop Cycle",
+    "harvest_date": "Harvest Date",
+    "livestock_count": "Livestock Count",
+    "vaccination": "Vaccination",
+    "farm_yield": "Farm Yield"
+  },
+  "furniture": {
+    "wood_type": "Wood Type",
+    "thickness": "Thickness",
+    "assembly": "Assembly",
+    "cut_list": "Cut List",
+    "produced_pieces": "Produced Pieces"
+  },
+  "electronics": {
+    "serial_number": "Serial Number",
+    "warranty": "Warranty",
+    "rma_claim": "RMA Claim",
+    "fault_desc": "Fault Description",
+    "brand": "Brand"
+  },
+  "chemicals": {
+    "concentration": "Concentration",
+    "hazard_level": "Hazard Level",
+    "mixing_batch": "Mixing Batch",
+    "ingredients": "Ingredients",
+    "expiry": "Expiry Date"
+  },
+  "sanitary": {
+    "plumbing_set": "Plumbing Set",
+    "model_color": "Model / Color",
+    "is_set": "Is Set?",
+    "components": "Components"
+  },
+  "office_services": {
+    "pricing_type": "Pricing Type",
+    "booking": "Booking",
+    "print_pos": "Printing POS",
+    "start_end": "Start / End Time"
+  },
+  "branches": {
+    "title": "Branch Locations",
+    "add_branch": "Add New Branch",
+    "branch_name": "Branch Name",
+    "branch_code": "Branch Code",
+    "manager": "Branch Manager",
+    "status": "Operating Status",
+    "target": "Target Revenue"
+  },
+  "subsidiaries": {
+    "title": "Subsidiary Companies",
+    "add_subsidiary": "Add Subsidiary",
+    "company_name": "Company Name",
+    "sector": "Business Sector",
+    "ownership": "Ownership %",
+    "capital": "Capital",
+    "ceo": "CEO Name"
+  },
+  "ecommerce": {
+    "title": "Digital E-Commerce",
+    "add_platform": "Add Sales Platform",
+    "platform_name": "Platform Name",
+    "store_url": "Store URL",
+    "api_key": "API Key",
+    "last_sync": "Last Sync",
+    "total_orders": "Total Orders"
+  },
+  "shipments": {
+    "title": "Supply Chain Tracking",
+    "add_shipment": "Add Shipment",
+    "tracking_no": "Tracking Number",
+    "carrier": "Shipping Carrier",
+    "origin": "Origin",
+    "destination": "Destination",
+    "expected_arrival": "Expected Arrival",
+    "status": "Shipment Status"
+  },
+  "trade_contracts": {
+    "title": "Trade Contracts Mgmt",
+    "contract_title": "Contract Title",
+    "second_party": "Second Party",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "contract_value": "Contract Value",
+    "status": "Contract Status"
+  },
+  "stock_waste": {
+    "title": "Stock Waste & Damage",
+    "item_name": "Item Name",
+    "reason": "Damage Reason",
+    "quantity": "Waste Quantity",
+    "financial_loss": "Financial Loss",
+    "date_reported": "Reporting Date"
+  },
+  "barcode_mgmt": {
+    "title": "Barcode & Label Mgmt",
+    "product_name": "Product Name",
+    "barcode_format": "Barcode Format",
+    "barcode_value": "Barcode Value",
+    "is_printed": "Printed",
+    "generate": "Generate Barcode"
+  },
+  "recruitment": {
+    "title": "Recruitment & Applicant Tracking",
+    "candidate_name": "Candidate Name",
+    "job_position": "Job Position",
+    "stage": "Recruitment Stage",
+    "rating": "Interview Rating",
+    "interview_date": "Interview Date"
+  },
+  "performance": {
+    "title": "Employee Performance Reviews",
+    "employee_name": "Employee Name",
+    "review_period": "Review Period",
+    "score": "Final Score",
+    "feedback": "Manager Feedback",
+    "status": "Review Status"
+  },
+  "crm_leads": {
+    "title": "CRM & Lead Management",
+    "lead_name": "Lead Name",
+    "value": "Opportunity Value",
+    "stage": "Sales Stage",
+    "source": "Lead Source",
+    "contact": "Contact Info"
+  },
+  "legal_cases": {
+    "title": "Legal Affairs & Case Tracking",
+    "case_number": "Case Number",
+    "court": "Competent Court",
+    "type": "Case Type",
+    "next_session": "Next Session Date",
+    "status": "Legal Status"
+  },
+  "quality_mgmt": {
+    "title": "Quality Control & Management",
+    "item_name": "Item / Product Name",
+    "batch": "Batch Number",
+    "test_type": "Test Type",
+    "result": "Final Result",
+    "inspector": "Inspector In-Charge",
+    "date": "Inspection Date"
+  },
+  "maintenance": {
+    "title": "Periodic Maintenance Mgmt",
+    "machine": "Machine / Equipment",
+    "type": "Maintenance Type",
+    "frequency": "Frequency",
+    "last_service": "Last Service",
+    "next_service": "Next Service",
+    "status": "Schedule Status"
+  },
+  "medical": {
+    "title": "Healthcare Management System",
+    "patients": "Registered Patients",
+    "appointments": "Appointment Schedule",
+    "pharmacy": "Pharmacy & Inventory",
+    "new_patient": "Add New Patient",
+    "phone": "Phone Number",
+    "history": "Medical History"
+  },
+  "hotel": {
+    "title": "Hotel & Hospitality Mgmt",
+    "rooms": "Living Units",
+    "bookings": "Active Bookings",
+    "services": "Guest Services",
+    "new_room": "Add New Room",
+    "guest": "Guest Name",
+    "check_in": "Check-In Date",
+    "check_out": "Check-Out Date"
+  },
+  "labs": {
+    "title": "Laboratory & Analysis Mgmt",
+    "test_name": "Test Name",
+    "sample_id": "Sample ID",
+    "result": "Test Result",
+    "status": "Sample Status"
+  },
+  "pdf": {
+    "vat_number": "Tax Number",
+    "page": "Page",
+    "of": "of",
+    "tax_invoice": "Tax Invoice",
+    "purchase_invoice": "Purchase Invoice",
+    "quotation": "Quotation",
+    "settlement": "Financial Settlement",
+    "invoice_number": "Invoice No",
+    "issue_date": "Issue Date",
+    "item_desc": "Item / Description",
+    "quantity": "Qty",
+    "price": "Price",
+    "total": "Total",
+    "subtotal": "Subtotal",
+    "vat_amount": "VAT Amount",
+    "total_due": "Total Due",
+    "scan_to_verify": "Scan to verify",
+    "cash": "Cash",
+    "credit": "Credit"
+  },
+  "modules": {
+    "add_record": "Add New Record",
+    "customers": {
+      "name": "Customer Relationship Management (CRM)",
+      "desc": "Manage customers, debts, and collection",
+      "tabs": {
+        "directory": "Directory",
+        "receivables": "Receivables",
+        "insights": "Insights"
+      },
+      "fields": {
+        "classification": "Classification",
+        "credit_limit": "Credit Limit",
+        "vip": "VIP Customers",
+        "total_receivables": "Total Receivables"
+      }
+    },
+    "contracts": {
+      "name": "Legal Contracts Management",
+      "desc": "Commercial, Labor, and Rental Contracts",
+      "fields": {
+        "title": "Contract Title",
+        "value": "Contract Value",
+        "start_date": "Start Date",
+        "end_date": "End Date",
+        "status": "Status"
+      }
+    },
+    "cheques": {
+      "name": "Smart Cheque Portfolio",
+      "desc": "Manage Inward and Outward Cheques",
+      "reports": {
+        "collection": "Collection Report"
+      }
+    },
+    "no_records": "No records found",
+    "tabs": {
+      "records": "Records",
+      "reports": "Reports",
+      "settings": "Settings"
+    },
+    "records_count": "Records Count",
+    "reports": {
+      "title": "Report Center",
+      "summary_pdf": "Full Summary (PDF)",
+      "data_excel": "Export Data (Excel)",
+      "summary_filtered": "Filtered Records Summary",
+      "filtered_count": "Selected Records Count",
+      "filtered_amount": "Total Selected Amount",
+      "percent_of_total": "Percent of Total"
+    },
+    "settings": {
+      "title": "Module Settings",
+      "enable_tax": "Enable VAT",
+      "enable_tax_desc": "Apply VAT to transactions in this module",
+      "currency": "Preferred Currency",
+      "currency_desc": "Currency to be used in reports and transactions"
+    },
+    "quick_statements": {
+      "name": "Quick Financial Statements",
+      "desc": "View Balance Sheet and Income Statement"
+    },
+    "compliance_governance": {
+      "name": "Compliance & Governance",
+      "desc": "Policy management and oversight"
+    },
+    "internal_audit": {
+      "name": "Internal Audit",
+      "desc": "Process and entry inspection"
+    },
+    "invoice_audit": {
+      "name": "Invoice Audit",
+      "desc": "Review sales and purchase invoices"
+    },
+    "taxes_global": {
+      "name": "Global Taxes",
+      "desc": "International VAT management"
+    },
+    "risk_crisis_mgmt": {
+      "name": "Risk & Crisis Management",
+      "desc": "Predicting and handling risks"
+    },
+    "financial_analysis": {
+      "name": "Financial Analysis",
+      "desc": "KPIs and financial ratios"
+    },
+    "financial_reports": {
+      "revenue_analysis": "Revenue Analysis"
+    },
+    "zakat_estimate": {
+      "name": "Zakat Estimation",
+      "desc": "Sharia Zakat calculation"
+    },
+    "zatca_integration": {
+      "name": "ZATCA Integration",
+      "desc": "Integration with FATOORA portal"
+    },
+    "tech_support": {
+      "name": "Technical Support",
+      "desc": "Support tickets and assistance"
+    },
+    "business_ops": {
+      "name": "Business Operations",
+      "desc": "Field activity management"
+    },
+    "cloud_inbox": {
+      "name": "Cloud Inbox",
+      "desc": "Document and file archiving"
+    },
+    "meeting_mgmt": {
+      "name": "Meeting Management",
+      "desc": "Organizing meetings and minutes"
+    },
+    "workflow_mgmt": {
+      "name": "Workflow Management",
+      "desc": "Automating procedural paths"
+    },
+    "multi_task_mgmt": {
+      "name": "Multi-Task Management",
+      "desc": "Distributing and tracking tasks"
+    },
+    "branch_mgmt": {
+      "name": "Branch Management",
+      "desc": "Coordinating inter-branch ops"
+    },
+    "ceo_dashboard": {
+      "name": "CEO Dashboard",
+      "desc": "Comprehensive overview for leaders"
+    },
+    "bi_reports": {
+      "name": "BI Reports",
+      "desc": "Interactive data dashboards"
+    },
+    "smart_reports": {
+      "name": "Smart Reports",
+      "desc": "AI-generated reports"
+    },
+    "monitoring": {
+      "name": "Monitoring & Control",
+      "desc": "System and process monitoring"
+    },
+    "smart_notifications": {
+      "name": "Smart Notifications",
+      "desc": "Automated system alerts"
+    },
+    "reminders_tasks": {
+      "name": "Reminders & Tasks",
+      "desc": "Personal appointment management"
+    },
+    "user_management": {
+      "name": "User Management",
+      "desc": "Permissions and roles"
+    },
+    "approval_system": {
+      "name": "Approval System",
+      "desc": "Digital approval paths"
+    },
+    "audit_trail": {
+      "name": "Audit Trail",
+      "desc": "Tracking user actions"
+    },
+    "kpi_mgmt": {
+      "name": "KPI Management",
+      "desc": "Tracking goals and results"
+    },
+    "security_monitoring": {
+      "name": "Security Monitoring",
+      "desc": "Data protection and access"
+    },
+    "ai_core": {
+      "name": "AI Core",
+      "desc": "System's intelligent engine"
+    },
+    "hr": {
+      "name": "Human Resources",
+      "desc": "Staff and payroll management"
+    },
+    "invoices": {
+      "name": "Sales & Invoices",
+      "desc": "Invoice and customer management"
+    },
+    "purchases": {
+      "name": "Purchases",
+      "desc": "Supplier and order management"
+    },
+    "pos": {
+      "name": "Point of Sale (POS)",
+      "desc": "Fast selling and barcode"
+    },
+    "ecommerce": {
+      "name": "E-commerce",
+      "desc": "Store and order management"
+    },
+    "commercial_hub": {
+      "name": "Commercial Hub",
+      "desc": "Business operations center"
+    },
+    "crm": {
+      "name": "Customer Relationship Mgmt (CRM)",
+      "desc": "Tracking customers and leads"
+    },
+    "commissions_ops": {
+      "name": "Commissions & Incentives",
+      "desc": "Calculating agent incentives"
+    },
+    "inventory": {
+      "name": "Inventory",
+      "desc": "Product and quantity management"
+    },
+    "warehouse": {
+      "name": "Warehouse",
+      "desc": "Storage and movement management"
+    },
+    "barcode_mgmt": {
+      "name": "Barcode Management",
+      "desc": "Printing and generating barcodes"
+    },
+    "expiry": {
+      "name": "Expiry Management",
+      "desc": "Tracking expiration dates"
+    },
+    "stock_waste": {
+      "name": "Stock Waste",
+      "desc": "Inventory loss settlement"
+    },
+    "supply_chain": {
+      "name": "Supply Chain",
+      "desc": "Logistics and sourcing"
+    },
+    "trade_contracts": {
+      "name": "Trade Contracts",
+      "desc": "Sourcing agreement management"
+    },
+    "shop_accounts": {
+      "name": "Shop Accounts",
+      "desc": "Financial settlements for stores"
+    },
+    "general_companies": {
+      "name": "General Companies",
+      "desc": "Holding company management"
+    },
+    "factories_industrial": {
+      "name": "Factories & Industrial",
+      "desc": "Industrial production"
+    },
+    "professional_offices": {
+      "name": "Professional Offices",
+      "desc": "Consultancy firm management"
+    },
+    "shops_stores": {
+      "name": "Shops & Stores",
+      "desc": "Managing retail outlets"
+    },
+    "branch_chains": {
+      "name": "Branch Chains",
+      "desc": "Multi-branch management"
+    },
+    "holding_groups": {
+      "name": "Holding Groups",
+      "desc": "Consolidating financial statements"
+    },
+    "import_export": {
+      "name": "Import & Export",
+      "desc": "International shipping and customs"
+    },
+    "shipping_logistics": {
+      "name": "Shipping & Logistics",
+      "desc": "Shipping movement management"
+    },
+    "delivery_uber": {
+      "name": "Delivery & Apps",
+      "desc": "Delivery fleet management"
+    },
+    "digital_ecommerce": {
+      "name": "Digital E-commerce",
+      "desc": "Digital products and subscriptions"
+    },
+    "corp_contracts": {
+      "name": "Corporate Contracts",
+      "desc": "Major agreement management"
+    },
+    "unified_accounts": {
+      "name": "Unified Accounts",
+      "desc": "Connecting financial accounts"
+    },
+    "manufacturing_industrial": {
+      "name": "Industrial Manufacturing",
+      "desc": "Automated production lines"
+    },
+    "projects": {
+      "name": "Project Management",
+      "desc": "Contracting and engineering projects"
+    },
+    "joint_ventures": {
+      "name": "Joint Ventures",
+      "desc": "Partnerships and agreements"
+    },
+    "contracting_maintenance": {
+      "name": "Contracting & Maintenance",
+      "desc": "Construction work management"
+    },
+    "manufacturing": {
+      "name": "Manufacturing",
+      "desc": "Production and transformation ops",
+      "production_analysis": "Production Analysis"
+    },
+    "mrp": {
+      "name": "Materials Requirement Planning (MRP)",
+      "desc": "Raw material management"
+    },
+    "cost_accounting": {
+      "name": "Cost Accounting",
+      "desc": "Product cost analysis"
+    },
+    "quality_mgmt": {
+      "name": "Quality Management",
+      "desc": "Quality inspection and control"
+    },
+    "maintenance": {
+      "name": "Maintenance",
+      "desc": "Preventive and periodic maintenance"
+    },
+    "periodic_maintenance": {
+      "name": "Periodic Maintenance",
+      "desc": "Scheduling periodic appointments"
+    },
+    "hotels_apartments": {
+      "name": "Hotels & Apartments",
+      "desc": "Booking and lodging management"
+    },
+    "hospitals_medical": {
+      "name": "Hospitals & Medical",
+      "desc": "Clinic and patient management"
+    },
+    "livestock_agriculture": {
+      "name": "Livestock & Agriculture",
+      "desc": "Animal and crop production"
+    },
+    "pharmacies_medicine": {
+      "name": "Pharmacies & Medicine",
+      "desc": "Medicine and pharmacy management"
+    },
+    "gas_stations": {
+      "name": "Gas Stations",
+      "desc": "Pump and stock management"
+    },
+    "laboratories": {
+      "name": "Laboratories",
+      "desc": "Lab test management"
+    },
+    "car_trading": {
+      "name": "Car Trading",
+      "desc": "Selling, buying and renting cars"
+    },
+    "real_estate": {
+      "name": "Real Estate",
+      "desc": "Property and rental management"
+    },
+    "furniture_wood": {
+      "name": "Furniture & Wood",
+      "desc": "Manufacturing and selling furniture"
+    },
+    "electronics_appliances": {
+      "name": "Electronics",
+      "desc": "Electrical appliances and tools"
+    },
+    "cleaning_materials": {
+      "name": "Cleaning Materials",
+      "desc": "Detergent trading"
+    },
+    "sanitary_ware": {
+      "name": "Sanitary Ware",
+      "desc": "Plumbing supply trading"
+    },
+    "office_services": {
+      "name": "Office Services",
+      "desc": "Supplying office needs"
+    },
+    "ai_robot_industries": {
+      "name": "AI & Robot Industries",
+      "desc": "Automation and AI"
+    },
+    "financial_risk_mgmt": {
+      "name": "Financial Risk Management",
+      "desc": "Analyzing risk exposure"
+    },
+    "fraud_detection": {
+      "name": "Fraud Detection",
+      "desc": "Smart oversight on manipulation"
+    },
+    "ops_audit": {
+      "name": "Operational Audit",
+      "desc": "Reviewing process efficiency"
+    },
+    "kpi_mgmt_ext": {
+      "name": "Extended KPIs",
+      "desc": "Deep performance analysis"
+    },
+    "approvals_ext": {
+      "name": "Extended Approvals",
+      "desc": "Expanding approval paths"
+    },
+    "ai_insights": {
+      "name": "AI Insights",
+      "desc": "Advanced predictive analytics"
+    },
+    "accounting": {
+      "name": "Accounting",
+      "desc": "Entries and financial reports"
+    },
+    "auditing": {
+      "name": "Auditing",
+      "desc": "Comprehensive financial review"
+    },
+    "feasibility": {
+      "name": "Feasibility Studies",
+      "desc": "New project analysis"
+    },
+    "taxes": {
+      "name": "Taxes & Zakat",
+      "desc": "Filings and tax integration"
+    },
+    "custody": {
+      "name": "Custody Management",
+      "desc": "Tracking employee custodies"
+    },
+    "loans_installments": {
+      "name": "Loans & Installments",
+      "desc": "Financing and collection mgmt"
+    },
+    "cash_flow": {
+      "name": "Cash Flow",
+      "desc": "Tracking cash inflows and outflows"
+    },
+    "revenue_mgmt": {
+      "name": "Revenue Management",
+      "desc": "Income analysis and collection"
+    },
+    "expenses": {
+      "name": "Expenses",
+      "desc": "Spending and expense management"
+    },
+    "budgeting": {
+      "name": "Budgeting",
+      "desc": "Budget planning and monitoring"
+    },
+    "assets": {
+      "name": "Assets",
+      "desc": "Fixed assets and depreciation"
+    },
+    "bank_reconciliation": {
+      "name": "Bank Reconciliation",
+      "desc": "Matching bank statements"
+    },
+    "suppliers": {
+      "name": "Suppliers",
+      "desc": "Supplier directory and claims"
+    },
+    "wallet": {
+      "name": "Financial Wallet",
+      "desc": "Cash and bank management"
+    },
+    "hr_payroll_mgmt": {
+      "name": "Payroll Management",
+      "desc": "Processing salary slips"
+    },
+    "sales_commissions": {
+      "name": "Sales Commissions",
+      "desc": "Calculating agent incentives"
+    },
+    "fleet_mgmt": {
+      "name": "Fleet Management",
+      "desc": "Manage vehicles, fuel, and drivers"
+    }
+  },
+  "modules.financial_reports.revenue_analysis": "Revenue Analysis",
+  "modules.financial_reports.monthly_trend": "Monthly Revenue Trend",
+  "modules.financial_reports.cost_center_performance": "Cost Center Performance",
+  "modules.customers.classification_dist": "Customer Classification Dist.",
+  "budgeting.add_budget": "Add Estimated Budget",
+  "budgeting.account": "Account",
+  "budgeting.allocated_amount": "Allocated Amount",
+  "budgeting.title": "Budgets & Smart Control",
+  "budgeting.spent": "Spent",
+  "budgeting.remaining": "Remaining",
+  "budgeting.approved_budget": "Approved Budget",
+  "budgeting.no_budgets_yet": "No estimated budgets defined yet",
+  "budgeting.start_now": "Start Now",
+  "budgeting.total_allocated": "Total Allocated",
+  "budgeting.total_spent": "Total Spent",
+  "budgeting.overall_utilization": "Overall Utilization Rate",
+  "budgeting.over_limit": "Over Limit",
+  "budgeting.critical": "Critical",
+  "budgeting.start_now_desc": "Start adding estimated budgets for expense accounts to monitor financial performance.",
+  "zatca.dashboard_title": "ZATCA Integration Dashboard",
+  "zatca.status.label": "Current Status",
+  "zatca.status.phase1": "Phase 1: Active",
+  "zatca.stats.reported": "Reported Invoices",
+  "zatca.stats.pending": "Pending Invoices",
+  "zatca.stats.errors": "Integration Errors",
+  "zatca.phase2.title": "Phase 2 Activation",
+  "zatca.phase2.desc": "Integration with ZATCA requires issuing a CSID certificate and installing it in the system.",
+  "zatca.phase2.button": "Start Integration Procedures",
+  "zatca.history.title": "Recent Transmissions",
+  "zatca.history.empty": "No invoices sent yet",
+  "zatca.status.waiting": "Waiting",
+  "zatca.dialog.link_device": "Link Device to Authority",
+  "zatca.dialog.otp_label": "OTP (from Fatoora Portal)",
+  "zatca.dialog.csr_info": "The system will generate a CSR and send it to ZATCA to obtain a CSID certificate.",
+  "zatca.dialog.cancel": "Cancel",
+  "zatca.dialog.confirm": "Confirm Link",
+  "zatca.tabs.overview": "Overview",
+  "zatca.tabs.compliance": "Compliance",
+  "zatca.tabs.technical": "Technical Settings",
+  "zatca.compliance.title": "Compliance Check",
+  "zatca.compliance.xml": "XML Structure (UBL 2.1)",
+  "zatca.compliance.xml_desc": "Mandatory elements verified",
+  "zatca.compliance.qr": "QR Encoding (TLV)",
+  "zatca.compliance.qr_desc": "Compliant with Authority specs",
+  "zatca.compliance.run_scan": "Run Full Scan",
+  "zatca.compliance.scan_msg": "Scanning all issued invoices to verify data integrity...",
+  "zatca.technical.title": "Technical Integration (Sandbox/Production)",
+  "zatca.technical.otp": "OTP Code from Fatoora Portal",
+  "zatca.technical.otp_hint": "Enter 6-digit code",
+  "zatca.technical.gen_csr": "Generate CSR",
+  "zatca.technical.req_csid": "Request CSID",
+  "zatca.technical.warning": "Warning: A one-time OTP from ZATCA platform must be used to complete the initial linking process for each device.",
+  "reports.tax_zakat_title": "Tax & Zakat Reports",
+  "reports.zakat_estimate": "Zakat Estimation",
+  "reports.view_zakat_details": "View Zakat Pool Details",
+  "reports.manage_zatca": "Manage Technical Integration",
+  "reports.sales_tax": "Sales Tax",
+  "reports.purchase_tax": "Purchase Tax",
+  "reports.net_tax": "Net Tax Due",
+  "reports.liquid_assets": "Liquid Assets (Cash, Inventory, Debts)",
+  "reports.liabilities": "Current Liabilities (Deductions)",
+  "reports.zakat_pool": "Zakat Pool (Net)",
+  "reports.zakat_due_est": "Estimated Zakat Due (2.5%)",
+  "reports.zatca_compliance_msg": "System compliant with integration requirements",
+  "reports.print_report": "Print Report",
+  "reports.zakat_pool_calc": "Approximate Zakat Pool Calculation",
+  "reports.zakat_pool_desc": "Based on current balances in financial accounts",
+  "reports.zakat_important_note_title": "Important Note",
+  "reports.zakat_important_note_desc": "This estimate is based on system data only. Please consult a legal accountant or religious authority to verify zakat requirements and calculate accurately according to the lunar year and sharia thresholds.",
+  "zatca.authority_name": "Zakat, Tax and Customs Authority (ZATCA)",
+  "zatca.phase2_subtitle": "E-Invoicing - Phase 2",
+  "currency.sar": "SAR",
+  "hr.total_payroll": "Total Monthly Payroll",
+  "hr.deductions": "Total Deductions",
+  "hr.total_employees": "Total Employees",
+  "hr.pending_requests": "Pending Requests",
+  "hr.monthly_payroll": "Monthly Payroll",
+  "hr.bonuses": "Bonuses",
+  "hr.title": "Professional HR Management",
+  "hr.tabs.stats": "Analytics",
+  "wallet.link_bank_title": "Link New Bank Account",
+  "wallet.bank_name": "Bank Name",
+  "wallet.acc_number": "Account Number",
+  "wallet.iban": "IBAN Number",
+  "hr.edit_structure_title": "Update Salary Structure",
+  "hr.housing_allowance": "Housing Allowance",
+  "hr.transport_allowance": "Transport Allowance",
+  "hr.other_allowance": "Other Allowances",
+  "hr.nationality": "Nationality (for insurance rules)",
+  "pdf.salary_slip": "Salary Slip",
+  "pdf.earnings": "Earnings",
+  "pdf.deductions": "Deductions",
+  "hr.employee": "Employee",
+  "hr.id": "Employee ID",
+  "hr.social_insurance": "Social Insurance",
+  "hr.tax": "Income Tax",
+  "hr.loans": "Loan Deduction",
+  "hr.employer_sig": "Employer Signature",
+  "hr.employee_sig": "Employee Signature",
+  "pdf.issue_date": "Issue Date",
+  "hr.total_net": "Total Net Due",
+  "accounting.total_balance": "Total Balance",
+  "compliance.total_logs": "Total Logs",
+  "compliance.critical_events": "Critical Events",
+  "compliance.gov_status": "Gov Status",
+  "compliance.active": "Active",
+  "compliance.risk_assessment": "Risk Assessment",
+  "compliance.liquidity_risk": "Liquidity Risk",
+  "compliance.operational_risk": "Operational Risk",
+  "compliance.tax_compliance": "Tax Compliance",
+  "compliance.system_health": "System Health",
+  "compliance.data_integrity": "Data Integrity",
+  "compliance.optimal": "Optimal",
+  "compliance.sync_status": "Sync Status",
+  "compliance.connected": "Connected",
+  "compliance.security_protocol": "Security Protocol",
+  "compliance.footer_info": "Reports are updated automatically based on user interactions and financial transactions.",
+  "tax.global_title": "Tax & Zakat Center",
+  "zatca.title": "ZATCA Integration",
+  "zatca.recent_submissions": "Recent Submissions",
+  "zatca.no_submissions": "No submission records found",
+  "tax.vat_summary": "VAT Summary",
+  "tax.zakat_estimate": "Sharia Zakat Estimation",
+  "support.tasks.todo": "Todo",
+  "support.tasks.in_progress": "In Progress",
+  "support.tasks.done": "Done",
+  "support.tasks.no_tasks": "No tasks currently",
+  "support.tasks.add_task": "Add New Task",
+  "support.tasks.title_label": "Task Title",
+  "support.tasks.desc_label": "Description",
+  "support.tasks.priority_label": "Priority",
+  "support.tasks.high": "High",
+  "support.tasks.medium": "Medium",
+  "support.tasks.low": "Low",
+  "branch.new_branch": "New Branch",
+  "branch.edit_branch": "Edit Branch",
+  "branch.name_label": "Branch Name",
+  "branch.location_label": "Location",
+  "branch.phone_label": "Phone Number",
+  "branch.status_inactive": "Inactive",
+  "branch.save_btn": "Save Branch",
+  "branch.no_branches": "No branches found",
+  "branch.add_first": "Add first branch now",
+  "financial_reports.liquidity": "Liquidity",
+  "support.workflow.create_title": "Create Automation Workflow",
+  "support.workflow.name_label": "Workflow Name",
+  "support.workflow.trigger_label": "Trigger Event",
+  "support.workflow.on_invoice": "On Invoice Create",
+  "support.workflow.on_stock_low": "On Stock Low",
+  "support.workflow.on_new_employee": "On New Employee",
+  "support.workflow.activate": "Activate Now",
+  "support.workflow.trigger_prefix": "Trigger: ",
+  "support.workflow.no_workflows": "No automation workflows found"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"ar": _ar, "en": _en};
 }

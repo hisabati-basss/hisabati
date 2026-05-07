@@ -7,7 +7,8 @@ import '../services/pdf_service.dart';
 import '../widgets/attachment_viewer.dart';
 
 class InvoiceEntryScreen extends StatefulWidget {
-  const InvoiceEntryScreen({super.key});
+  final String? invoiceId;
+  const InvoiceEntryScreen({super.key, this.invoiceId});
 
   @override
   State<InvoiceEntryScreen> createState() => _InvoiceEntryScreenState();
@@ -20,6 +21,8 @@ class _UILineItem {
   double price;
   int quantity;
   double discount;
+  String? serialNumber;
+  String? batchId;
 
   _UILineItem({
     this.itemId,
@@ -28,6 +31,8 @@ class _UILineItem {
     required this.price,
     this.quantity = 1,
     this.discount = 0.0,
+    this.serialNumber,
+    this.batchId,
   });
 
   double get total => (price * quantity) * (1 - discount / 100);
@@ -42,6 +47,7 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
   bool _isSaving = false;
   String _paymentType = 'cash';
   String? _selectedAccountId;
+  final TextEditingController _commissionCtrl = TextEditingController(text: '0');
   String? _selectedClientId;
   String? _attachmentPath;
   String? _selectedAgentId;
@@ -77,15 +83,71 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
     final accs = await db.query('accounts', where: "type = 'asset'");
     List<Map<String, dynamic>> agents = [];
     List<Map<String, dynamic>> clients = [];
-    try { agents = await _db.getSalesAgents(); } catch (_) {}
+    try { agents = await _db.getSalesAgentsWithStats(); } catch (_) {}
     try { clients = await _db.getClients(); } catch (_) {}
     setState(() {
       _cashAccounts = accs;
       _salesAgents = agents;
-      _clients = clients;
+      _clients = List<Map<String, dynamic>>.from(clients);
+      
+      // 🛡️ Harmony Fix: Ensure WALK_IN_CUSTOMER is always available (prevents Dropdown crash)
+      final hasWalkIn = _clients.any((c) => c['id'] == 'WALK_IN_CUSTOMER');
+      if (!hasWalkIn) {
+        _clients.insert(0, {
+          'id': 'WALK_IN_CUSTOMER', 
+          'name': tr('pos.partner_walkin')
+        });
+      }
+
       if (accs.isNotEmpty) _selectedAccountId = accs.first['id']?.toString();
-      if (clients.isNotEmpty) {
-        _selectedClientId = clients.firstWhere((c) => c['id'] == 'CL_DEFAULT', orElse: () => clients.first)['id']?.toString();
+      
+      // Default selection logic (for new invoices)
+      if (widget.invoiceId == null) {
+        _selectedClientId = _clients.firstWhere(
+          (c) => c['id'] == 'WALK_IN_CUSTOMER',
+          orElse: () => _clients.firstWhere(
+            (c) => c['id'] == 'CL_DEFAULT',
+            orElse: () => _clients.first
+          )
+        )['id']?.toString();
+      }
+    });
+
+    if (widget.invoiceId != null) {
+      await _loadInvoiceData(widget.invoiceId!);
+    }
+  }
+
+  Future<void> _loadInvoiceData(String invoiceId) async {
+    final db = await _db.database;
+    final invs = await db.query('invoices', where: 'id = ?', whereArgs: [invoiceId]);
+    if (invs.isEmpty) return;
+    
+    final inv = invs.first;
+    setState(() {
+      _selectedClientId = inv['client_id']?.toString();
+      _selectedAgentId = inv['sales_agent_id']?.toString();
+      _paymentType = (inv['payment_type']?.toString() ?? 'cash');
+      final dueDateStr = inv['due_date']?.toString();
+      if (dueDateStr != null) _dueDate = DateTime.tryParse(dueDateStr);
+    });
+
+    final invLines = await db.query('invoice_lines', where: 'invoice_id = ?', whereArgs: [invoiceId]);
+    setState(() {
+      _lines.clear();
+      for (var l in invLines) {
+        final qty = (l['quantity'] as num?)?.toInt() ?? 1;
+        final total = (l['total'] as num?)?.toDouble() ?? 0;
+        final price = qty > 0 ? (total / qty) : 0;
+        
+        _lines.add(_UILineItem(
+          id: l['id']?.toString() ?? DateTime.now().toString(),
+          itemId: l['item_id']?.toString(),
+          name: l['name']?.toString() ?? '',
+          price: price.toDouble(),
+          quantity: qty,
+          discount: 0.0,
+        ));
       }
     });
   }
@@ -392,7 +454,7 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
     );
   }
 
-  double get _subtotal => _lines.fold(0, (sum, item) => sum + item.total);
+  double get _subtotal => _lines.fold(0.0, (sum, item) => sum + item.total);
   double get _discountAmount => _subtotal * (_totalDiscount / 100);
   double get _taxAmount =>
       (_subtotal - _discountAmount) * ((_company['tax_rate'] ?? 15.0) / 100);
@@ -426,12 +488,8 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
             decoration: BoxDecoration(
-              color: context.obsidianGlass,
-              border: Border(
-                top: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
+              color: Colors.grey.shade900.withValues(alpha: 0.7),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: Scaffold(
               backgroundColor: Colors.transparent,
@@ -558,52 +616,112 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
           ),
         ),
         // Client Selector
-        if (_clients.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: DropdownButtonFormField<String>(
-              value: _selectedClientId,
-              decoration: InputDecoration(
-                labelText: tr('sales_module.client'),
-                labelStyle: TextStyle(color: context.mutedText, fontSize: 12),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white24)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white12)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _clients.any((c) => c['id']?.toString() == _selectedClientId) ? _selectedClientId : (_clients.isNotEmpty ? _clients.first['id']?.toString() : null),
+                  decoration: InputDecoration(
+                    labelText: tr('sales_module.client'),
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.black.withValues(alpha: 0.3),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                  ),
+                  dropdownColor: const Color(0xFF1E1E1E),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: _clients.map((c) => DropdownMenuItem<String>(
+                    value: c['id']?.toString(),
+                    child: Text(c['name']?.toString() ?? ''),
+                  )).toList(),
+                  onChanged: (val) => setState(() => _selectedClientId = val),
+                ),
               ),
-              dropdownColor: const Color(0xFF1E1E1E),
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              items: _clients.map((c) => DropdownMenuItem<String>(
-                value: c['id']?.toString(),
-                child: Text(c['name']?.toString() ?? ''),
-              )).toList(),
-              onChanged: (val) => setState(() => _selectedClientId = val),
-            ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _loadInitialData,
+                icon: const Icon(Icons.refresh, color: primaryOrange, size: 20),
+                tooltip: "تحديث القائمة",
+              ),
+            ],
           ),
+        ),
         // Sales Agent Selector (optional)
-        if (_salesAgents.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: (_selectedAgentId == null || _salesAgents.any((a) => a['id']?.toString() == _selectedAgentId)) ? _selectedAgentId : null,
+                  decoration: InputDecoration(
+                    labelText: tr('sales_module.invoice_entry.agent_optional'),
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.black.withValues(alpha: 0.3),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                  ),
+                  dropdownColor: const Color(0xFF1E1E1E),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: [
+                    const DropdownMenuItem<String>(value: null, child: Text("بدون مندوب")),
+                    ..._salesAgents.map((a) => DropdownMenuItem<String>(
+                      value: a['id']?.toString(),
+                      child: Text(a['name']?.toString() ?? ''),
+                    )),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedAgentId = val;
+                      if (val != null) {
+                        final agent = _salesAgents.firstWhere((a) => a['id'].toString() == val);
+                        final rate = (agent['commission_rate'] as num?)?.toDouble() ?? 5.0;
+                        double subtotal = 0;
+                        for (var line in _lines) {
+                          subtotal += line.total;
+                        }
+                        _commissionCtrl.text = (subtotal * (rate / 100)).toStringAsFixed(2);
+                      } else {
+                        _commissionCtrl.text = "0";
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _loadInitialData,
+                icon: const Icon(Icons.sync, color: Colors.blueAccent, size: 20),
+                tooltip: "تحديث المندوبين",
+              ),
+            ],
+          ),
+        ),
+        if (_selectedAgentId != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: DropdownButtonFormField<String>(
-              value: _selectedAgentId,
-              decoration: InputDecoration(
-                labelText: tr('sales_module.invoice_entry.agent_optional'),
-                labelStyle: TextStyle(color: context.mutedText, fontSize: 12),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white24)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white12)),
-              ),
-              dropdownColor: const Color(0xFF1E1E1E),
+            child: TextField(
+              controller: _commissionCtrl,
+              keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white, fontSize: 13),
-              items: [
-                DropdownMenuItem<String>(value: null, child: Text(tr('sales_module.invoice_entry.no_agent'))),
-                ..._salesAgents.map((a) => DropdownMenuItem<String>(
-                  value: a['id']?.toString(),
-                  child: Text(a['name']?.toString() ?? ''),
-                )),
-              ],
-              onChanged: (val) => setState(() => _selectedAgentId = val),
+              decoration: InputDecoration(
+                labelText: "مبلغ عمولة المندوب (يدوي)",
+                labelStyle: const TextStyle(color: primaryOrange, fontSize: 12),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.black.withValues(alpha: 0.3),
+                prefixIcon: const Icon(Icons.money, color: primaryOrange, size: 16),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryOrange.withValues(alpha: 0.2))),
+              ),
             ),
           ),
       ],
@@ -726,6 +844,46 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
               ),
             ],
           ),
+          if (line.itemId != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) => line.serialNumber = val,
+                    controller: TextEditingController(text: line.serialNumber),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                    decoration: InputDecoration(
+                      hintText: "الرقم التسلسلي (Serial)",
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.black.withValues(alpha: 0.2),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) => line.batchId = val,
+                    controller: TextEditingController(text: line.batchId),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                    decoration: InputDecoration(
+                      hintText: "رقم الشحنة (Batch)",
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.black.withValues(alpha: 0.2),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -984,7 +1142,19 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final invoiceId = "INV_${DateTime.now().millisecondsSinceEpoch}";
+      final invoiceId = widget.invoiceId ?? () {
+        final year = DateTime.now().year;
+        return "INV-$year-${DateTime.now().millisecondsSinceEpoch}"; // Fallback, will be overridden below
+      }();
+      
+      String finalInvoiceId = invoiceId;
+      if (widget.invoiceId == null) {
+        final countRes = await _db.database.then((db) => db.rawQuery('SELECT COUNT(*) as count FROM invoices'));
+        final count = (countRes.first['count'] as int) + 1;
+        final year = DateTime.now().year;
+        finalInvoiceId = "INV-$year-${count.toString().padLeft(5, '0')}";
+      }
+
       final now = DateTime.now().toIso8601String();
       
       final invoiceLines = _lines.map((l) => <String, dynamic>{
@@ -997,7 +1167,7 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
 
       await _db.saveInvoiceWithLines(
         invoice: {
-          'id': invoiceId,
+          'id': finalInvoiceId,
           'issue_date': now,
           'due_date': _dueDate?.toIso8601String(),
           'subtotal': _subtotal - _discountAmount,
@@ -1006,13 +1176,31 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
           'payment_type': _paymentType,
           'client_id': _selectedClientId,
           'sales_agent_id': _selectedAgentId,
+          'status': _paymentType == 'cash' ? 'paid' : 'draft',
         },
         lines: invoiceLines.map((l) => <String, dynamic>{
           ...l,
-          'invoice_id': invoiceId,
+          'invoice_id': finalInvoiceId,
         }).toList(),
         paymentAccountId: _paymentType == 'cash' ? _selectedAccountId : null,
       );
+
+      // Save manual commission if agent is selected
+      if (_selectedAgentId != null) {
+        final manualComm = double.tryParse(_commissionCtrl.text) ?? 0.0;
+        if (manualComm > 0) {
+          await _db.database.then((db) => db.insert('commissions', {
+            'id': 'COM_MANUAL_${DateTime.now().millisecondsSinceEpoch}',
+            'employee_id': _selectedAgentId,
+            'amount': manualComm,
+            'rate': 0.0, // Manual fixed amount
+            'sales_amount': _total,
+            'period': '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+            'status': 'pending',
+            'created_at': now,
+          }));
+        }
+      }
 
       // Generate PDF
       PdfService.generateInvoice(
@@ -1027,7 +1215,7 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
         items: invoiceLines,
         company: {
           'name': _company['name'],
-          'vat_number': '300012345600003',
+          'vat_number': _company['vat_number']?.toString() ?? '',
           'currency': 'ر.س',
           'tax_rate': _company['tax_rate'],
         },
@@ -1036,12 +1224,12 @@ class _InvoiceEntryScreenState extends State<InvoiceEntryScreen> {
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم اصدار الفاتورة وتوليد القيد بنجاح!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(tr('sales_module.invoice_saved')), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحفظ: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('common.save_error', args: ['$e']))));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

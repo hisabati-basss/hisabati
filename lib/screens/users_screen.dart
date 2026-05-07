@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../theme/app_theme_extension.dart';
@@ -7,6 +8,7 @@ import '../services/database_helper.dart';
 import 'currency_center_screen.dart';
 import 'recurring_transactions_screen.dart';
 import 'bank_reconciliation_screen.dart';
+import 'admin/permissions_matrix_screen.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -82,13 +84,11 @@ class _UsersScreenState extends State<UsersScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 2), 
           child: SizedBox(
             width: double.infinity,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              runSpacing: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +97,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       tr('users.central_system'),
                       style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       tr('users.title'),
                       style: TextStyle(
@@ -112,7 +112,7 @@ class _UsersScreenState extends State<UsersScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        // Space eliminated
 
         Expanded(
           child: AnimatedSwitcher(
@@ -144,11 +144,11 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Widget _buildTabs(BuildContext context, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(2), // 📉 Reduced from 4
+      padding: const EdgeInsets.all(2), 
       decoration: BoxDecoration(
-        color: context.cardSurface,
+        color: context.obsidianGlass,
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)),
+        border: Border.all(color: context.glassBorder),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -185,28 +185,28 @@ class _UsersScreenState extends State<UsersScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
-          horizontal: 8, // 📉 Reduced
-          vertical: 2, // 📉 Reduced
+          horizontal: 12, 
+          vertical: 5, 
         ),
         decoration: BoxDecoration(
           color: isSelected ? primaryOrange : Colors.transparent,
-          borderRadius: BorderRadius.circular(4), // 📉 Sharper
+          borderRadius: BorderRadius.circular(100), 
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: context.iconSize - 10, // 📉 Reduced
+              size: 18, 
               color: isSelected ? Colors.black87 : context.mutedText,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             Text(
               title,
               style: TextStyle(
                 color: isSelected ? Colors.black87 : context.mutedText,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: context.bodySize - 4, // 📉 Reduced
+                fontSize: 12, 
               ),
             ),
           ],
@@ -224,10 +224,11 @@ class _UsersScreenState extends State<UsersScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              tr('users.managers_label'), // 📉 Shortened
+              tr('users.managers_label'),
               style: TextStyle(
-                fontSize: context.subHeaderSize, // 📉 Reduced from 18
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
+                color: context.textColor,
               ),
             ),
             GestureDetector(
@@ -241,25 +242,25 @@ class _UsersScreenState extends State<UsersScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 2),
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: context.cardSurface.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
+            color: context.sheetGlass,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.glassBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: _users.isEmpty 
               ? [const Center(child: Padding(padding: EdgeInsets.all(8.0), child: Text("لا يوجد مستخدمين بعد")))]
               : _users.map((u) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
+                  padding: const EdgeInsets.only(bottom: 8.0),
                   child: _buildUserItem(context, u, isMobile),
                 )).toList(),
           ),
         ),
-        const SizedBox(height: 16), // 📉 Reduced from 32
+        const SizedBox(height: 6), 
         Text(
           'تخصيص الصلاحيات المتقدمة',
           style: TextStyle(
@@ -267,7 +268,7 @@ class _UsersScreenState extends State<UsersScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 12), // 📉 Reduced from 16
+        const SizedBox(height: 6), 
         Container(
           padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 16/24
           decoration: BoxDecoration(
@@ -538,7 +539,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     'id': 'U_${DateTime.now().millisecondsSinceEpoch}',
                     'name': nameCtrl.text.trim(),
                     'username': usernameCtrl.text.trim(),
-                    'password_hash': passwordCtrl.text.trim(),
+                    'password_hash': sha256.convert(utf8.encode(passwordCtrl.text.trim())).toString(),
                     'email': emailCtrl.text.trim(),
                     'role': selectedRole,
                     'is_active': 1,
@@ -713,11 +714,11 @@ class _UsersScreenState extends State<UsersScreen> {
     Color statusColor = isActive ? const Color(0xFF00F260) : Colors.redAccent;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.05)),
+        color: context.isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.glassBorder),
       ),
       child: Row(
         children: [
@@ -729,40 +730,40 @@ class _UsersScreenState extends State<UsersScreen> {
               children: [
                 Text(
                   name,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.textColor),
                 ),
                 Text(
                   email,
-                  style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 5),
+                  style: TextStyle(color: context.mutedText, fontSize: 12),
                 ),
               ],
             ),
           ),
           if (!isMobile) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: context.badgeSurface.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(2),
+                color: context.badgeSurface,
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 role,
-                style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 5),
+                style: TextStyle(color: context.mutedText, fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 4),
           ],
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(4),
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(100),
             ),
             child: Text(
               status,
               style: TextStyle(
                 color: statusColor,
-                fontSize: context.bodySize - 6,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -775,7 +776,15 @@ class _UsersScreenState extends State<UsersScreen> {
               IconButton(
                 icon: const Icon(Icons.key, color: Colors.orangeAccent, size: 18),
                 tooltip: 'تخصيص الصلاحيات',
-                onPressed: () => _showPermissionMatrixDialog(user),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => PermissionsMatrixScreen(
+                      userId: user['id'].toString(),
+                      userName: user['name'] ?? '',
+                    )),
+                  );
+                },
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -935,23 +944,30 @@ class _UsersScreenState extends State<UsersScreen> {
     Color statusColor = Colors.greenAccent;
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.02),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: statusColor.withValues(alpha: 0.05)),
+        color: context.sheetGlass,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.glassBorder),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.location_city,
-                color: statusColor.withValues(alpha: 0.6),
-                size: context.iconSize - 8,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryOrange.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.location_city,
+                  color: primaryOrange,
+                  size: 20,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -959,18 +975,20 @@ class _UsersScreenState extends State<UsersScreen> {
                     name,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: context.bodySize - 2,
+                      fontSize: 12,
+                      color: context.textColor,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.map, size: 8, color: context.mutedText.withValues(alpha: 0.5)),
+                      Icon(Icons.qr_code, size: 10, color: context.mutedText),
                       const SizedBox(width: 4),
                       Text(
                         "الرمز: $code",
                         style: TextStyle(
                           color: context.mutedText,
-                          fontSize: context.bodySize - 5,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -983,32 +1001,30 @@ class _UsersScreenState extends State<UsersScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
                   status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: context.bodySize - 6,
+                  style: const TextStyle(
+                    color: Colors.greenAccent,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 18),
-                tooltip: 'تعديل',
+                icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 16),
                 onPressed: () => _showEditBranchDialog(branch),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
-                tooltip: 'حذف',
+                icon: const Icon(Icons.delete, color: Colors.redAccent, size: 16),
                 onPressed: () => _deleteBranch(branch['id'] ?? ''),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -1174,27 +1190,27 @@ class _UsersScreenState extends State<UsersScreen> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // 📉 Reduced blur
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), // 📉 Reduced from 16/10
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: isPrimary ? primaryOrange : primaryOrange.withValues(alpha: 0.05),
             border: Border.all(color: primaryOrange.withValues(alpha: 0.1)),
-            borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 100
+            borderRadius: BorderRadius.circular(100), 
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
-                size: 14, // 📉 Reduced from 16
+                size: 16, 
                 color: isPrimary ? Colors.black87 : context.textColor,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
                   color: isPrimary ? Colors.black87 : context.textColor,
                   fontWeight: FontWeight.bold,
-                  fontSize: 11, // 📉 Reduced from 12
+                  fontSize: 12, 
                 ),
               ),
             ],

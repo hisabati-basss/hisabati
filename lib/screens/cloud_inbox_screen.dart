@@ -22,13 +22,39 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
   final ImagePicker _picker = ImagePicker();
 
   List<Map<String, dynamic>> _drafts = [];
+  List<Map<String, dynamic>> _folders = [];
+  String? _selectedFolderId;
   bool _isLoading = true;
   bool _isScanning = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDrafts();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await Future.wait([
+      _loadDrafts(),
+      _loadFolders(),
+    ]);
+  }
+
+  Future<void> _loadFolders() async {
+    final folders = await _dbHelper.getAllFolders();
+    if (mounted) {
+      setState(() {
+        _folders = folders;
+        // Auto-select "Invoices" folder if it exists
+        final invoiceFolder = _folders.firstWhere(
+          (f) => f['name'].toString().toLowerCase().contains('فاتورة') || f['name'].toString().toLowerCase().contains('invoice'),
+          orElse: () => {},
+        );
+        if (invoiceFolder.isNotEmpty) {
+          _selectedFolderId = invoiceFolder['id'];
+        }
+      });
+    }
   }
 
   Future<void> _loadDrafts() async {
@@ -43,7 +69,14 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
   }
 
   Future<void> _scanInvoice() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    // ImageSource.camera is not supported on Windows by image_picker_windows
+    // We fallback to gallery (file picker) on desktop
+    ImageSource source = ImageSource.camera;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      source = ImageSource.gallery;
+    }
+
+    final XFile? photo = await _picker.pickImage(source: source);
     if (photo == null) return;
 
     setState(() => _isScanning = true);
@@ -79,7 +112,7 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
   Future<void> _approveDraft(Map<String, dynamic> draft) async {
     setState(() => _isLoading = true);
     try {
-      final success = await _dbHelper.approveDraftInvoice(draft['id']);
+      final success = await _dbHelper.approveDraftInvoice(draft['id'], folderId: _selectedFolderId);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(tr('cloud_inbox.approve_success')), backgroundColor: Colors.green),
@@ -295,6 +328,42 @@ class _CloudInboxScreenState extends State<CloudInboxScreen> {
                   borderRadius: BorderRadius.circular(8),
                   child: Image.file(File(draft['attachment_path']), height: 150, width: double.infinity, fit: BoxFit.cover),
                 ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text("file_manager.organize_in_folder".tr(), style: TextStyle(fontSize: context.bodySize - 2, color: primaryOrange, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: context.cardSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.cardBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedFolderId,
+                    isExpanded: true,
+                    hint: Text("file_manager.select_save_folder".tr(), style: TextStyle(color: context.mutedText, fontSize: 13)),
+                    dropdownColor: const Color(0xFF1A1A1A),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text("file_manager.root_folder".tr(), style: const TextStyle(fontSize: 13)),
+                      ),
+                      ..._folders.map((f) => DropdownMenuItem<String>(
+                        value: f['id'],
+                        child: Text(f['name'], style: const TextStyle(fontSize: 13)),
+                      )),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedFolderId = val);
+                      Navigator.pop(context);
+                      _showReviewDialog(draft); // Refresh dialog
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
         ),

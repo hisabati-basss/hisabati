@@ -213,18 +213,32 @@ class ChequeService {
       SELECT 
         SUM(CASE WHEN type = ? AND status = ? THEN amount ELSE 0 END) as receivable_pending,
         SUM(CASE WHEN type = ? AND status = ? THEN amount ELSE 0 END) as payable_pending,
-        SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as bounced_total
+        SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as bounced_total,
+        SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as cleared_total
       FROM cheques
       WHERE is_deleted = 0
-    ''', [TYPE_RECEIVABLE, STATUS_PENDING, TYPE_PAYABLE, STATUS_PENDING, STATUS_BOUNCED]);
+    ''', [TYPE_RECEIVABLE, STATUS_PENDING, TYPE_PAYABLE, STATUS_PENDING, STATUS_BOUNCED, STATUS_CLEARED]);
 
-    if (res.isEmpty) return {'receivable_pending': 0, 'payable_pending': 0, 'bounced_total': 0};
+    if (res.isEmpty) return {'receivable_pending': 0, 'payable_pending': 0, 'bounced_total': 0, 'cleared_total': 0};
     
     return {
       'receivable_pending': (res.first['receivable_pending'] as num?)?.toDouble() ?? 0.0,
       'payable_pending': (res.first['payable_pending'] as num?)?.toDouble() ?? 0.0,
       'bounced_total': (res.first['bounced_total'] as num?)?.toDouble() ?? 0.0,
+      'cleared_total': (res.first['cleared_total'] as num?)?.toDouble() ?? 0.0,
     };
   }
+
+  /// Generates a report of cheques due within a specific period.
+  Future<List<Map<String, dynamic>>> getChequesReport(DateTime start, DateTime end) async {
+    final db = await _dbHelper.database;
+    return await db.query(
+      'cheques',
+      where: 'due_date BETWEEN ? AND ? AND is_deleted = 0',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'due_date ASC'
+    );
+  }
 }
+
 

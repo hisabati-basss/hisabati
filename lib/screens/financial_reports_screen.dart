@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -6,6 +7,10 @@ import '../services/database_helper.dart';
 import '../services/reporting_service.dart';
 import 'trial_balance_screen.dart';
 import '../services/export_service.dart';
+import 'cost_center_management_screen.dart';
+import 'budget_performance_screen.dart';
+import 'revenue_analysis_screen.dart';
+import '../widgets/revenue_analysis_mini.dart';
 
 class FinancialReportsScreen extends StatefulWidget {
   const FinancialReportsScreen({super.key});
@@ -25,13 +30,14 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
   List<Map<String, dynamic>> _costCenters = [];
   
   Map<String, double> _pnl = {'revenue': 0, 'expenses': 0, 'net_profit': 0};
+  Map<String, double> _vat = {'total_tax': 0, 'total_sales': 0, 'total_gross': 0};
   List<Map<String, dynamic>> _ccPerformance = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _loadInitialData();
   }
 
@@ -49,11 +55,13 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
     
     final stats = await _reportingService.getPNLReport(startStr, endStr, costCenterId: _selectedCostCenterId);
     final performance = await _reportingService.getCostCenterPerformance(startStr, endStr);
+    final vatStats = await _reportingService.getVatReport(startStr, endStr);
     
     if (mounted) {
       setState(() {
         _pnl = stats;
         _ccPerformance = performance;
+        _vat = vatStats;
         _isLoading = false;
       });
     }
@@ -67,7 +75,7 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
     ];
     
     for (var cc in _ccPerformance) {
-      records.add({'label': tr('financial_reports.center_net', args: [cc['name'] as String]), 'value': cc['profit']});
+      records.add({'label': tr('financial_reports.center_net', args: [cc['name']?.toString() ?? 'N/A']), 'value': cc['profit']});
     }
 
     await _reportingService.generateFinancialPDF(
@@ -79,117 +87,168 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     bool isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(100 + context.headerSize), // 📉 Reduced from 140
-        child: Container(
-          padding: EdgeInsets.fromLTRB(context.cardPadding, 8, context.cardPadding, 0), // 📉 Reduced from 20/10/20/0
-          child: Column(
+      body: Stack(
+        children: [
+          Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(tr('financial_reports.title'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
-                      Text(tr('financial_reports.subtitle'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: context.textColor)),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _handlePdfExport,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: Icon(Icons.picture_as_pdf_outlined, color: primaryOrange, size: context.iconSize - 6),
-                        tooltip: tr('common.report'),
-                      ),
-                      const SizedBox(width: 4),
-                      _buildCostCenterFilter(),
-                    ],
-                  ),
-                ],
+              // Ultra Slim Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_ios, size: 18),
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              tr('financial_reports.subtitle'),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87, 
+                                fontSize: 16, 
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.auto_awesome, color: Colors.orangeAccent, size: 14),
+                          ],
+                        ),
+                        Text(
+                          tr('financial_reports.title'),
+                          style: TextStyle(color: context.mutedText, fontSize: 9),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 4), // 📉 Reduced from 8
-              TabBar(
-                controller: _tabController,
-                indicatorColor: primaryOrange,
-                labelColor: primaryOrange,
-                unselectedLabelColor: context.mutedText,
-                indicatorSize: TabBarIndicatorSize.label,
-                dividerColor: Colors.transparent,
-                labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold), // 📉 Reduced
-                labelPadding: const EdgeInsets.symmetric(horizontal: 12), // 📉 Reduced
-                tabs: [
-                  Tab(text: tr('financial_reports.tab_profit'), height: 28),
-                  Tab(text: tr('financial_reports.tab_centers'), height: 28),
-                  Tab(text: tr('financial_reports.tab_balance'), height: 28),
-                  Tab(text: "أعمار الديون", height: 28),
-                ],
+              
+              // Ultra Compact Tabs
+              Container(
+                height: 30, // 📉 Reduced from 36
+                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 2), // 📉 Further reduced
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: false,
+                  labelColor: isDark ? Colors.black87 : Colors.white,
+                  unselectedLabelColor: context.mutedText,
+                  indicator: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(6)),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10), // 📉 Reduced from 11
+                  dividerColor: Colors.transparent,
+                  padding: EdgeInsets.zero,
+                  tabs: [
+                    Tab(text: tr('financial_reports.tab_profit')),
+                    Tab(text: tr('financial_reports.tab_centers')),
+                    Tab(text: tr('financial_reports.tab_balance')),
+                    Tab(text: "أعمار الديون"),
+                    Tab(text: "الضريبة (VAT)"),
+                    Tab(text: tr('manufacturing.production_analysis')),
+                  ],
+                ),
+              ),
+              
+              // Ultra Slim Filter & Export Bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 4), // 📉 Removed top padding
+                child: Row(
+                  children: [
+                    _buildCostCenterFilter(),
+                    const SizedBox(width: 8),
+                    _buildDateRangePicker(),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _handlePdfExport,
+                      constraints: const BoxConstraints(maxHeight: 24, maxWidth: 24),
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.picture_as_pdf_outlined, color: primaryOrange, size: 16),
+                    ),
+                  ],
+                ),
+              ),
+              
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPNLTab(isMobile),
+                    _buildCostCentersTab(isMobile),
+                    _buildBalanceSheetTab(isMobile),
+                    _buildAgingTab(isMobile),
+                    _buildVatTab(isMobile),
+                    _buildProductionTab(isMobile),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Center(child: RevenueAnalysisMini()),
+          ),
+        ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: primaryOrange))
-        : TabBarView(
-            controller: _tabController,
-            children: [
-              _buildPNLTab(isMobile),
-              _buildCostCentersTab(isMobile),
-              _buildBalanceSheetTab(isMobile),
-              _buildAgingTab(isMobile),
-            ],
-          ),
     );
   }
 
   Widget _buildCostCenterFilter() {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: 28, // 📉 Forced height
-      padding: const EdgeInsets.symmetric(horizontal: 4), // 📉 Reduced
+      height: 20, // 📉 Reduced from 24
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4), // 📉 Sharper
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.15)),
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
       ),
-      child: DropdownButton<String?>(
-        value: _selectedCostCenterId,
-        underline: const SizedBox(),
-        isDense: true, // 📉 Compact
-        dropdownColor: context.cardSurface,
-        icon: Icon(Icons.keyboard_arrow_down, size: context.iconSize - 8),
-        hint: Text(tr('financial_reports.tab_centers'), style: TextStyle(fontSize: context.bodySize - 3)),
-        items: [
-          DropdownMenuItem(value: null, child: Text(tr('common.all'), style: TextStyle(fontSize: context.bodySize - 3))),
-          ..._costCenters.map((cc) => DropdownMenuItem(
-            value: cc['id'] as String,
-            child: Text(cc['name'] as String, style: TextStyle(fontSize: context.bodySize - 3)),
-          )),
-        ],
-        onChanged: (val) {
-          setState(() => _selectedCostCenterId = val);
-          _refreshData();
-        },
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: _selectedCostCenterId,
+          isDense: true,
+          dropdownColor: isDark ? Colors.grey.shade900 : Colors.white,
+          icon: const Icon(Icons.keyboard_arrow_down, size: 10, color: primaryOrange),
+          hint: Text(tr('common.all'), style: TextStyle(fontSize: 9, color: context.mutedText)),
+          items: [
+            DropdownMenuItem(value: null, child: Text(tr('common.all'), style: TextStyle(fontSize: 9, color: isDark ? Colors.white : Colors.black87))),
+            ..._costCenters.map((cc) => DropdownMenuItem(
+              value: cc['id'] as String,
+              child: Text(cc['name'] as String, style: TextStyle(fontSize: 9, color: isDark ? Colors.white : Colors.black87)),
+            )),
+          ],
+          onChanged: (val) {
+            setState(() => _selectedCostCenterId = val);
+            _refreshData();
+          },
+        ),
       ),
     );
   }
 
   Widget _buildPNLTab(bool isMobile) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(context.sectionPadding), // 📉 Reduced from 20
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24), // 📉 Top padding is 0 to bring cards up
       child: Column(
         children: [
           _buildModernStatsGrid(isMobile),
-          const SizedBox(height: 16), // 📉 Reduced from 32
+          const SizedBox(height: 12), // 📉 Reduced
           _buildExpenseChart(isMobile),
-          const SizedBox(height: 16), // 📉 Reduced from 32
-          _buildDateRangePicker(),
         ],
       ),
     );
@@ -197,12 +256,30 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
 
   Widget _buildCostCentersTab(bool isMobile) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(context.sectionPadding), // 📉 Reduced from 20
+      padding: EdgeInsets.all(context.sectionPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(tr('financial_reports.cost_centers_performance'), style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold, color: context.textColor)),
-          const SizedBox(height: 12), // 📉 Reduced from 20
+          _buildSectionHeader(tr('financial_reports.cost_centers_performance')),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildReportCard(
+                tr('financial_reports.manage_cost_centers'), 
+                Icons.account_tree, 
+                Colors.blueAccent,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CostCenterManagementScreen())),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _buildReportCard(
+                tr('financial_reports.budget_performance'), 
+                Icons.bar_chart, 
+                Colors.orangeAccent,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPerformanceScreen())),
+              )),
+            ],
+          ),
+          const SizedBox(height: 24),
           ..._ccPerformance.map((cc) => _buildCCRow(cc)).toList(),
         ],
       ),
@@ -308,23 +385,23 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
 
   Widget _buildAccountSection(String title, List accounts, Color color, double total, String exportKey) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.12))),
+      padding: const EdgeInsets.all(8), // 📉 Reduced from 10
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.1))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize)),
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize - 2)), // 📉 Reduced
           Row(children: [
-            Text("${total.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize)),
+            Text("${total.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize - 2)), // 📉 Reduced
             const SizedBox(width: 4),
             _buildCsvExportButton(exportKey, accounts),
           ]),
         ]),
-        if (accounts.isNotEmpty) const Divider(height: 12),
+        if (accounts.isNotEmpty) const Divider(height: 8), // 📉 Reduced
         ...accounts.map((acc) => Padding(
-          padding: const EdgeInsets.only(bottom: 3),
+          padding: const EdgeInsets.only(bottom: 2), // 📉 Reduced
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Expanded(child: Text("${acc['code']} ${acc['name']}", style: TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            Text("${((acc['balance'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            Expanded(child: Text("${acc['code']} ${acc['name']}", style: TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis)), // 📉 Reduced from 11
+            Text("${((acc['balance'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)), // 📉 Reduced from 11
           ]),
         )),
       ]),
@@ -360,27 +437,44 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
   }
 
   Widget _buildGlassStatCard(String label, double value, Color color, IconData icon) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.4), // 📉 Lighter
-        borderRadius: BorderRadius.circular(context.cardRadius / 2), // 📉 Sharper
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(8), // 📉 Reduced from 12
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(label, style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 4)), // 📉 Reduced
-                Icon(icon, color: color.withValues(alpha: 0.5), size: context.iconSize - 6), // 📉 Reduced from 18
-              ],
-            ),
-            const Spacer(),
-            Text("${value.toStringAsFixed(0)}", style: TextStyle(fontSize: context.bodySize + 2, fontWeight: FontWeight.bold, color: context.textColor)), // 📉 Reduced from headerSize
-          ],
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Icon(icon, size: 14, color: color),
+                  Text(label, style: TextStyle(color: context.mutedText, fontSize: 10)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              FittedBox(
+                child: Text(
+                  "${value.toStringAsFixed(0)}",
+                  style: TextStyle(
+                    fontSize: 22, 
+                    fontWeight: FontWeight.bold, 
+                    color: isDark ? Colors.white : Colors.black87
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -426,7 +520,7 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
                   children: [
                     Container(width: 4, height: 4, decoration: BoxDecoration(color: _getColor(cc['id']), shape: BoxShape.circle)), // 📉 Reduced
                     const SizedBox(width: 4),
-                    Expanded(child: Text(cc['name'], style: TextStyle(fontSize: context.bodySize - 4, color: context.textColor), overflow: TextOverflow.ellipsis)), // 📉 Reduced
+                    Expanded(child: Text(cc['name'] ?? 'N/A', style: TextStyle(fontSize: context.bodySize - 4, color: context.textColor), overflow: TextOverflow.ellipsis)), // 📉 Reduced
                   ],
                 ),
               )).toList(),
@@ -452,7 +546,7 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(cc['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)), // 📉 Reduced
+              Text(cc['name'] ?? 'N/A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)), // 📉 Reduced
               Text("Rev: ${cc['revenue']?.toStringAsFixed(0)}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 4)), // 📉 Reduced/Shortened
             ],
           ),
@@ -469,25 +563,35 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
   }
 
   Widget _buildDateRangePicker() {
-    return OutlinedButton.icon(
-      onPressed: () async {
-        final picked = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now());
-        if (picked != null) {
-          setState(() {
-            _startDate = picked.start;
-            _endDate = picked.end;
-          });
-          _refreshData();
-        }
-      },
-      icon: Icon(Icons.date_range, size: context.iconSize - 8), // 📉 Reduced
-      label: Text(tr('financial_reports.filter_period'), style: TextStyle(fontSize: context.bodySize - 3)),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: primaryOrange,
-        side: const BorderSide(color: primaryOrange, width: 0.5),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), // 📉 Tightened
-        minimumSize: const Size(60, 24), // 📉 Small button
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)), // 📉 Sharper
+    return Container(
+      height: 20, // 📉 Reduced from 28
+      decoration: BoxDecoration(
+        color: primaryOrange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: primaryOrange.withValues(alpha: 0.2)),
+      ),
+      child: InkWell(
+        onTap: () async {
+          final picked = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now());
+          if (picked != null) {
+            setState(() { _startDate = picked.start; _endDate = picked.end; });
+            _refreshData();
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.date_range, size: 10, color: primaryOrange),
+              const SizedBox(width: 4),
+              Text(
+                'الفترة',
+                style: TextStyle(color: primaryOrange, fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -556,10 +660,168 @@ class _FinancialReportsScreenState extends State<FinancialReportsScreen> with Si
     );
   }
 
-  Color _getColor(String id) {
+  Widget _buildVatTab(bool isMobile) {
+    double netVat = (_vat['output_vat'] ?? 0) - (_vat['input_vat'] ?? 0);
+    bool isRefund = netVat < 0;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(context.sectionPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("الإقرار الضريبي (VAT Declaration)", style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          _buildGlassStatCard("إجمالي المبيعات الخاضعة", _vat['total_sales'] ?? 0, Colors.blue, Icons.point_of_sale),
+          const SizedBox(height: 12),
+          _buildGlassStatCard("ضريبة المخرجات (Sales VAT)", _vat['output_vat'] ?? 0, Colors.redAccent, Icons.receipt),
+          const SizedBox(height: 12),
+          _buildGlassStatCard("ضريبة المدخلات (Purchases VAT)", _vat['input_vat'] ?? 0, Colors.orange, Icons.shopping_cart),
+          const SizedBox(height: 12),
+          _buildGlassStatCard(
+            isRefund ? "صافي ضريبة مستردة (Refund)" : "صافي ضريبة مستحقة (Net Payable)", 
+            netVat.abs(), 
+            isRefund ? Colors.teal : Colors.green, 
+            Icons.account_balance_wallet
+          ),
+          const SizedBox(height: 24),
+          Text("* ملاحظة: يعتمد هذا التقرير على فواتير المبيعات والمشتريات المسجلة في النظام للفترة المحددة.", style: TextStyle(color: context.mutedText, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Color _getColor(String? id) {
     if (id == 'CC_MGMT') return Colors.blue;
     if (id == 'CC_SALES') return Colors.teal;
     if (id == 'CC_OPS') return primaryOrange;
     return Colors.purple;
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: context.subHeaderSize,
+          fontWeight: FontWeight.bold,
+          color: context.textColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? color.withValues(alpha: 0.15) : color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 6),
+            Text(
+              title, 
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductionTab(bool isMobile) {
+    final startStr = _startDate.toIso8601String().split('T')[0];
+    final endStr = _endDate.toIso8601String().split('T')[0];
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _reportingService.getProductionReport(startStr, endStr),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: primaryOrange));
+        final data = snapshot.data!;
+        
+        if (data.isEmpty || (data['total_orders'] ?? 0) == 0) {
+          return Center(child: Text(tr('common.no_data'), style: TextStyle(color: context.mutedText)));
+        }
+
+        final double matCost = (data['mat_cost'] as num?)?.toDouble() ?? 0;
+        final double overhead = (data['overhead_cost'] as num?)?.toDouble() ?? 0;
+        final double total = (matCost + overhead) > 0 ? (matCost + overhead) : 1;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(context.sectionPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('manufacturing.production_analysis'), style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildBalanceKPI(tr('manufacturing.completed_orders'), (data['total_orders'] as num?)?.toDouble() ?? 0.0, Colors.blue)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildBalanceKPI(tr('manufacturing.total_value'), (data['total_cost'] as num?)?.toDouble() ?? 0.0, primaryOrange)),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildSectionHeader(tr('manufacturing.cost_breakdown')),
+              const SizedBox(height: 12),
+              Container(
+                height: 120, // 📉 Reduced from 150
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.cardSurface.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: PieChart(
+                        PieChartData(
+                          sections: [
+                            PieChartSectionData(color: Colors.blue, value: matCost, title: "${((matCost/total)*100).toStringAsFixed(0)}%", radius: 40, titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                            PieChartSectionData(color: Colors.orange, value: overhead, title: "${((overhead/total)*100).toStringAsFixed(0)}%", radius: 40, titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLegendItem(tr('manufacturing.material_costs'), Colors.blue),
+                        const SizedBox(height: 8),
+                        _buildLegendItem(tr('manufacturing.overhead_costs'), Colors.orange),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+      ],
+    );
   }
 }

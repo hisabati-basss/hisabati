@@ -4,6 +4,7 @@ import '../services/ai_chat_controller.dart';
 import '../widgets/robot_avatar.dart';
 import '../theme/app_theme_extension.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class AiCenterDock extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -175,7 +176,7 @@ class _AiCenterDockState extends State<AiCenterDock> with TickerProviderStateMix
               padding: const EdgeInsets.symmetric(horizontal: 16),
               color: Colors.transparent,
               child: Text(
-                _controller.selectedFile != null ? "تحليل ملف..." : "تحدث مع HBASSS...",
+                _controller.selectedFile != null ? "تحليل ملف..." : "تحدث مع مساعد حساباتي...",
                 style: TextStyle(color: context.mutedText, fontSize: 13),
               ),
             ),
@@ -203,7 +204,7 @@ class _AiCenterDockState extends State<AiCenterDock> with TickerProviderStateMix
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "HBASSS",
+                "مساعد حساباتي",
                 style: TextStyle(
                   color: primaryOrange.withValues(alpha: progress.clamp(0.0, 1.0)),
                   fontSize: 14,
@@ -270,7 +271,7 @@ class _AiCenterDockState extends State<AiCenterDock> with TickerProviderStateMix
                   controller: _textController,
                   style: const TextStyle(fontSize: 14),
                   decoration: const InputDecoration(
-                    hintText: "أرسل رسالة إلى HBASSS...",
+                    hintText: "أرسل رسالة إلى مساعد حساباتي...",
                     border: InputBorder.none,
                     isDense: true,
                   ),

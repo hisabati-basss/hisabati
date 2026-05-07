@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:intl/intl.dart' as intl;
 import '../services/database_helper.dart';
+import '../services/pdf_service.dart';
 import '../theme/app_theme_extension.dart'; // 📉 Added missing import
 import '../widgets/glass_container.dart';
 import '../widgets/attachment_viewer.dart';
@@ -18,6 +20,7 @@ class _WalletScreenState extends State<WalletScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<Map<String, dynamic>> _accounts = [];
   List<Map<String, dynamic>> _history = [];
+  Map<String, dynamic>? _company;
   bool _isLoading = true;
 
   @override
@@ -30,12 +33,20 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() => _isLoading = true);
     final accs = await _dbHelper.getWalletAccounts();
     final hist = await _dbHelper.getTransferHistory();
+    final company = await _dbHelper.getCompanyInfo();
+    double total = 0;
+    for (var a in accs) {
+      total += (a['balance'] as num?)?.toDouble() ?? 0.0;
+    }
     setState(() {
       _accounts = accs;
       _history = hist;
+      _company = company;
+      _totalBalance = total;
       _isLoading = false;
     });
   }
+  double _totalBalance = 0;
 
   Future<void> _toggleReconciliation(String id, bool currentStatus) async {
     await _dbHelper.setReconciliationStatus(id, !currentStatus);
@@ -50,115 +61,139 @@ class _WalletScreenState extends State<WalletScreen> {
     final TextEditingController notesController = TextEditingController();
     String? attachmentPath;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(20),
-          child: GlassContainer(
-            padding: const EdgeInsets.all(24),
-            borderRadius: 28,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(tr('wallet.transfer_title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 20),
-                  
-                  // From Account
-                  _buildDropdown(
-                    label: tr('wallet.from_account'),
-                    value: fromAccount,
-                    items: _accounts,
-                    onChanged: (val) => setDialogState(() => fromAccount = val),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // To Account
-                  _buildDropdown(
-                    label: tr('wallet.to_account'),
-                    value: toAccount,
-                    items: _accounts.where((a) => a['id'] != fromAccount).toList(),
-                    onChanged: (val) => setDialogState(() => toAccount = val),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Amount and Fee
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(
-                          label: tr('wallet.amount'),
-                          controller: amountController,
-                          icon: Icons.attach_money,
-                        ),
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Container(
+            width: 500,
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+            decoration: BoxDecoration(
+              color: context.isDark ? const Color(0xFF1A1A1F) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: context.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, 10)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildTextField(
-                          label: tr('wallet.bank_fee'),
-                          controller: feeController,
-                          icon: Icons.account_balance_wallet,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                    ),
+                    Text(tr('wallet.transfer_title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: context.textColor)),
+                    const SizedBox(height: 24),
+                    
+                    // From Account
+                    _buildDropdown(
+                      label: tr('wallet.from_account'),
+                      value: fromAccount,
+                      items: _accounts,
+                      onChanged: (val) => setDialogState(() => fromAccount = val),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // To Account
+                    _buildDropdown(
+                      label: tr('wallet.to_account'),
+                      value: toAccount,
+                      items: _accounts.where((a) => a['id'] != fromAccount).toList(),
+                      onChanged: (val) => setDialogState(() => toAccount = val),
+                    ),
+                    const SizedBox(height: 16),
 
-                  _buildTextField(
-                    label: tr('wallet.notes'),
-                    controller: notesController,
-                    icon: Icons.notes,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Image Attachment (v13 feature)
-                  AttachmentViewer(
-                    onAttachmentSelected: (path) => attachmentPath = path,
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(tr('common.cancel'), style: const TextStyle(color: Colors.white60)),
-                        ),
-                      ),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent.withValues(alpha: 0.3),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    // Amount and Fee
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            label: tr('wallet.amount'),
+                            controller: amountController,
+                            icon: Icons.attach_money,
                           ),
-                          onPressed: () async {
-                            if (fromAccount != null && toAccount != null && amountController.text.isNotEmpty) {
-                              await _dbHelper.transferFunds(
-                                fromAccountId: fromAccount!,
-                                toAccountId: toAccount!,
-                                amount: double.parse(amountController.text),
-                                fee: double.parse(feeController.text),
-                                attachmentPath: attachmentPath,
-                                notes: notesController.text,
-                              );
-                              if (mounted) {
-                                Navigator.pop(context);
-                                _refreshData();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(tr('wallet.transfer_success'))),
-                                );
-                              }
-                            }
-                          },
-                          child: Text(tr('wallet.confirm_transfer_btn')),
                         ),
-                      ),
-                    ],
-                  )
-                ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            label: tr('wallet.bank_fee'),
+                            controller: feeController,
+                            icon: Icons.account_balance_wallet,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      label: tr('wallet.notes'),
+                      controller: notesController,
+                      icon: Icons.notes,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Image Attachment
+                    AttachmentViewer(
+                      onAttachmentSelected: (path) => attachmentPath = path,
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                            child: Text(tr('common.cancel'), style: TextStyle(color: context.mutedText)),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryOrange,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            onPressed: () async {
+                              if (fromAccount != null && toAccount != null && amountController.text.isNotEmpty) {
+                                await _dbHelper.transferFunds(
+                                  fromAccountId: fromAccount!,
+                                  toAccountId: toAccount!,
+                                  amount: double.parse(amountController.text),
+                                  fee: double.parse(feeController.text),
+                                  attachmentPath: attachmentPath,
+                                  notes: notesController.text,
+                                );
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                  _refreshData();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(tr('wallet.transfer_success')), backgroundColor: Colors.green),
+                                  );
+                                }
+                              }
+                            },
+                            child: Text(tr('wallet.confirm_transfer_btn'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -184,8 +219,34 @@ class _WalletScreenState extends State<WalletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr('wallet.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: Colors.white)), // 📉 Reduced from 28
-                Text(tr('wallet.subtitle'), style: TextStyle(color: Colors.white60, fontSize: context.bodySize - 1)), // 📉 Shortened
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tr('wallet.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(tr('wallet.subtitle'), style: TextStyle(color: Colors.white60, fontSize: context.bodySize - 1)),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text("${_totalBalance.toStringAsFixed(2)} ${_company?['currency'] ?? ''}", 
+                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                        Text(tr('accounting.total_balance'), style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.print_outlined, color: Colors.white60),
+                      onPressed: () {
+                         if (_company != null) {
+                           PdfService.generateWalletReportPdf(accounts: _accounts, company: _company!);
+                         }
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 12), // 📉 Reduced from 16/32
                 
                 // Account Cards Grid
@@ -193,8 +254,11 @@ class _WalletScreenState extends State<WalletScreen> {
                   height: 150, // 📉 Reduced from 200
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _accounts.length,
+                    itemCount: _accounts.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == _accounts.length) {
+                        return _buildAddBankButton();
+                      }
                       final acc = _accounts[index];
                       return _buildWalletCard(acc, index);
                     },
@@ -232,54 +296,197 @@ class _WalletScreenState extends State<WalletScreen> {
     ];
     final color = colors[index % colors.length];
 
-    return Container(
-      width: 250, // 📉 Slightly reduced from 280 (but keeping readable for numbers)
-      margin: const EdgeInsets.only(left: 8), // 📉 Reduced from 12/16
-      child: GlassContainer(
-        borderRadius: context.cardRadius, // 📉 Reduced from 24
-        child: Stack(
+    return GestureDetector(
+      onTap: () => _showBankLinkDialog(acc),
+      child: Container(
+        width: 250, // 📉 Slightly reduced from 280 (but keeping readable for numbers)
+        margin: const EdgeInsets.only(left: 8), // 📉 Reduced from 12/16
+        child: GlassContainer(
+          borderRadius: context.cardRadius, // 📉 Reduced from 24
+          child: Stack(
+            children: [
+              Positioned(
+                top: -20,
+                right: -20,
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: color.withValues(alpha: 0.1),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Icon(
+                          acc['id'].toString().contains('BANK') || acc['bank_name'] != null ? Icons.account_balance : Icons.account_balance_wallet,
+                          color: color,
+                          size: context.iconSize, // 📉 Added
+                        ),
+                        Text(acc['code'] ?? "", style: TextStyle(color: Colors.white38, fontSize: context.bodySize - 2)), // 📉 Reduced from 12
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(acc['name'], style: TextStyle(fontSize: context.bodySize + 1, color: Colors.white70)), // 📉 Reduced from 16
+                        if (acc['bank_name'] != null)
+                          Text(acc['bank_name'], style: const TextStyle(fontSize: 10, color: Colors.white24)),
+                        if (acc['iban'] != null && acc['iban'].toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(acc['iban'], style: const TextStyle(fontSize: 8, color: Colors.white24, letterSpacing: 0.5)),
+                          ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "${intl.NumberFormat("#,###.##").format(acc['balance'])} ${tr('common.currency_symbol')}",
+                          style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: Colors.white), // 📉 Reduced from 24
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBankLinkDialog(Map<String, dynamic> acc) {
+    final TextEditingController bankNameCtrl = TextEditingController(text: acc['bank_name']);
+    final TextEditingController accNumCtrl = TextEditingController(text: acc['bank_account_number']);
+    final TextEditingController ibanCtrl = TextEditingController(text: acc['iban']);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.bgSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
           children: [
-            Positioned(
-              top: -20,
-              right: -20,
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: color.withValues(alpha: 0.1),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 24
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Icon(
-                        acc['id'].toString().contains('BANK') ? Icons.account_balance : Icons.account_balance_wallet,
-                        color: color,
-                        size: context.iconSize, // 📉 Added
-                      ),
-                      Text(acc['code'] ?? "", style: TextStyle(color: Colors.white38, fontSize: context.bodySize - 2)), // 📉 Reduced from 12
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(acc['name'], style: TextStyle(fontSize: context.bodySize + 1, color: Colors.white70)), // 📉 Reduced from 16
-                      const SizedBox(height: 2), // 📉 Reduced from 4
-                      Text(
-                        "${intl.NumberFormat("#,###.##").format(acc['balance'])} ${tr('common.currency_symbol')}",
-                        style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: Colors.white), // 📉 Reduced from 24
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const Icon(Icons.account_balance, color: Colors.blueAccent),
+            const SizedBox(width: 12),
+            Expanded(child: Text(tr('wallet.link_bank_title'))),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTextField(label: tr('wallet.bank_name'), controller: bankNameCtrl, icon: Icons.business),
+            const SizedBox(height: 12),
+            _buildTextField(label: tr('wallet.acc_number'), controller: accNumCtrl, icon: Icons.numbers),
+            const SizedBox(height: 12),
+            _buildTextField(label: tr('wallet.iban'), controller: ibanCtrl, icon: Icons.account_balance),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              final db = await _dbHelper.database;
+              await db.update('accounts', {
+                'bank_name': bankNameCtrl.text,
+                'bank_account_number': accNumCtrl.text,
+                'iban': ibanCtrl.text,
+              }, where: 'id = ?', whereArgs: [acc['id']]);
+              if (mounted) {
+                Navigator.pop(ctx);
+                _refreshData();
+              }
+            },
+            child: Text(tr('common.save'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddBankButton() {
+    return GestureDetector(
+      onTap: _showAddNewBankDialog,
+      child: Container(
+        width: 200,
+        margin: const EdgeInsets.only(left: 8),
+        child: GlassContainer(
+          borderRadius: context.cardRadius,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.add_circle_outline, color: Colors.white60, size: 40),
+              const SizedBox(height: 12),
+              Text(tr('wallet.link_bank_title'), style: const TextStyle(color: Colors.white60)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddNewBankDialog() {
+    final TextEditingController nameCtrl = TextEditingController();
+    final TextEditingController codeCtrl = TextEditingController();
+    final TextEditingController bankNameCtrl = TextEditingController();
+    final TextEditingController accNumCtrl = TextEditingController();
+    final TextEditingController ibanCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.bgSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(tr('wallet.link_bank_title')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTextField(label: tr('common.name'), controller: nameCtrl, icon: Icons.label),
+              const SizedBox(height: 12),
+              _buildTextField(label: tr('accounting.code'), controller: codeCtrl, icon: Icons.code),
+              const SizedBox(height: 12),
+              _buildTextField(label: tr('wallet.bank_name'), controller: bankNameCtrl, icon: Icons.business),
+              const SizedBox(height: 12),
+              _buildTextField(label: tr('wallet.acc_number'), controller: accNumCtrl, icon: Icons.numbers),
+              const SizedBox(height: 12),
+              _buildTextField(label: tr('wallet.iban'), controller: ibanCtrl, icon: Icons.account_balance),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigoAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              if (nameCtrl.text.isEmpty || codeCtrl.text.isEmpty) return;
+              await _dbHelper.addAccount({
+                'name': nameCtrl.text,
+                'code': codeCtrl.text,
+                'type': 'asset',
+                'bank_name': bankNameCtrl.text,
+                'bank_account_number': accNumCtrl.text,
+                'iban': ibanCtrl.text,
+                'id': 'ACC_BANK_${codeCtrl.text}',
+              });
+              if (mounted) {
+                Navigator.pop(ctx);
+                _refreshData();
+              }
+            },
+            child: Text(tr('common.save'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
@@ -360,10 +567,11 @@ class _WalletScreenState extends State<WalletScreen> {
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              dropdownColor: Colors.black.withValues(alpha: 0.9),
+              dropdownColor: context.bgSurface,
+              icon: Icon(Icons.arrow_drop_down, color: context.mutedText),
               items: items.map((a) => DropdownMenuItem(
                 value: a['id'].toString(),
-                child: Text(a['name'], style: const TextStyle(color: Colors.white)),
+                child: Text(a['name'], style: TextStyle(color: context.textColor)),
               )).toList(),
               onChanged: onChanged,
             ),
@@ -381,12 +589,13 @@ class _WalletScreenState extends State<WalletScreen> {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: context.textColor),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, size: 18, color: Colors.white38),
+            prefixIcon: Icon(icon, size: 18, color: context.mutedText),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
+            fillColor: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryOrange, width: 1.5)),
           ),
         ),
       ],

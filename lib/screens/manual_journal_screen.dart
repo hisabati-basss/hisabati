@@ -50,8 +50,8 @@ class _ManualJournalScreenState extends State<ManualJournalScreen> {
     }
   }
 
-  double get _totalDebit => _lines.fold(0, (sum, item) => sum + item.debit);
-  double get _totalCredit => _lines.fold(0, (sum, item) => sum + item.credit);
+  double get _totalDebit => _lines.fold(0.0, (sum, item) => sum + item.debit);
+  double get _totalCredit => _lines.fold(0.0, (sum, item) => sum + item.credit);
   bool get _isBalanced =>
       (_totalDebit - _totalCredit).abs() < 0.01 && _totalDebit > 0;
 
@@ -92,9 +92,11 @@ class _ManualJournalScreenState extends State<ManualJournalScreen> {
       }).toList();
 
       await _db.saveManualJournalEntry(
-        date: _selectedDate.toIso8601String().split('T')[0],
-        description: _descController.text,
-        lines: lines,
+        {
+          'date': _selectedDate.toIso8601String().split('T')[0],
+          'description': _descController.text,
+        },
+        lines,
       );
 
       if (mounted) {
@@ -151,54 +153,42 @@ class _ManualJournalScreenState extends State<ManualJournalScreen> {
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
             decoration: BoxDecoration(
-              color: context.obsidianGlass,
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.1),
-                ),
-              ),
+              color: Colors.grey.shade900.withValues(alpha: 0.7),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: Column(
               children: [
                 // Header Bar for the Bottom Sheet
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.black.withValues(alpha: 0.02),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
                     children: [
-                      Text(
-                        tr('manual_journal.new_title'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      Container(
+                        width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2)),
                       ),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: Icon(Icons.close, color: context.mutedText),
+                          Text(
+                            tr('manual_journal.new_title'),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
-                          IconButton(
-                            onPressed: _isLoading ? null : _saveEntry,
-                            icon: Icon(
-                              Icons.check_circle,
-                              color: _isBalanced
-                                  ? Colors.greenAccent
-                                  : (isDark ? Colors.white30 : Colors.black26),
-                              size: 28,
-                            ),
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: Icon(Icons.close, color: context.mutedText),
+                              ),
+                              IconButton(
+                                onPressed: _isLoading ? null : _saveEntry,
+                                icon: Icon(
+                                  Icons.check_circle,
+                                  color: _isBalanced ? Colors.greenAccent : Colors.white24,
+                                  size: 28,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -323,14 +313,15 @@ class _ManualJournalScreenState extends State<ManualJournalScreen> {
             decoration: InputDecoration(
               isDense: true,
               labelText: tr('manual_journal.desc_label'),
-              labelStyle: TextStyle(fontSize: context.bodySize),
+              labelStyle: TextStyle(fontSize: context.bodySize, color: Colors.white54),
               hintText: tr('manual_journal.desc_hint'),
-              hintStyle: TextStyle(fontSize: context.bodySize),
-              border: const OutlineInputBorder(),
+              hintStyle: TextStyle(fontSize: context.bodySize, color: Colors.white24),
+              filled: true,
+              fillColor: Colors.black.withValues(alpha: 0.3),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
               floatingLabelStyle: const TextStyle(color: primaryOrange),
-              focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: primaryOrange),
-              ),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryOrange)),
             ),
           ),
         ],

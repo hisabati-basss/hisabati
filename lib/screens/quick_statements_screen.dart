@@ -1,4 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class QuickStatementsScreen extends StatefulWidget {
   const QuickStatementsScreen({super.key});
@@ -19,20 +23,103 @@ class _QuickStatementsScreenState extends State<QuickStatementsScreen> {
     StatementType(id: 'estimated', nameAr: 'ميزانية تقديرية (للبنوك)', nameEn: 'Estimated Balance Sheet', icon: Icons.calculate, color: Colors.teal, descAr: 'ميزانية تقديرية لتقديمها للبنوك أو جهات التمويل'),
   ];
 
-  Future<void> _generateStatement(String id) async {
+  Future<void> _generateStatement(String id, String name) async {
     setState(() => _generating[id] = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate generation
+    await Future.delayed(const Duration(milliseconds: 800)); 
     if (mounted) {
       setState(() => _generating[id] = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('تم إنشاء التقرير بنجاح ✓'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      _showReportPreview(name);
     }
+  }
+
+  Future<void> _printPdf(String name) async {
+    final pdf = pw.Document();
+    
+    // Use a font that supports Arabic if possible, or just standard for demo
+    // Note: Printing Arabic in PDF requires a font file. For now, we'll use standard text.
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text('Hisabati ERP - Financial Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.Text('Report Name: $name', style: pw.TextStyle(fontSize: 18)),
+                pw.SizedBox(height: 10),
+                pw.Text('Generated on: ${DateTime.now().toString()}', style: pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 40),
+                pw.Divider(),
+                pw.Text('This is a professional financial statement generated automatically.', textAlign: pw.TextAlign.center),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: '$name.pdf',
+    );
+  }
+
+  void _showReportPreview(String name) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Row(
+          children: [
+            const Icon(Icons.analytics_outlined, color: Colors.blue),
+            const SizedBox(width: 12),
+            Text(name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Container(
+          width: 400,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.green, size: 60),
+              SizedBox(height: 16),
+              Text('تم إنشاء التقرير المالي بنجاح', style: TextStyle(color: Colors.white, fontSize: 16)),
+              SizedBox(height: 8),
+              Text('التقرير جاهز الآن للطباعة أو المعاينة كملف PDF', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 13)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق', style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _printPdf(name);
+            },
+            icon: const Icon(Icons.print_rounded, size: 18),
+            label: const Text('طباعة / تحميل PDF'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -41,118 +128,103 @@ class _QuickStatementsScreenState extends State<QuickStatementsScreen> {
     const brandColor = Color(0xFFFF6B00);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text('القوائم المالية السريعة', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          TextButton.icon(
-            onPressed: () async {
-              for (final s in _statements) {
-                await _generateStatement(s.id);
-              }
-            },
-            icon: Icon(Icons.all_inclusive, color: brandColor, size: 18),
-            label: Text('توليد الكل', style: TextStyle(color: brandColor, fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _statements.length,
-        itemBuilder: (context, index) {
-          final stmt = _statements[index];
-          final isGenerating = _generating[stmt.id] == true;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: stmt.color.withValues(alpha: 0.2)),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      backgroundColor: Colors.transparent, 
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            expandedHeight: 120,
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text('القوائم المالية السريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              centerTitle: false,
+              titlePadding: const EdgeInsetsDirectional.only(start: 24, bottom: 16),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 56, height: 56,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Center(
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      for (final s in _statements) {
+                        await _generateStatement(s.id, s.nameAr);
+                      }
+                    },
+                    icon: const Icon(Icons.all_inclusive, color: brandColor, size: 20),
+                    label: const Text('توليد الكل', style: TextStyle(color: brandColor, fontWeight: FontWeight.bold)),
+                    style: TextButton.styleFrom(
+                      backgroundColor: brandColor.withValues(alpha: 0.1),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final stmt = _statements[index];
+                  final isGenerating = _generating[stmt.id] == true;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: stmt.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: stmt.color.withValues(alpha: 0.15)),
                     ),
-                    child: Icon(stmt.icon, color: stmt.color, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(stmt.nameAr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        const SizedBox(height: 2),
-                        Text(stmt.nameEn, style: TextStyle(fontSize: 11, color: isDark ? Colors.white30 : Colors.black26)),
-                        const SizedBox(height: 6),
-                        Text(stmt.descAr, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black38, height: 1.3)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  isGenerating
-                    ? SizedBox(width: 36, height: 36, child: CircularProgressIndicator(strokeWidth: 3, color: stmt.color))
-                    : Column(
-                        children: [
-                          IconButton(
-                            onPressed: () => _generateStatement(stmt.id),
-                            icon: Icon(Icons.play_circle_fill, color: stmt.color, size: 36),
-                            tooltip: 'توليد',
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _generateStatement(stmt.id, stmt.nameAr),
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
                             children: [
-                              IconButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('جاري تصدير ${stmt.nameAr} إلى PDF...'),
-                                      backgroundColor: stmt.color,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.picture_as_pdf, size: 18),
-                                tooltip: 'PDF',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                              Container(
+                                width: 64, height: 64,
+                                decoration: BoxDecoration(
+                                  color: stmt.color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(stmt.icon, color: stmt.color, size: 32),
                               ),
-                              IconButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('جاري تصدير ${stmt.nameAr} إلى Excel...'),
-                                      backgroundColor: stmt.color,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.table_chart, size: 18),
-                                tooltip: 'Excel',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(stmt.nameAr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                                    const SizedBox(height: 4),
+                                    Text(stmt.nameEn, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                                    const SizedBox(height: 8),
+                                    Text(stmt.descAr, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 16),
+                              isGenerating
+                                ? const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 4, color: Colors.blue))
+                                : Icon(Icons.play_circle_fill, color: stmt.color, size: 48),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                ],
+                    ),
+                  );
+                },
+                childCount: _statements.length,
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

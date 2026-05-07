@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/reporting_service.dart';
 import '../services/database_helper.dart';
+import 'finance/revenue_analysis_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -103,11 +104,105 @@ class _ReportsScreenState extends State<ReportsScreen> {
               _buildChartSection(isMobile),
               const SizedBox(height: 16), // 📉 Reduced from 40
               _buildCostCenterTable(),
-              const SizedBox(height: 16), // 📉 Reduced from 60
+              const SizedBox(height: 32),
+              
+              Row(
+                children: [
+                  Icon(Icons.hub_outlined, color: primaryOrange, size: context.iconSize),
+                  const SizedBox(width: 8),
+                  Text("مركز التقارير العامة", style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold, color: context.textColor)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildGeneralReportsHub(isMobile),
+              const SizedBox(height: 40),
             ],
           ),
         );
       }
+    );
+  }
+
+  Widget _buildGeneralReportsHub(bool isMobile) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: isMobile ? 1 : 3,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 2.2,
+      children: [
+        _reportHubCard("تحليل الإيرادات", "Sales Analysis", Icons.insights, Colors.orangeAccent, () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => const RevenueAnalysisScreen()))),
+        _reportHubCard("أعمار الديون", "Aging Report", Icons.timer_outlined, Colors.purpleAccent, _showAgingReport),
+        _reportHubCard("تقرير الإهلاك", "Asset Depreciation", Icons.history_outlined, Colors.redAccent, _showDepreciationReport),
+        _reportHubCard("مسير الرواتب", "Payroll Summary", Icons.payments_outlined, Colors.tealAccent, () {}),
+      ],
+    );
+  }
+
+  Widget _reportHubCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(context.cardRadius),
+        border: Border.all(color: context.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(subtitle, style: TextStyle(color: context.mutedText, fontSize: 10)),
+              ],
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios, size: 12),
+        ],
+      ),
+    ),
+  );
+}
+
+
+  void _showAgingReport() async {
+    final report = await _reportingService.getAgingReport();
+    if (report.isEmpty) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا توجد مديونيات حالياً")));
+       return;
+    }
+    await _reportingService.generateFinancialPDF(
+      title: "تقرير أعمار الديون (AR Aging)",
+      records: report.map((r) => {'label': r['client'], 'value': r['total']}).toList(),
+    );
+  }
+
+  void _showDepreciationReport() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, 1, 1).toIso8601String().split('T')[0];
+    final end = now.toIso8601String().split('T')[0];
+    final report = await _reportingService.getDepreciationReport(start, end);
+    
+    if (report.isEmpty) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا توجد قيود إهلاك لهذه الفترة")));
+       return;
+    }
+
+    await _reportingService.generateFinancialPDF(
+      title: "تقرير الإهلاك السنوي",
+      period: "$start - $end",
+      records: report.map((r) => {'label': "${r['asset_name']} (${r['date']})", 'value': r['amount']}).toList(),
     );
   }
 

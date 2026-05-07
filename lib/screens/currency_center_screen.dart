@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../services/database_helper.dart';
+import '../services/currency_service.dart';
 import '../theme/app_theme_extension.dart';
 
 class CurrencyCenterScreen extends StatefulWidget {
@@ -41,15 +42,13 @@ class _CurrencyCenterScreenState extends State<CurrencyCenterScreen> {
   Future<void> _syncRatesFromApi() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _db.fetchLiveRates(); // I'll add this to DatabaseHelper or a new service
-      if (response != null) {
-        for (var entry in response.entries) {
-          await _db.addCurrencyRate({
-            'from_currency': 'USD',
-            'to_currency': entry.key,
-            'rate': entry.value,
-          });
-        }
+      final updatedRates = await CurrencyService().updateRatesOnline();
+      for (var entry in updatedRates.entries) {
+        await _db.addCurrencyRate({
+          'from_currency': 'USD',
+          'to_currency': entry.key,
+          'rate': entry.value,
+        });
       }
       await _loadData();
     } catch (e) {
@@ -95,23 +94,29 @@ class _CurrencyCenterScreenState extends State<CurrencyCenterScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(context),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 _buildQuickConverter(context),
-                const SizedBox(height: 32),
-                Text(
-                  tr('currency.last_update'),
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    const Icon(Icons.history, color: Colors.orangeAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      tr('currency.last_update'),
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
@@ -124,25 +129,28 @@ class _CurrencyCenterScreenState extends State<CurrencyCenterScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddRateDialog,
-        backgroundColor: primaryOrange,
-        icon: const Icon(Icons.add, color: Colors.black),
-        label: Text(
-          tr('currency.add_rate'),
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: FloatingActionButton.extended(
+          elevation: 4,
+          onPressed: _showAddRateDialog,
+          backgroundColor: primaryOrange,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          icon: const Icon(Icons.add, color: Colors.black, size: 20),
+          label: Text(
+            tr('currency.add_rate'),
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios, color: context.textColor),
-        ),
+        Icon(Icons.currency_exchange_outlined, color: Colors.orangeAccent, size: 20),
         const SizedBox(width: 8),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,124 +158,138 @@ class _CurrencyCenterScreenState extends State<CurrencyCenterScreen> {
             Text(
               tr('currency.title'),
               style: TextStyle(
-                color: context.textColor,
-                fontSize: 28,
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               tr('currency.subtitle'),
-              style: TextStyle(
-                color: context.mutedText,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: context.mutedText, fontSize: 10),
             ),
           ],
         ),
         const Spacer(),
         if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-          )
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
         else
           IconButton(
+            constraints: const BoxConstraints(maxHeight: 32, maxWidth: 32),
+            padding: EdgeInsets.zero,
             onPressed: _syncRatesFromApi,
-            icon: const Icon(Icons.sync),
+            icon: const Icon(Icons.sync, size: 18),
             color: const Color(0xFFFF9800),
-            tooltip: 'تحديث الأسعار المباشرة',
           ),
       ],
     );
   }
 
   Widget _buildQuickConverter(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: context.cardSurface.withValues(alpha: 0.4),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => _updateConversion(),
-                      style: TextStyle(color: context.textColor, fontSize: 24, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        hintText: '0.00',
-                        hintStyle: TextStyle(color: context.mutedText.withValues(alpha: 0.3)),
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.9),
+          border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10, offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+                  _buildConverterRow(
+                    controller: _amountController,
+                    currency: _fromCurrency,
+                    onCurrencyChanged: (v) {
+                      setState(() => _fromCurrency = v!);
+                      _updateConversion();
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.orangeAccent.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(Icons.swap_vert, color: Colors.orangeAccent, size: 16),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _fromCurrency,
-                      underline: Container(),
-                      dropdownColor: Colors.black87,
-                      items: ['USD', 'EUR', 'GBP', 'SAR', 'EGP', 'KWD', 'AED']
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: context.textColor))))
-                          .toList(),
-                      onChanged: (v) {
-                        setState(() => _fromCurrency = v!);
-                        _updateConversion();
-                      },
-                    ),
+                  _buildConverterRow(
+                    result: _convertedResult.toStringAsFixed(2),
+                    currency: _toCurrency,
+                    isResult: true,
+                    onCurrencyChanged: (v) {
+                      setState(() => _toCurrency = v!);
+                      _updateConversion();
+                    },
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Icon(Icons.swap_vert, color: Colors.orangeAccent),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _convertedResult.toStringAsFixed(2),
-                    style: const TextStyle(color: Colors.orangeAccent, fontSize: 28, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildConverterRow({
+    TextEditingController? controller,
+    String? result,
+    required String currency,
+    required ValueChanged<String?> onCurrencyChanged,
+    bool isResult = false,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: isResult
+              ? Text(
+                  result!,
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, 
+                    fontSize: 18, fontWeight: FontWeight.bold),
+                )
+              : TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => _updateConversion(),
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, 
+                    fontSize: 18, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    hintText: '0.00',
+                    hintStyle: TextStyle(
+                      color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.2)),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _toCurrency,
-                      underline: Container(),
-                      dropdownColor: Colors.black87,
-                      items: ['SAR', 'EGP', 'KWD', 'AED', 'USD', 'EUR', 'GBP']
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: context.textColor))))
-                          .toList(),
-                      onChanged: (v) {
-                        setState(() => _toCurrency = v!);
-                        _updateConversion();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+        ),
+        Container(
+          height: 35,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: DropdownButton<String>(
+            value: currency,
+            underline: Container(),
+            dropdownColor: Colors.grey.shade900,
+            icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white60),
+            items: ['USD', 'EUR', 'GBP', 'SAR', 'EGP', 'KWD', 'AED']
+                .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white, fontSize: 13))))
+                .toList(),
+            onChanged: onCurrencyChanged,
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -278,46 +300,64 @@ class _CurrencyCenterScreenState extends State<CurrencyCenterScreen> {
       itemBuilder: (context, index) {
         final rate = _rates[index];
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: context.cardSurface.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.05)),
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withValues(alpha: 0.02)
+                : Colors.white, // Clean white in light mode
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.03),
+              width: 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.1 : 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: Colors.orangeAccent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.currency_exchange, color: Colors.orangeAccent, size: 20),
+                child: const Icon(Icons.currency_exchange, color: Colors.orangeAccent, size: 16),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${rate['from_currency']} → ${rate['to_currency']}',
-                      style: TextStyle(color: context.textColor, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, 
+                        fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     Text(
                       DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(rate['date'])),
-                      style: TextStyle(color: context.mutedText, fontSize: 12),
+                      style: TextStyle(color: context.mutedText, fontSize: 10),
                     ),
                   ],
                 ),
               ),
               Text(
                 rate['rate'].toString(),
-                style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
                 onPressed: () => _deleteRate(rate['id']),
               ),
             ],

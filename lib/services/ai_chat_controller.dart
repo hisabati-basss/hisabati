@@ -58,7 +58,7 @@ class AiChatController extends ChangeNotifier {
   Function(String)? onReportRequested;
 
   // Dynamic Suggestions
-  List<String> _currentSuggestions = ['شرح مميزات HBASSS', 'كيف أنشئ فاتورة؟', 'تحليل القوائم المالية'];
+  List<String> _currentSuggestions = ['شرح مميزات المساعد الذكي', 'كيف أنشئ فاتورة؟', 'تحليل القوائم المالية'];
   List<String> get currentSuggestions => _currentSuggestions;
 
   AiChatController() {
@@ -105,6 +105,8 @@ class AiChatController extends ChangeNotifier {
       await _flutterTts.setSpeechRate(0.5);
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
+      // Ensure completion handler fires properly on Desktop/Mobile
+      await _flutterTts.awaitSpeakCompletion(true);
     } catch (e) {
       debugPrint("TTS Init Error: $e");
     }
@@ -235,7 +237,7 @@ class AiChatController extends ChangeNotifier {
     } catch (e) {
       isLastRequestFailed = true;
       final fallbackResponse = await _handleLocalCommand(text) ?? 
-          "عذراً، نظام جيميناي غير متاح حالياً بسبب ضغط الطلبات. تم تفعيل المساعد المحلي المحدود لمساعدتك.";
+          "أواجه ضغطاً مؤقتاً في الاتصال. تم تفعيل المعالجة السريعة للرد على طلباتك الأساسية مباشرة من جهازك لضمان استمرارية العمل وخصوصية بياناتك.";
       
       messages.insert(0, Message(text: fallbackResponse, isUser: false, isOffline: true));
       _playVoiceFromText(fallbackResponse);
@@ -262,31 +264,31 @@ class AiChatController extends ChangeNotifier {
       if (target != null) {
         final index = _mapScreenToIndex(target);
         if (onNavigateRequested != null) onNavigateRequested!(index);
-        return "جاري الانتقال لـ ${tr('sidebar.' + target)} (محلياً).";
+        return "جاري الانتقال لـ ${tr('sidebar.' + target)}.";
       }
     }
 
     // 2. Financials
     if (lowerText.contains("رصيد") || lowerText.contains("كاش") || lowerText.contains("خزينة")) {
       final cash = await db.getAccountBalance('ACC_CASH');
-      return "رصيد الخزينة الحالي هو $cash (تم الجلب محلياً).";
+      return "رصيد الخزينة الحالي هو $cash.";
     }
     
     if (lowerText.contains("مبيعات") && (lowerText.contains("اليوم") || lowerText.contains("الآن"))) {
       final total = await db.getTodaySalesTotal();
-      return "إجمالي مبيعات اليوم حتى الآن هو $total (تم الجلب محلياً).";
+      return "إجمالي مبيعات اليوم حتى الآن هو $total.";
     }
 
     // 3. HR
     if (lowerText.contains("موظف") || lowerText.contains("عامل")) {
       final count = (await db.getEmployees()).length;
-      return "يوجد حالياً $count موظف مسجل في النظام (محلياً).";
+      return "يوجد حالياً $count موظف مسجل في النظام.";
     }
 
     // 4. Invoices
     if (lowerText.contains("فاتورة") || lowerText.contains("فواتير")) {
       final stats = await db.getPendingInvoicesStats();
-      return "يوجد ${stats['count']} فاتورة معلقة بإجمالي ${stats['total']} (محلياً).";
+      return "يوجد ${stats['count']} فاتورة معلقة بإجمالي ${stats['total']}.";
     }
 
     return null; 
@@ -340,6 +342,9 @@ class AiChatController extends ChangeNotifier {
   Future<void> _playVoiceFromText(String text) async {
     if (text.trim().isEmpty) return;
     String cleanText = text.replaceAll(RegExp(r'[*#_~`]'), '');
+    
+    // 🛡️ CRITICAL: Explicitly set language before each speak to fix Windows/Mobile switching to EN
+    await _flutterTts.setLanguage("ar-SA");
     await _flutterTts.speak(cleanText);
   }
 

@@ -10,6 +10,10 @@ import '../services/tax_engine.dart';
 import '../services/currency_service.dart';
 import '../services/email_service.dart';
 import '../widgets/splash_screen_widget.dart';
+import '../widgets/apple_entrance.dart';
+import '../services/module_config_service.dart';
+import 'branch_management_screen.dart';
+import 'fiscal_year_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -23,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _twoFactorEnabled = true;
   bool _emailNotifications = true;
   bool _pushNotifications = false;
+  bool _showLockedModules = true;
 
   String _selectedLanguage = "العربية";
   String _selectedCurrency = "sar";
@@ -54,6 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _vatController.text = contextData['vat_number'] ?? "";
       _addressController.text = contextData['address'] ?? "";
       _taxController.text = _taxRate.toString();
+      _showLockedModules = ModuleConfigService().showLockedModules;
       _isLoading = false;
     });
   }
@@ -66,14 +72,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       taxRate: _taxRate, 
       currency: _selectedCurrency, 
       country: _selectedCountry,
+      companyName: _nameController.text.isNotEmpty ? _nameController.text : null,
       vatNumber: _vatController.text,
       address: _addressController.text,
       logoPath: _logoPath,
     );
-    // Also update company name if changed
-    if (_nameController.text.isNotEmpty) {
-      await DatabaseHelper().setCurrentCompany(_nameController.text, "General");
-    }
   }
 
   Future<void> _pickLogo() async {
@@ -93,320 +96,396 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tr('settings_module.title'),
-            style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            tr('settings_module.subtitle'),
-            style: TextStyle(
-              fontSize: context.headerSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildSettingsGroup(context, tr('settings_module.group_company'), [
-             Padding(
-              padding: EdgeInsets.all(context.cardPadding),
-              child: Column(
-                children: [
-                   Center(
-                    child: Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: _pickLogo,
-                          child: Container(
-                            width: 80, height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.white10,
-                              borderRadius: BorderRadius.circular(context.cardRadius),
-                              image: _logoPath != null ? DecorationImage(image: FileImage(File(_logoPath!)), fit: BoxFit.contain) : null,
-                            ),
-                            child: _logoPath == null ? Icon(Icons.add_a_photo_outlined, color: primaryOrange, size: context.iconSize + 4) : null,
-                          ),
-                        ),
-                        if (_logoPath != null)
-                          Positioned(
-                            bottom: -5, right: -5,
-                            child: IconButton(
-                              onPressed: _pickLogo,
-                              icon: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: primaryOrange, shape: BoxShape.circle),
-                                child: const Icon(Icons.edit, size: 12, color: Colors.black87),
-                              ),
-                            ),
-                          )
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(tr('settings_module.logo_label'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 2)),
-                  const SizedBox(height: 16),
-                  _buildTextField(tr('settings_module.company_name'), _nameController, Icons.business_outlined),
-                  const SizedBox(height: 12),
-                  _buildTextField(tr('settings_module.vat_number'), _vatController, Icons.numbers, isNumeric: true),
-                  const SizedBox(height: 12),
-                  _buildTextField(tr('settings_module.address'), _addressController, Icons.location_on_outlined),
-                ],
+          AppleEntrance(
+            delay: const Duration(milliseconds: 100),
+            child: Text(
+              tr('settings_module.title'),
+              style: TextStyle(
+                color: context.mutedText, 
+                fontSize: 11, 
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ]),
-
+          ),
+          const SizedBox(height: 2),
+          AppleEntrance(
+            delay: const Duration(milliseconds: 200),
+            child: Text(
+              tr('settings_module.subtitle'),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
+                color: context.textColor,
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
 
-          _buildSettingsGroup(context, tr('settings_module.group_system'), [
-            _buildSettingsItem(
-              context,
-              tr('settings_module.country'),
-              Icons.public,
-              trailing: DropdownButton<String>(
-                value: _selectedCountry,
-                dropdownColor: context.cardSurface,
-                underline: const SizedBox(),
-                icon: Icon(Icons.arrow_drop_down, color: primaryOrange, size: context.iconSize),
-                style: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold, fontSize: context.bodySize),
-                items: [
-                  "egypt", "saudi", "kuwait", "uae", "jordan", "oman", "qatar", "bahrain", 
-                  "iraq", "lebanon", "morocco", "tunisia", "algeria", "turkey", "usa", "uk"
-                ].map((c) => DropdownMenuItem(value: c, child: Text(tr('onboarding.countries.$c')))).toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  final taxConfig = TaxEngine.getConfigForCountry(v);
-                  setState(() {
-                    _selectedCountry = v;
-                    // Standardized keys mapping
-                    final String key = v.toLowerCase();
-                    if (key == "saudi") _selectedCurrency = "sar";
-                    else if (key == "uae") _selectedCurrency = "aed";
-                    else if (key == "egypt") _selectedCurrency = "egp";
-                    else if (key == "kuwait") _selectedCurrency = "kwd";
-                    else if (key == "turkey") _selectedCurrency = "try";
-                    else if (key == "usa") _selectedCurrency = "usd";
-                    else if (key == "uk") _selectedCurrency = "gbp";
-                    else if (key == "jordan") _selectedCurrency = "jod";
-                    else if (key == "oman") _selectedCurrency = "omr";
-                    else if (key == "qatar") _selectedCurrency = "qar";
-                    else if (key == "bahrain") _selectedCurrency = "bhd";
-                    
-                    _taxRate = taxConfig.standardRate;
-                    _taxController.text = _taxRate.toString();
-                  });
-                  _saveSettings();
-                },
-              ),
-            ),
-            _buildSettingsItem(
-              context,
-              tr('settings_module.currency'),
-              Icons.payments_outlined,
-              trailing: DropdownButton<String>(
-                value: _selectedCurrency,
-                dropdownColor: context.cardSurface,
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, color: primaryOrange),
-                style: const TextStyle(color: primaryOrange, fontWeight: FontWeight.bold),
-                items: CurrencyService.currencySymbols.keys.map((code) => 
-                  DropdownMenuItem(value: code.toLowerCase(), child: Text(code))
-                ).toList(),
-                onChanged: (v) {
-                  setState(() => _selectedCurrency = v!);
-                  _saveSettings();
-                },
-              ),
-            ),
-            _buildSettingsItem(
-              context,
-              tr('settings_module.tax_rate'),
-              Icons.percent_rounded,
-              trailing: SizedBox(
-                width: 60,
-                child: TextField(
-                  controller: _taxController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(color: primaryOrange, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    border: InputBorder.none,
-                    suffixText: "%",
-                    suffixStyle: TextStyle(color: primaryOrange),
-                  ),
-                  onSubmitted: (v) => _saveSettings(),
+          AppleEntrance(
+            delay: const Duration(milliseconds: 300),
+            child: _buildSettingsGroup(context, tr('settings_module.group_company'), [
+               Padding(
+                padding: EdgeInsets.all(context.cardPadding),
+                child: Column(
+                  children: [
+                     Center(
+                      child: Stack(
+                        children: [
+                          GestureDetector(
+                            onTap: _pickLogo,
+                            child: Container(
+                              width: 70, height: 70,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: primaryOrange.withValues(alpha: 0.2)),
+                                image: (_logoPath != null && File(_logoPath!).existsSync()) 
+                                    ? DecorationImage(image: FileImage(File(_logoPath!)), fit: BoxFit.contain) 
+                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: _logoPath == null ? Icon(Icons.add_a_photo_outlined, color: primaryOrange, size: 24) : null,
+                            ),
+                          ),
+                          if (_logoPath != null)
+                            Positioned(
+                              bottom: -2, right: -2,
+                              child: GestureDetector(
+                                onTap: _pickLogo,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(color: primaryOrange, shape: BoxShape.circle),
+                                  child: const Icon(Icons.edit, size: 10, color: Colors.black),
+                                ),
+                              ),
+                            )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(tr('settings_module.company_name'), _nameController, Icons.business_outlined),
+                    const SizedBox(height: 8),
+                    _buildTextField(tr('settings_module.vat_number'), _vatController, Icons.numbers, isNumeric: true),
+                    const SizedBox(height: 8),
+                    _buildTextField(tr('settings_module.address'), _addressController, Icons.location_on_outlined),
+                  ],
                 ),
               ),
-            ),
-          ]),
+            ]),
+          ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
 
-          _buildSettingsGroup(context, tr('settings_module.group_profile'), [
-            _buildSettingsItem(
-              context,
-              tr('settings_module.change_password'),
-              Icons.lock_outline,
-              onTap: () => _showChangePasswordDialog(),
-            ),
-            _buildSettingsItem(
-              context,
-              tr('settings_module.two_factor'),
-              Icons.security_outlined,
-              trailing: Switch(
-                value: _twoFactorEnabled,
-                onChanged: (v) => setState(() => _twoFactorEnabled = v),
-                activeColor: primaryOrange,
-                padding: EdgeInsets.zero,
+          AppleEntrance(
+            delay: const Duration(milliseconds: 400),
+            child: _buildSettingsGroup(context, tr('settings_module.group_system'), [
+              _buildSettingsItem(
+                context,
+                tr('settings_module.country'),
+                Icons.public,
+                trailing: DropdownButton<String>(
+                  value: _selectedCountry,
+                  dropdownColor: context.cardSurface,
+                  underline: const SizedBox(),
+                  icon: Icon(Icons.arrow_drop_down, color: primaryOrange, size: context.iconSize),
+                  style: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold, fontSize: context.bodySize),
+                  items: [
+                    "egypt", "saudi", "kuwait", "uae", "jordan", "oman", "qatar", "bahrain", 
+                    "iraq", "lebanon", "morocco", "tunisia", "algeria", "turkey", "usa", "uk"
+                  ].map((c) => DropdownMenuItem(value: c, child: Text(tr('onboarding.countries.$c')))).toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    final taxConfig = TaxEngine.getConfigForCountry(v);
+                    setState(() {
+                      _selectedCountry = v;
+                      final String key = v.toLowerCase();
+                      if (key == "saudi") _selectedCurrency = "sar";
+                      else if (key == "uae") _selectedCurrency = "aed";
+                      else if (key == "egypt") _selectedCurrency = "egp";
+                      else if (key == "kuwait") _selectedCurrency = "kwd";
+                      else if (key == "turkey") _selectedCurrency = "try";
+                      else if (key == "usa") _selectedCurrency = "usd";
+                      else if (key == "uk") _selectedCurrency = "gbp";
+                      else if (key == "jordan") _selectedCurrency = "jod";
+                      else if (key == "oman") _selectedCurrency = "omr";
+                      else if (key == "qatar") _selectedCurrency = "qar";
+                      else if (key == "bahrain") _selectedCurrency = "bhd";
+                      
+                      _taxRate = taxConfig.standardRate;
+                      _taxController.text = _taxRate.toString();
+                    });
+                    _saveSettings();
+                  },
+                ),
               ),
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          _buildSettingsGroup(context, tr('settings_module.group_notifications'), [
-            _buildSettingsItem(
-              context,
-              tr('settings_module.email_notif'),
-              Icons.mail_outline,
-              trailing: Switch(
-                value: _emailNotifications,
-                onChanged: (v) => setState(() => _emailNotifications = v),
-                activeColor: primaryOrange,
-                padding: EdgeInsets.zero,
+              _buildSettingsItem(
+                context,
+                tr('settings_module.currency'),
+                Icons.payments_outlined,
+                trailing: DropdownButton<String>(
+                  value: _selectedCurrency,
+                  dropdownColor: context.cardSurface,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, color: primaryOrange),
+                  style: const TextStyle(color: primaryOrange, fontWeight: FontWeight.bold),
+                  items: CurrencyService.currencySymbols.keys.map((code) => 
+                    DropdownMenuItem(value: code.toLowerCase(), child: Text(code))
+                  ).toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedCurrency = v!);
+                    _saveSettings();
+                  },
+                ),
               ),
-            ),
-            _buildSettingsItem(
-              context,
-              tr('settings_module.push_notif'),
-              Icons.notifications_none,
-              trailing: Switch(
-                value: _pushNotifications,
-                onChanged: (v) => setState(() => _pushNotifications = v),
-                activeColor: primaryOrange,
-                padding: EdgeInsets.zero,
+              _buildSettingsItem(
+                context,
+                tr('settings_module.tax_rate'),
+                Icons.percent_rounded,
+                trailing: SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _taxController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(color: primaryOrange, fontWeight: FontWeight.bold),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                      border: InputBorder.none,
+                      suffixText: "%",
+                      suffixStyle: TextStyle(color: primaryOrange),
+                    ),
+                    onSubmitted: (v) => _saveSettings(),
+                  ),
+                ),
               ),
-            ),
-          ]),
+            ]),
+          ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
 
-          _buildSettingsGroup(context, tr('settings_module.group_general'), [
-             _buildSettingsItem(
-               context, 
-               tr('settings_module.email_setup'), 
-               Icons.mark_email_read_outlined,
-               onTap: () => _showSmtpConfigDialog(),
-             ),
-             _buildSettingsItem(
-               context, 
-               tr('settings_module.onboarding_restart'), 
-               Icons.refresh_rounded,
-               onTap: () {
-                 Navigator.push(
-                   context,
-                   MaterialPageRoute(
-                     builder: (_) => OnboardingModulesScreen(
-                       onCompleted: () => Navigator.pop(context), 
+          AppleEntrance(
+            delay: const Duration(milliseconds: 450),
+            child: _buildSettingsGroup(context, "إدارة المؤسسة (Enterprise)", [
+              _buildSettingsItem(
+                context,
+                "إدارة الفروع (Multi-Branch)",
+                Icons.account_tree_outlined,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BranchManagementScreen())),
+              ),
+              _buildSettingsItem(
+                context,
+                "السنوات المالية والإقفال",
+                Icons.calendar_today_outlined,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FiscalYearScreen())),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+
+          AppleEntrance(
+            delay: const Duration(milliseconds: 500),
+            child: _buildSettingsGroup(context, tr('settings_module.group_profile'), [
+              _buildSettingsItem(
+                context,
+                tr('settings_module.change_password'),
+                Icons.lock_outline,
+                onTap: () => _showChangePasswordDialog(),
+              ),
+              _buildSettingsItem(
+                context,
+                tr('settings_module.two_factor'),
+                Icons.security_outlined,
+                trailing: Switch(
+                  value: _twoFactorEnabled,
+                  onChanged: (v) => setState(() => _twoFactorEnabled = v),
+                  activeColor: primaryOrange,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+
+          AppleEntrance(
+            delay: const Duration(milliseconds: 600),
+            child: _buildSettingsGroup(context, tr('settings_module.group_notifications'), [
+              _buildSettingsItem(
+                context,
+                tr('settings_module.email_notif'),
+                Icons.mail_outline,
+                trailing: Switch(
+                  value: _emailNotifications,
+                  onChanged: (v) => setState(() => _emailNotifications = v),
+                  activeColor: primaryOrange,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+              _buildSettingsItem(
+                context,
+                tr('settings_module.push_notif'),
+                Icons.notifications_none,
+                trailing: Switch(
+                  value: _pushNotifications,
+                  onChanged: (v) => setState(() => _pushNotifications = v),
+                  activeColor: primaryOrange,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+
+          AppleEntrance(
+            delay: const Duration(milliseconds: 700),
+            child: _buildSettingsGroup(context, tr('settings_module.group_general'), [
+              _buildSettingsItem(
+                context, 
+                tr('settings_module.email_setup'), 
+                Icons.mark_email_read_outlined,
+                onTap: () => _showSmtpConfigDialog(),
+              ),
+              _buildSettingsItem(
+                context, 
+                tr('settings_module.onboarding_restart'), 
+                Icons.refresh_rounded,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OnboardingModulesScreen(
+                        onCompleted: () => Navigator.pop(context), 
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+
+          AppleEntrance(
+            delay: const Duration(milliseconds: 800),
+            child: _buildSettingsGroup(context, tr('settings_module.group_ui'), [
+              ValueListenableBuilder<bool>(
+                valueListenable: perfShowBlur,
+                builder: (context, value, _) => _buildSettingsItem(
+                  context,
+                  tr('settings_module.glass_effect'),
+                  Icons.blur_on_rounded,
+                  trailing: Switch(
+                    value: value,
+                    onChanged: (v) => perfShowBlur.value = v,
+                    activeColor: primaryOrange,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: perfShowShadows,
+                builder: (context, value, _) => _buildSettingsItem(
+                  context,
+                  tr('settings_module.shadows'),
+                  Icons.wb_sunny_outlined,
+                  trailing: Switch(
+                    value: value,
+                    onChanged: (v) => perfShowShadows.value = v,
+                    activeColor: primaryOrange,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: perfShowAnimations,
+                builder: (context, value, _) => _buildSettingsItem(
+                  context,
+                  tr('settings_module.animations'),
+                  Icons.auto_awesome_motion_rounded,
+                  trailing: Switch(
+                    value: value,
+                    onChanged: (v) => perfShowAnimations.value = v,
+                    activeColor: primaryOrange,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              _buildSettingsItem(
+                context,
+                "إظهار الوحدات المقفلة (🔒)",
+                Icons.lock_outline,
+                trailing: Switch(
+                  value: _showLockedModules,
+                  onChanged: (v) async {
+                    setState(() => _showLockedModules = v);
+                    await ModuleConfigService().toggleShowLockedModules(v);
+                  },
+                  activeColor: primaryOrange,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+
+          AppleEntrance(
+            delay: const Duration(milliseconds: 900),
+            child: _buildSettingsGroup(context, "حول حساباتي ERP", [
+               Padding(
+                 padding: const EdgeInsets.all(12.0),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Center(
+                       child: Image.asset('assets/image/logo icon.PNG', height: 45),
                      ),
-                   ),
-                 );
-               },
-             ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          _buildSettingsGroup(context, tr('settings_module.group_ui'), [
-             ValueListenableBuilder<bool>(
-               valueListenable: perfShowBlur,
-               builder: (context, value, _) => _buildSettingsItem(
-                 context,
-                 tr('settings_module.glass_effect'),
-                 Icons.blur_on_rounded,
-                 trailing: Switch(
-                   value: value,
-                   onChanged: (v) => perfShowBlur.value = v,
-                   activeColor: primaryOrange,
-                   padding: EdgeInsets.zero,
-                 ),
-               ),
-             ),
-             ValueListenableBuilder<bool>(
-               valueListenable: perfShowShadows,
-               builder: (context, value, _) => _buildSettingsItem(
-                 context,
-                 tr('settings_module.shadows'),
-                 Icons.wb_sunny_outlined,
-                 trailing: Switch(
-                   value: value,
-                   onChanged: (v) => perfShowShadows.value = v,
-                   activeColor: primaryOrange,
-                   padding: EdgeInsets.zero,
-                 ),
-               ),
-             ),
-             ValueListenableBuilder<bool>(
-               valueListenable: perfShowAnimations,
-               builder: (context, value, _) => _buildSettingsItem(
-                 context,
-                 tr('settings_module.animations'),
-                 Icons.auto_awesome_motion_rounded,
-                 trailing: Switch(
-                   value: value,
-                   onChanged: (v) => perfShowAnimations.value = v,
-                   activeColor: primaryOrange,
-                   padding: EdgeInsets.zero,
-                 ),
-               ),
-             ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          _buildSettingsGroup(context, "حول حساباتي ERP", [
-             Padding(
-               padding: const EdgeInsets.all(16.0),
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   Center(
-                     child: Image.asset('assets/image/logo icon.PNG', height: 60),
-                   ),
-                   const SizedBox(height: 16),
-                   _buildAboutRow("الإصدار", "1.0.0"),
-                   _buildAboutRow("المطور", "basss"),
-                   _buildAboutRow("الرخصة", "تجارية"),
-                   _buildAboutRow("الموقع", "www.hisabati.com"),
-                   _buildAboutRow("الدعم الفني", "bassemsabri@outlook.sa"),
-                   const SizedBox(height: 16),
-                   SizedBox(
-                     width: double.infinity,
-                     child: OutlinedButton.icon(
-                       style: OutlinedButton.styleFrom(
-                         padding: const EdgeInsets.symmetric(vertical: 12),
-                         side: BorderSide(color: primaryOrange.withValues(alpha: 0.3)),
-                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                     const SizedBox(height: 12),
+                     _buildAboutRow("الإصدار", "1.0.0"),
+                     _buildAboutRow("المطور", "Hisabati Team"),
+                     _buildAboutRow("الرخصة", "تجارية"),
+                     _buildAboutRow("الموقع", "www.hisabati.com"),
+                     _buildAboutRow("الدعم الفني", "support@hisabati.com"),
+                     const SizedBox(height: 12),
+                     SizedBox(
+                       width: double.infinity,
+                       child: OutlinedButton.icon(
+                         style: OutlinedButton.styleFrom(
+                           padding: const EdgeInsets.symmetric(vertical: 8),
+                           side: BorderSide(color: primaryOrange.withValues(alpha: 0.3)),
+                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                         ),
+                         icon: const Icon(Icons.sync, color: primaryOrange, size: 14),
+                         label: const Text("التحقق من التحديثات", style: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                         onPressed: () {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             const SnackBar(content: Text("التطبيق محدث إلى آخر إصدار (1.0.0)"), backgroundColor: Colors.green),
+                           );
+                         },
                        ),
-                       icon: const Icon(Icons.sync, color: primaryOrange, size: 18),
-                       label: const Text("التحقق من التحديثات", style: TextStyle(color: primaryOrange, fontWeight: FontWeight.bold)),
-                       onPressed: () {
-                         ScaffoldMessenger.of(context).showSnackBar(
-                           const SnackBar(content: Text("التطبيق محدث إلى آخر إصدار (1.0.0)"), backgroundColor: Colors.green),
-                         );
-                       },
                      ),
-                   ),
-                 ],
+                   ],
+                 ),
                ),
-             ),
-          ]),
+            ]),
+          ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           _buildSettingsGroup(context, "إدارة البيانات", [
              ListTile(
                dense: true,
@@ -417,7 +496,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
              ),
           ]),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
           Center(
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
@@ -477,7 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -492,12 +571,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: InputDecoration(
         isDense: true,
         labelText: label,
-        labelStyle: TextStyle(color: context.mutedText, fontSize: context.bodySize),
-        prefixIcon: Icon(icon, color: primaryOrange, size: context.iconSize),
+        labelStyle: TextStyle(color: context.mutedText, fontSize: 11),
+        prefixIcon: Icon(icon, color: primaryOrange.withValues(alpha: 0.8), size: 18),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.cardRadius), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(context.cardRadius), borderSide: const BorderSide(color: primaryOrange, width: 1)),
+        fillColor: Colors.white.withValues(alpha: 0.03),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryOrange, width: 1)),
       ),
     );
   }
@@ -529,21 +610,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: context.subHeaderSize,
-              color: context.textColor,
-            ),
+          padding: const EdgeInsets.only(left: 4.0, right: 4.0, bottom: 6, top: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 3, height: 12,
+                decoration: BoxDecoration(
+                  color: primaryOrange,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: context.textColor.withValues(alpha: 0.9),
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
           ),
         ),
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: context.cardSurface,
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(context.cardRadius),
+            color: context.sheetGlass,
+            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(children: items),
         ),

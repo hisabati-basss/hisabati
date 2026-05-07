@@ -124,15 +124,36 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
               ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text("${double.tryParse(invoice['total']?.toString() ?? '0') ?? 0.0}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)), // 📉 Smaller/Simplified
-              const SizedBox(height: 2), // 📉 Reduced from 4
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), // 📉 Reduced
-                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(context.cardRadius / 2)),
-                child: Text((invoice['status'] ?? "مكتمل").toString(), style: TextStyle(color: Colors.green, fontSize: context.bodySize - 4, fontWeight: FontWeight.bold)), // 📉 Reduced from 10
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("${double.tryParse(invoice['total']?.toString() ?? '0') ?? 0.0}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)), // 📉 Smaller/Simplified
+                  const SizedBox(height: 2), // 📉 Reduced from 4
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), // 📉 Reduced
+                    decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(context.cardRadius / 2)),
+                    child: Text((invoice['status'] ?? "مكتمل").toString(), style: TextStyle(color: Colors.green, fontSize: context.bodySize - 4, fontWeight: FontWeight.bold)), // 📉 Reduced from 10
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: context.mutedText, size: 20),
+                padding: EdgeInsets.zero,
+                onSelected: (val) async {
+                  if (val == 'edit') {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => InvoiceEntryScreen(invoiceId: invoice['id']?.toString())),
+                    );
+                    _loadInvoices();
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 18), SizedBox(width: 8), Text('تعديل')])),
+                ],
               ),
             ],
           ),

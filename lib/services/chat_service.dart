@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'database_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatMessage {
   final String id;
   final String senderId;
   final String senderName;
   final String text;
+  final String? attachmentUrl;
   final DateTime timestamp;
 
   ChatMessage({
@@ -15,6 +16,7 @@ class ChatMessage {
     required this.senderId,
     required this.senderName,
     required this.text,
+    this.attachmentUrl,
     required this.timestamp,
   });
 
@@ -24,6 +26,7 @@ class ChatMessage {
       senderId: map['sender_id'] ?? '',
       senderName: map['sender_name'] ?? 'Unknown',
       text: map['content'] ?? '',
+      attachmentUrl: map['attachment_url'],
       timestamp: map['created_at'] != null 
           ? DateTime.parse(map['created_at']).toLocal() 
           : DateTime.now(),
@@ -33,12 +36,11 @@ class ChatMessage {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'channel_id': 'CH_GENERAL',
       'sender_id': senderId,
       'sender_name': senderName,
       'content': text,
-      'created_at': timestamp.toIso8601String(),
-      'is_task': 0
+      'attachment_url': attachmentUrl,
+      'created_at': timestamp.toUtc().toIso8601String(),
     };
   }
 }
@@ -46,63 +48,38 @@ class ChatMessage {
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
-  ChatService._internal() {
-    _startPolling();
-  }
+  ChatService._internal();
 
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final _supabase = Supabase.instance.client;
   final _uuid = const Uuid();
-  final StreamController<List<ChatMessage>> _controller = StreamController<List<ChatMessage>>.broadcast();
 
-  Timer? _pollingTimer;
-
-  void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      _refreshChat();
-    });
+  Stream<List<ChatMessage>> getChatStream() {
+    return _supabase
+        .from('employee_chats')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .limit(100)
+        .map((data) => data.map((m) => ChatMessage.fromMap(m)).toList());
   }
 
-  Future<void> _refreshChat() async {
-    try {
-      final db = await _dbHelper.database;
-      final results = await db.query('messages', 
-        where: 'channel_id = ?', 
-        whereArgs: ['CH_GENERAL'], 
-        orderBy: 'created_at DESC', 
-        limit: 100
-      );
-      final messages = results.map((m) => ChatMessage.fromMap(m)).toList();
-      _controller.add(messages);
-    } catch (e) {
-      debugPrint("Chat Refresh Error: $e");
-    }
-  }
-
-  Future<void> sendMessage(String text, {required String senderId, required String senderName}) async {
+  Future<void> sendMessage(String text, {
+    required String senderId, 
+    required String senderName,
+    String? attachmentUrl,
+  }) async {
     final msg = ChatMessage(
       id: _uuid.v4(),
       senderId: senderId,
       senderName: senderName,
       text: text,
+      attachmentUrl: attachmentUrl,
       timestamp: DateTime.now(),
     );
 
     try {
-      final db = await _dbHelper.database;
-      await db.insert('messages', msg.toMap());
-      _refreshChat(); // Immediate refresh
+      await _supabase.from('employee_chats').insert(msg.toMap());
     } catch (e) {
       debugPrint("Chat Send Error: $e");
     }
-  }
-
-  Stream<List<ChatMessage>> getChatStream() {
-    _refreshChat(); // Initial load
-    return _controller.stream;
-  }
-
-  void dispose() {
-    _pollingTimer?.cancel();
-    _controller.close();
   }
 }

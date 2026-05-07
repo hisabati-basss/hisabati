@@ -1,5 +1,5 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme_extension.dart';
 
@@ -45,6 +45,7 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryOrange = Color(0xFFFF8C00);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
       length: 2,
@@ -70,7 +71,7 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
                       children: [
                         Text("نظام إدارة العقارات السكنية v1.0", style: TextStyle(color: context.mutedText, fontSize: 10, letterSpacing: 1.0)),
                         const SizedBox(height: 2),
-                        Text("إدارة الوحدات والعقود", style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: context.textColor)),
+                        Text("إدارة الوحدات والعقود", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                       ],
                     ),
                     Wrap(
@@ -83,34 +84,44 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Tabs
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardSurface.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(context.cardRadius / 2),
-                  border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-                ),
-                child: TabBar(
-                  indicatorColor: primaryOrange,
-                  indicatorWeight: 3,
-                  labelColor: primaryOrange,
-                  unselectedLabelColor: context.mutedText,
-                  labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(text: "الوحدات السكنية", icon: Icon(Icons.home_rounded, size: 18)),
-                    Tab(text: "العقود والتحصيل", icon: Icon(Icons.description_rounded, size: 18)),
-                  ],
+              // Tabs (Glassy)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+                    ),
+                    child: TabBar(
+                      indicator: BoxDecoration(
+                        color: primaryOrange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: Colors.black,
+                      unselectedLabelColor: context.mutedText,
+                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      dividerColor: Colors.transparent,
+                      tabs: const [
+                        Tab(text: "الوحدات السكنية", icon: Icon(Icons.home_rounded, size: 18)),
+                        Tab(text: "العقود والتحصيل", icon: Icon(Icons.description_rounded, size: 18)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildUnitsTab(isMobile),
-                    _buildContractsTab(isMobile),
+                    _buildUnitsTab(isMobile, isDark),
+                    _buildContractsTab(isMobile, isDark),
                   ],
                 ),
               ),
@@ -121,7 +132,7 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
     );
   }
 
-  Widget _buildUnitsTab(bool isMobile) {
+  Widget _buildUnitsTab(bool isMobile, bool isDark) {
     if (_units.isEmpty) {
       return Center(
         child: Column(
@@ -138,92 +149,138 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isMobile ? 1 : 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 2.5,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 2.2,
       ),
       itemCount: _units.length,
-      itemBuilder: (ctx, idx) => _buildUnitCard(_units[idx]),
+      itemBuilder: (ctx, idx) => _buildUnitCard(_units[idx], isDark),
     );
   }
 
-  Widget _buildUnitCard(Map<String, dynamic> unit) {
+  Widget _buildUnitCard(Map<String, dynamic> unit, bool isDark) {
     bool isAvailable = unit['status'] == 'AVAILABLE';
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(context.cardRadius / 2),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: (isAvailable ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.apartment_rounded, color: isAvailable ? Colors.green : Colors.orange, size: 20),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(unit['name'] ?? "وحدة غير مسمى", style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(unit['address'] ?? "", style: TextStyle(color: context.mutedText, fontSize: 10), maxLines: 1),
-              ],
-            ),
-          ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Row(
             children: [
-              Text("${unit['rent_amount']} ر.س", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF8C00))),
-              Text(isAvailable ? "متاحة" : "مؤجرة", style: TextStyle(fontSize: 10, color: isAvailable ? Colors.green : Colors.orange)),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isAvailable ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.apartment_rounded, color: isAvailable ? Colors.green : Colors.orange, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      unit['name'] ?? "وحدة غير مسمى", 
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      unit['address'] ?? "", 
+                      style: TextStyle(color: context.mutedText, fontSize: 10), 
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    "${unit['rent_amount']} ر.س", 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF8C00), fontSize: 13)
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (isAvailable ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      isAvailable ? "متاحة" : "مؤجرة", 
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isAvailable ? Colors.green : Colors.orange)
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildContractsTab(bool isMobile) {
+  Widget _buildContractsTab(bool isMobile, bool isDark) {
     if (_contracts.isEmpty) {
       return Center(child: Text("لا توجد عقود نشطة", style: TextStyle(color: context.mutedText)));
     }
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 20),
       itemCount: _contracts.length,
-      itemBuilder: (ctx, idx) => _buildContractListItem(_contracts[idx]),
+      itemBuilder: (ctx, idx) => _buildContractListItem(_contracts[idx], isDark),
     );
   }
 
-  Widget _buildContractListItem(Map<String, dynamic> contract) {
+  Widget _buildContractListItem(Map<String, dynamic> contract, bool isDark) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(context.cardRadius / 2),
-        border: Border.all(color: context.cardBorder.withValues(alpha: 0.05)),
-      ),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.history_edu_rounded, color: Color(0xFFFF8C00)),
-        title: Text(contract['tenant_name'] ?? "مستأجر"),
-        subtitle: Text("ينتهي في: ${contract['end_date']} | المبلغ السنوي: ${contract['annual_rent']} ر.س"),
-        trailing: _buildActionButton(Icons.payments_rounded, "تحصيل", onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('سيتم تسجيل تحصيل إيجار ${contract['tenant_name'] ?? "المستأجر"} — قادم في التحديث القادم'),
-              backgroundColor: const Color(0xFFFF8C00),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
             ),
-          );
-        }, isPrimary: true),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFFF8C00).withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.history_edu_rounded, color: Color(0xFFFF8C00), size: 20),
+              ),
+              title: Text(contract['tenant_name'] ?? "مستأجر", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              subtitle: Text(
+                "ينتهي: ${contract['end_date']} | ${contract['annual_rent']} ر.س",
+                style: TextStyle(color: context.mutedText, fontSize: 11),
+              ),
+              trailing: _buildActionButton(Icons.payments_rounded, "تحصيل", onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('سيتم تسجيل تحصيل إيجار ${contract['tenant_name'] ?? "المستأجر"} — قادم في التحديث القادم'),
+                    backgroundColor: const Color(0xFFFF8C00),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }, isPrimary: true),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -231,13 +288,14 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
   Widget _buildActionButton(IconData icon, String label, {VoidCallback? onPressed, bool isPrimary = false}) {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? const Color(0xFFFF8C00) : context.cardSurface,
-        foregroundColor: isPrimary ? Colors.black : context.textColor,
+        backgroundColor: isPrimary ? const Color(0xFFFF8C00) : Colors.white.withValues(alpha: 0.05),
+        foregroundColor: isPrimary ? Colors.black : Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        side: isPrimary ? BorderSide.none : BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
-      icon: Icon(icon, size: 16),
+      icon: Icon(icon, size: 14),
       label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
       onPressed: onPressed,
     );
@@ -248,130 +306,185 @@ class _RealEstateScreenState extends State<RealEstateScreen> {
     final addressCtrl = TextEditingController();
     final rentCtrl = TextEditingController();
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('إضافة وحدة سكنية جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'اسم الوحدة',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (ctx, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        final curve = Curves.easeInOutBack.transform(anim1.value);
+        return Transform.scale(
+          scale: curve,
+          child: Opacity(
+            opacity: anim1.value,
+            child: AlertDialog(
+              backgroundColor: Colors.transparent,
+              contentPadding: EdgeInsets.zero,
+              content: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('إضافة وحدة سكنية', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
+                        const SizedBox(height: 24),
+                        _input(nameCtrl, 'اسم الوحدة'),
+                        const SizedBox(height: 12),
+                        _input(addressCtrl, 'العنوان الكامل'),
+                        const SizedBox(height: 12),
+                        _input(rentCtrl, 'قيمة الإيجار الشهري', isNum: true),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: TextStyle(color: context.mutedText)))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (nameCtrl.text.isEmpty) return;
+                                  try {
+                                    await _db.addRealEstateUnit({
+                                      'name': nameCtrl.text,
+                                      'address': addressCtrl.text,
+                                      'rent_amount': double.tryParse(rentCtrl.text) ?? 0,
+                                      'status': 'AVAILABLE',
+                                    });
+                                    Navigator.pop(ctx);
+                                    _loadData();
+                                  } catch (e) {
+                                    debugPrint("Save Error: $e");
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF8C00),
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: const Text('حفظ الوحدة', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: addressCtrl,
-              decoration: InputDecoration(
-                labelText: 'العنوان',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: rentCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'قيمة الإيجار الشهري',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.isEmpty) return;
-              try {
-                await _db.addRealEstateUnit({
-                  'name': nameCtrl.text,
-                  'address': addressCtrl.text,
-                  'rent_amount': double.tryParse(rentCtrl.text) ?? 0,
-                  'status': 'AVAILABLE',
-                });
-                Navigator.pop(ctx);
-                _loadData();
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00)),
-            child: const Text('حفظ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+
+  Widget _input(TextEditingController c, String h, {bool isNum = false}) => TextField(
+    controller: c,
+    keyboardType: isNum ? TextInputType.number : TextInputType.text,
+    style: const TextStyle(color: Colors.white, fontSize: 14),
+    textAlign: TextAlign.right,
+    decoration: InputDecoration(
+      hintText: h,
+      hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.05),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    ),
+  );
 
   void _showContractForm() {
     final tenantCtrl = TextEditingController();
     final rentCtrl = TextEditingController();
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('إنشاء عقد إيجار جديد', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: tenantCtrl,
-              decoration: InputDecoration(
-                labelText: 'اسم المستأجر',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (ctx, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        final curve = Curves.easeInOutBack.transform(anim1.value);
+        return Transform.scale(
+          scale: curve,
+          child: Opacity(
+            opacity: anim1.value,
+            child: AlertDialog(
+              backgroundColor: Colors.transparent,
+              contentPadding: EdgeInsets.zero,
+              content: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('إنشاء عقد جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
+                        const SizedBox(height: 24),
+                        _input(tenantCtrl, 'اسم المستأجر'),
+                        const SizedBox(height: 12),
+                        _input(rentCtrl, 'الإيجار السنوي الإجمالي', isNum: true),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: TextStyle(color: context.mutedText)))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (tenantCtrl.text.isEmpty) return;
+                                  try {
+                                    final now = DateTime.now();
+                                    await _db.addRealEstateContract({
+                                      'tenant_name': tenantCtrl.text,
+                                      'annual_rent': double.tryParse(rentCtrl.text) ?? 0,
+                                      'start_date': now.toIso8601String().split('T')[0],
+                                      'end_date': DateTime(now.year + 1, now.month, now.day).toIso8601String().split('T')[0],
+                                    });
+                                    Navigator.pop(ctx);
+                                    _loadData();
+                                  } catch (e) {
+                                     debugPrint("Save Error: $e");
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF8C00),
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: const Text('حفظ العقد', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: rentCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'الإيجار السنوي',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () async {
-              if (tenantCtrl.text.isEmpty) return;
-              try {
-                final now = DateTime.now();
-                await _db.addRealEstateContract({
-                  'tenant_name': tenantCtrl.text,
-                  'annual_rent': double.tryParse(rentCtrl.text) ?? 0,
-                  'start_date': now.toIso8601String().split('T')[0],
-                  'end_date': DateTime(now.year + 1, now.month, now.day).toIso8601String().split('T')[0],
-                });
-                Navigator.pop(ctx);
-                _loadData();
-              } catch (e) {
-                if (mounted) {
-                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00)),
-            child: const Text('حفظ العقد', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

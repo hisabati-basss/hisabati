@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pdf/pdf.dart';
@@ -60,8 +61,668 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
   // Financial Calculations
   // ═══════════════════════════════════════════════════
 
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: [
+          // Ultra-Premium Header
+          Padding(
+            padding: EdgeInsets.fromLTRB(context.sectionPadding, 16, context.sectionPadding, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFF9A66FF), Color(0xFFCE9BFF)],
+                            ).createShader(bounds),
+                            child: const Text(
+                              "دراسات الجدوى",
+                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1.2, color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF9A66FF).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF9A66FF).withValues(alpha: 0.2)),
+                            ),
+                            child: const Text("PRO", style: TextStyle(color: Color(0xFF9A66FF), fontSize: 9, fontWeight: FontWeight.w900)),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        "نظام التحليل المالي المتكامل للمشاريع الاستثمارية",
+                        style: TextStyle(color: context.mutedText, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_results != null)
+                  _buildActionButton(
+                    label: "حفظ التقرير",
+                    icon: Icons.auto_awesome_rounded,
+                    color: Colors.green,
+                    onTap: _saveStudy,
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // High-End Glowing Pill TabBar with Glassmorphism
+          Container(
+            height: 38,
+            margin: EdgeInsets.symmetric(horizontal: context.sectionPadding),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: isDark ? 8 : 4, sigmaY: isDark ? 8 : 4),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: isDark ? 0.08 : 0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: isDark ? 0.1 : 0.05)),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    dividerColor: Colors.transparent,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: const Color(0xFF9A66FF).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF9A66FF).withValues(alpha: 0.3)),
+                    ),
+                    labelColor: const Color(0xFF9A66FF),
+                    unselectedLabelColor: context.mutedText,
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5),
+                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 10.5),
+                    tabs: const [
+                      Tab(text: "معطيات الدراسة"),
+                      Tab(text: "النتائج والتحليل"),
+                      Tab(text: "السجل التاريخي"),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildFormTab(),
+                _buildResultsTab(),
+                _buildSavedTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({required String label, required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Tab 0: معطيات الدراسة (Form)
+  // ═══════════════════════════════════════════════════
+  Widget _buildFormTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(context.sectionPadding),
+      child: Column(
+        children: [
+          // Project Details Card
+          _buildGlassContainer(
+            title: "بيانات المشروع الأساسية",
+            icon: Icons.auto_awesome_rounded,
+            child: Column(
+              children: [
+                _buildGlassInput(_nameCtrl, "اسم المشروع أو العلامة التجارية *", Icons.business_rounded),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _buildGlassInput(_sectorCtrl, "القطاع التجاري", Icons.category_rounded)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildGlassInput(_countryCtrl, "الموقع الجغرافي", Icons.location_on_rounded)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 10),
+
+          // Financial Inputs Card
+          _buildGlassContainer(
+            title: "المؤشرات المالية (المدخلات)",
+            icon: Icons.account_balance_wallet_rounded,
+            child: Column(
+              children: [
+                _buildGlassInput(_capitalCtrl, "رأس المال المبدئي (Investment) *", Icons.monetization_on_rounded, isNumber: true),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _buildGlassInput(_monthlyRevenueCtrl, "الإيرادات الشهرية", Icons.trending_up_rounded, isNumber: true)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildGlassInput(_monthlyCostCtrl, "المصروفات الشهرية", Icons.trending_down_rounded, isNumber: true)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _buildGlassInput(_yearsCtrl, "مدة الدراسة (سنوات)", Icons.timer_rounded, isNumber: true)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildGlassInput(_discountRateCtrl, "معدل الخصم (%)", Icons.percent_rounded, isNumber: true)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Scenario Selection
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.02),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("توقعات سيناريو السوق", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: context.textColor)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _buildScenarioCard("متفائل", "نمو عالٍ", 'optimistic', Colors.green),
+                    const SizedBox(width: 8),
+                    _buildScenarioCard("معتدل", "متوقع", 'moderate', Colors.blue),
+                    const SizedBox(width: 8),
+                    _buildScenarioCard("متشائم", "مخاطر", 'pessimistic', Colors.red),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Analyze Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _generateStudy,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9A66FF),
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: const Color(0xFF9A66FF).withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isLoading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.analytics_rounded, size: 20),
+                      SizedBox(width: 8),
+                      Text("بدء التحليل المالي الذكي", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                    ],
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Tab 1: النتائج (Results)
+  // ═══════════════════════════════════════════════════
+  Widget _buildResultsTab() {
+    if (_results == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.query_stats_rounded, size: 80, color: const Color(0xFF9A66FF).withValues(alpha: 0.1)),
+            const SizedBox(height: 16),
+            Text("بانتظار مدخلاتك للبدء بالتحليل...", style: TextStyle(color: context.mutedText, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }
+
+    final npv = (_results!['npv'] as double);
+    final irr = (_results!['irr'] as double);
+    final roi = (_results!['roi'] as double);
+    final payback = (_results!['payback_months'] as int);
+    final successRate = (_results!['success_rate'] as double);
+    final isFeasible = npv > 0;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(context.sectionPadding),
+      child: Column(
+        children: [
+          // Main Verdict Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isFeasible 
+                  ? [const Color(0xFF2E3192), const Color(0xFF1BFFFF)]
+                  : [const Color(0xFFED1C24), const Color(0xFFFCEE21)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: (isFeasible ? Colors.blue : Colors.red).withValues(alpha: 0.2),
+                  blurRadius: 12, offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isFeasible ? "المشروع مجدٍ اقتصادياً" : "المشروع يحتاج لإعادة تقييم",
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                      ),
+                      Text(
+                        isFeasible 
+                          ? "تظهر المؤشرات قدرة المشروع على تحقيق أرباح مستدامة."
+                          : "التكاليف الحالية تفوق العوائد المتوقعة في هذا السيناريو.",
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                  child: Icon(isFeasible ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white, size: 24),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Success Rate Circle & Primary Metrics
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildGlassContainer(
+                  title: "مؤشرات الربحية",
+                  icon: Icons.pie_chart_rounded,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildCircularIndicator(successRate / 100, "نسبة النجاح"),
+                      Column(
+                        children: [
+                          _buildMiniMetric("ROI", "${roi.toStringAsFixed(1)}%", Colors.blue),
+                          const SizedBox(height: 8),
+                          _buildMiniMetric("IRR", "${(irr * 100).toStringAsFixed(1)}%", const Color(0xFF9A66FF)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildSquareMetric("NPV", npv.toStringAsFixed(0), "القيمة الحالية", npv > 0 ? Colors.green : Colors.red),
+                    const SizedBox(height: 10),
+                    _buildSquareMetric("الاسترداد", payback > 0 ? "$payback شهر" : "N/A", "Payback", Colors.orange),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Cash Flow Chart Section
+          _buildGlassContainer(
+            title: "جدول التدفقات التراكمي",
+            icon: Icons.table_chart_rounded,
+            child: _buildCashFlowTable(_results!['cash_flows'] as List<Map<String, dynamic>>),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Export Actions
+          Row(
+            children: [
+              Expanded(
+                child: _buildLargeActionBtn("تصدير PDF", Icons.picture_as_pdf_rounded, Colors.blueGrey, () => _exportFeasibilityPDF(npv, irr, roi, payback, successRate, _results!['cash_flows'])),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildLargeActionBtn("حفظ الأرشيف", Icons.archive_rounded, Colors.green, _saveStudy),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Tab 2: الدراسات المحفوظة (Saved)
+  // ═══════════════════════════════════════════════════
+  Widget _buildSavedTab() {
+    if (_savedStudies.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open_rounded, size: 60, color: context.mutedText.withValues(alpha: 0.1)),
+            const SizedBox(height: 12),
+            Text("لا توجد دراسات مؤرشفة حالياً", style: TextStyle(color: context.mutedText, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.all(context.sectionPadding),
+      itemCount: _savedStudies.length,
+      itemBuilder: (_, i) {
+        final s = _savedStudies[i];
+        final bool isFeasible = ((s['npv'] as num?)?.toDouble() ?? 0) > 0;
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: context.cardSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.cardBorder.withValues(alpha: 0.05)),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: (isFeasible ? Colors.green : Colors.red).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(isFeasible ? Icons.check_circle_rounded : Icons.error_rounded, color: isFeasible ? Colors.green : Colors.red, size: 20),
+            ),
+            title: Text(s['project_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+            subtitle: Text("${s['sector'] ?? ''} • ${s['created_at']?.toString().substring(0, 10) ?? ''}", style: TextStyle(fontSize: 11, color: context.mutedText)),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text("${(s['success_rate'] as num?)?.toInt() ?? 0}%", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF9A66FF))),
+                const Text("Success", style: TextStyle(fontSize: 9, color: Colors.grey)),
+              ],
+            ),
+            onTap: () {
+              // Load this study back into the form?
+              setState(() {
+                 _nameCtrl.text = s['project_name'] ?? '';
+                 _capitalCtrl.text = s['capital']?.toString() ?? '';
+                 _monthlyRevenueCtrl.text = s['monthly_revenue']?.toString() ?? '';
+                 _monthlyCostCtrl.text = s['monthly_costs']?.toString() ?? '';
+                 _tabController.animateTo(0);
+              });
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Professional Components
+  // ═══════════════════════════════════════════════════
+
+  Widget _buildGlassContainer({required String title, required IconData icon, required Widget child}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: isDark ? 12 : 6, sigmaY: isDark ? 12 : 6),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: isDark ? 0.05 : 0.03),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: isDark ? 0.1 : 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 14, color: const Color(0xFF9A66FF)),
+                  const SizedBox(width: 6),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassInput(TextEditingController ctrl, String label, IconData icon, {bool isNumber = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 2, bottom: 2),
+          child: Text(label, style: TextStyle(color: context.mutedText, fontSize: 8.5, fontWeight: FontWeight.w800)),
+        ),
+        TextField(
+          controller: ctrl,
+          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, size: 14, color: context.mutedText.withValues(alpha: 0.4)),
+            isDense: true,
+            filled: true,
+            fillColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScenarioCard(String title, String subtitle, String value, Color color) {
+    final isSelected = _selectedScenario == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedScenario = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? color : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSelected ? color.withValues(alpha: 0.5) : Colors.transparent),
+          ),
+          child: Column(
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: isSelected ? Colors.white : color, fontSize: 11)),
+              Text(subtitle, style: TextStyle(color: isSelected ? Colors.white70 : context.mutedText, fontSize: 7), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircularIndicator(double percent, String label) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 56, height: 56,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CircularProgressIndicator(
+                value: percent,
+                strokeWidth: 5,
+                backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9A66FF)),
+                strokeCap: StrokeCap.round,
+              ),
+              Center(
+                child: Text("${(percent * 100).toInt()}%", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: context.mutedText, fontSize: 8.5, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildMiniMetric(String label, String value, Color color) {
+    return Container(
+      width: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSquareMetric(String label, String value, String desc, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(right: BorderSide(color: color, width: 2.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 9)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+          Text(desc, style: TextStyle(color: context.mutedText, fontSize: 7.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCashFlowTable(List<Map<String, dynamic>> data) {
+    return Column(
+      children: data.map((cf) {
+        final isHeader = cf['year'] == 0;
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.cardBorder.withValues(alpha: 0.05)))),
+          child: Row(
+            children: [
+              Expanded(child: Text(isHeader ? "التأسيس" : "سنة ${cf['year']}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+              Expanded(child: Text("${(cf['net'] as double).toStringAsFixed(0)}", style: TextStyle(fontSize: 11, color: cf['net'] >= 0 ? Colors.green : Colors.red))),
+              Expanded(
+                child: Text(
+                  "${(cf['cumulative'] as double).toStringAsFixed(0)}", 
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: cf['cumulative'] >= 0 ? Colors.green : Colors.red)
+                )
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildLargeActionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
+    return SizedBox(
+      height: 50,
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Keep original logic methods (_calculate, _calculateIRR, _generateStudy, _saveStudy, _loadSavedStudies, _exportFeasibilityPDF)
+  // ═══════════════════════════════════════════════════
+
   Map<String, dynamic> _calculate(double capital, double monthlyCost, double monthlyRevenue, int years, double discountRate, String scenario) {
-    // Scenario multipliers
     double revenueMultiplier = 1.0;
     double costMultiplier = 1.0;
     switch (scenario) {
@@ -74,26 +735,19 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
     final adjCost = monthlyCost * costMultiplier;
     final monthlyNetCashFlow = adjRevenue - adjCost;
     final annualNetCashFlow = monthlyNetCashFlow * 12;
-    final totalMonths = years * 12;
 
-    // NPV: Net Present Value
     double npv = -capital;
     for (int y = 1; y <= years; y++) {
       npv += annualNetCashFlow / pow(1 + discountRate, y);
     }
 
-    // IRR: Internal Rate of Return (Newton-Raphson approximation)
     double irr = _calculateIRR(capital, annualNetCashFlow, years);
+    int paybackMonths = monthlyNetCashFlow > 0 ? (capital / monthlyNetCashFlow).ceil() : (years * 12) + 1;
+    if (paybackMonths > (years * 12)) paybackMonths = -1;
 
-    // Payback Period
-    int paybackMonths = monthlyNetCashFlow > 0 ? (capital / monthlyNetCashFlow).ceil() : totalMonths + 1;
-    if (paybackMonths > totalMonths) paybackMonths = -1; // Never pays back
-
-    // ROI
     double totalProfit = (annualNetCashFlow * years) - capital;
     double roi = capital > 0 ? (totalProfit / capital) * 100 : 0;
 
-    // Success rate (heuristic)
     double successRate = 50;
     if (npv > 0) successRate += 20;
     if (irr > discountRate) successRate += 15;
@@ -101,7 +755,6 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
     if (roi > 30) successRate += 5;
     successRate = successRate.clamp(0, 99);
 
-    // Cash flow projections
     List<Map<String, dynamic>> cashFlows = [];
     double cumulative = -capital;
     for (int y = 0; y <= years; y++) {
@@ -146,7 +799,7 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
     final discountRate = (double.tryParse(_discountRateCtrl.text) ?? 10) / 100;
 
     if (capital <= 0 || _nameCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إدخال اسم المشروع ورأس المال"), backgroundColor: Colors.orange));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إدخال اسم المشروع ورأس المال")));
       return;
     }
 
@@ -183,319 +836,7 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
     });
     
     await _loadSavedStudies();
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم حفظ الدراسة بنجاح"), backgroundColor: Colors.green));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(context.sectionPadding, 8, context.sectionPadding, 0),
-          child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text("برنامج دراسات الجدوى", style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
-              Text("تحليل مالي بـ NPV / IRR / ROI", style: TextStyle(color: const Color(0xFF9A66FF), fontSize: context.bodySize - 1, fontWeight: FontWeight.bold)),
-            ])),
-            if (_results != null) GestureDetector(
-              onTap: _saveStudy,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(8)),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.save, size: 14, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12)),
-                ]),
-              ),
-            ),
-          ]),
-        ),
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 8),
-          decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(8)),
-          child: TabBar(
-            controller: _tabController, isScrollable: false,
-            labelColor: Colors.black87, unselectedLabelColor: context.mutedText,
-            indicator: BoxDecoration(color: const Color(0xFF9A66FF), borderRadius: BorderRadius.circular(8)),
-            indicatorSize: TabBarIndicatorSize.tab,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1),
-            dividerColor: Colors.transparent,
-            tabs: const [Tab(text: "معطيات الدراسة"), Tab(text: "النتائج"), Tab(text: "الدراسات المحفوظة")],
-          ),
-        ),
-        Expanded(child: TabBarView(controller: _tabController, children: [
-          _buildFormTab(),
-          _buildResultsTab(),
-          _buildSavedTab(),
-        ])),
-      ]),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════
-  // Tab 0: معطيات الدراسة
-  // ═══════════════════════════════════════════════════
-  Widget _buildFormTab() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(context.sectionPadding),
-      child: Column(children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF9A66FF).withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF9A66FF).withValues(alpha: 0.15)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              const Icon(Icons.auto_awesome, color: Color(0xFF9A66FF)),
-              const SizedBox(width: 8),
-              Text("بيانات المشروع", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
-            ]),
-            const SizedBox(height: 16),
-            _buildInput(_nameCtrl, "اسم المشروع *"),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _buildInput(_sectorCtrl, "القطاع (تقنية، مطاعم...)")),
-              const SizedBox(width: 10),
-              Expanded(child: _buildInput(_countryCtrl, "الدولة / المدينة")),
-            ]),
-            const SizedBox(height: 16),
-            Row(children: [
-              const Icon(Icons.monetization_on, color: Color(0xFF9A66FF), size: 18),
-              const SizedBox(width: 8),
-              Text("البيانات المالية", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)),
-            ]),
-            const SizedBox(height: 10),
-            _buildInput(_capitalCtrl, "رأس المال المبدئي *", isNumber: true),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _buildInput(_monthlyCostCtrl, "التكاليف الشهرية", isNumber: true)),
-              const SizedBox(width: 10),
-              Expanded(child: _buildInput(_monthlyRevenueCtrl, "الإيرادات الشهرية المتوقعة", isNumber: true)),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _buildInput(_yearsCtrl, "سنوات الدراسة", isNumber: true)),
-              const SizedBox(width: 10),
-              Expanded(child: _buildInput(_discountRateCtrl, "معدل الخصم %", isNumber: true)),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        
-        // Scenario selector
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.cardSurface.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text("اختر السيناريو", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)),
-            const SizedBox(height: 8),
-            Row(children: [
-              _buildScenarioChip("متفائل", 'optimistic', Colors.green),
-              const SizedBox(width: 8),
-              _buildScenarioChip("معتدل", 'moderate', Colors.blue),
-              const SizedBox(width: 8),
-              _buildScenarioChip("متشائم", 'pessimistic', Colors.red),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        
-        SizedBox(width: double.infinity, child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9A66FF), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-          icon: _isLoading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.analytics, color: Colors.white),
-          label: Text(_isLoading ? "جاري التحليل..." : "تشغيل دراسة الجدوى", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-          onPressed: _isLoading ? null : _generateStudy,
-        )),
-      ]),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════
-  // Tab 1: النتائج
-  // ═══════════════════════════════════════════════════
-  Widget _buildResultsTab() {
-    if (_results == null) {
-      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.analytics, size: 64, color: context.mutedText.withValues(alpha: 0.2)),
-        const SizedBox(height: 16),
-        Text("أدخل بيانات المشروع ثم اضغط 'تشغيل'", style: TextStyle(color: context.mutedText)),
-      ]));
-    }
-
-    final npv = (_results!['npv'] as double);
-    final irr = (_results!['irr'] as double);
-    final roi = (_results!['roi'] as double);
-    final payback = (_results!['payback_months'] as int);
-    final successRate = (_results!['success_rate'] as double);
-    final cashFlows = (_results!['cash_flows'] as List<Map<String, dynamic>>);
-    final isFeasible = npv > 0;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(context.sectionPadding),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Verdict
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: (isFeasible ? Colors.green : Colors.red).withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: (isFeasible ? Colors.green : Colors.red).withValues(alpha: 0.2)),
-          ),
-          child: Row(children: [
-            Icon(isFeasible ? Icons.check_circle : Icons.cancel, color: isFeasible ? Colors.green : Colors.red, size: 32),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(isFeasible ? "المشروع مجدٍ اقتصادياً ✓" : "المشروع غير مجدٍ حالياً ✗", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: isFeasible ? Colors.green : Colors.red)),
-              Text("نسبة النجاح: ${successRate.toInt()}% • سيناريو: ${_selectedScenario == 'optimistic' ? 'متفائل' : _selectedScenario == 'pessimistic' ? 'متشائم' : 'معتدل'}", style: TextStyle(color: context.mutedText, fontSize: 12)),
-            ])),
-            GestureDetector(
-              onTap: () => _tabController.animateTo(0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(border: Border.all(color: primaryOrange.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(8)),
-                child: Text("تعديل", style: TextStyle(color: primaryOrange, fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 12),
-
-        // KPI Row
-        Row(children: [
-          Expanded(child: _buildMetricCard("NPV", npv.toStringAsFixed(0), "صافي القيمة الحالية", npv > 0 ? Colors.green : Colors.red)),
-          const SizedBox(width: 8),
-          Expanded(child: _buildMetricCard("IRR", "${(irr * 100).toStringAsFixed(1)}%", "معدل العائد الداخلي", irr > 0 ? const Color(0xFF9A66FF) : Colors.red)),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: _buildMetricCard("ROI", "${roi.toStringAsFixed(1)}%", "العائد على الاستثمار", roi > 0 ? Colors.blue : Colors.red)),
-          const SizedBox(width: 8),
-          Expanded(child: _buildMetricCard("فترة الاسترداد", payback > 0 ? "$payback شهر" : "لا يسترد", "Payback Period", payback > 0 && payback <= 24 ? Colors.green : Colors.orange)),
-        ]),
-        const SizedBox(height: 16),
-
-        // Cash Flow Table
-        Text("التدفقات النقدية المتوقعة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-          ),
-          child: Column(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: const Color(0xFF9A66FF).withValues(alpha: 0.1), borderRadius: const BorderRadius.vertical(top: Radius.circular(12))),
-              child: Row(children: [
-                const Expanded(child: Text("السنة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                const Expanded(child: Text("التدفق السنوي", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                const Expanded(child: Text("التراكمي", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-              ]),
-            ),
-            ...cashFlows.map((cf) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.cardBorder.withValues(alpha: 0.05)))),
-              child: Row(children: [
-                Expanded(child: Text(cf['year'] == 0 ? "استثمار" : "السنة ${cf['year']}", style: TextStyle(fontSize: 12))),
-                Expanded(child: Text("${(cf['net'] as double).toStringAsFixed(0)}", style: TextStyle(fontSize: 12, color: (cf['net'] as double) >= 0 ? Colors.green : Colors.red))),
-                Expanded(child: Text("${(cf['cumulative'] as double).toStringAsFixed(0)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: (cf['cumulative'] as double) >= 0 ? Colors.green : Colors.red))),
-              ]),
-            )),
-          ]),
-        ),
-        const SizedBox(height: 16),
-
-        // Export buttons
-        Row(children: [
-          Expanded(child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(side: BorderSide(color: const Color(0xFF9A66FF).withValues(alpha: 0.3)), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF9A66FF)),
-            label: const Text("تصدير PDF", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF9A66FF))),
-            onPressed: () => _exportFeasibilityPDF(npv, irr, roi, payback, successRate, cashFlows),
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            icon: const Icon(Icons.save, color: Colors.white, size: 16),
-            label: const Text("حفظ الدراسة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-            onPressed: _saveStudy,
-          )),
-        ]),
-      ]),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════
-  // Tab 2: الدراسات المحفوظة
-  // ═══════════════════════════════════════════════════
-  Widget _buildSavedTab() {
-    if (_savedStudies.isEmpty) {
-      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.folder_open, size: 64, color: context.mutedText.withValues(alpha: 0.2)),
-        const SizedBox(height: 16),
-        Text("لا توجد دراسات محفوظة", style: TextStyle(color: context.mutedText)),
-      ]));
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.all(context.sectionPadding),
-      itemCount: _savedStudies.length,
-      itemBuilder: (_, i) {
-        final s = _savedStudies[i];
-        final npv = (s['npv'] as num?)?.toDouble() ?? 0;
-        final success = (s['success_rate'] as num?)?.toDouble() ?? 0;
-        final isFeasible = npv > 0;
-        
-        return Dismissible(
-          key: Key(s['id']?.toString() ?? '$i'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerLeft, padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.delete, color: Colors.red),
-          ),
-          onDismissed: (_) async {
-            await _db.deleteFeasibilityStudy(s['id']);
-            _loadSavedStudies();
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: (isFeasible ? Colors.green : Colors.red).withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: (isFeasible ? Colors.green : Colors.red).withValues(alpha: 0.15)),
-            ),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFF9A66FF).withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.analytics, size: 18, color: Color(0xFF9A66FF)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(s['project_name']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)),
-                Text("${s['sector'] ?? ''} • ${s['country'] ?? ''} • ${s['created_at']?.toString().substring(0, 10) ?? ''}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
-              ])),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(isFeasible ? "مجدٍ ✓" : "غير مجدٍ ✗", style: TextStyle(color: isFeasible ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
-                Text("نجاح: ${success.toInt()}%", style: TextStyle(color: context.mutedText, fontSize: 11)),
-              ]),
-            ]),
-          ),
-        );
-      },
-    );
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم حفظ الدراسة بنجاح")));
   }
 
   Future<void> _exportFeasibilityPDF(double npv, double irr, double roi, int payback, double success, List<Map<String, dynamic>> cashFlows) async {
@@ -508,91 +849,25 @@ class _FeasibilityStudyScreenState extends State<FeasibilityStudyScreen> with Si
         pageFormat: PdfPageFormat.a4, textDirection: pw.TextDirection.rtl,
         theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicBold),
         build: (c) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Center(child: pw.Text('دراسة الجدوى الاقتصادية', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.deepPurple))),
-          pw.SizedBox(height: 6),
-          pw.Center(child: pw.Text(_nameCtrl.text, style: pw.TextStyle(fontSize: 16, color: PdfColors.grey700))),
-          pw.SizedBox(height: 20), pw.Divider(), pw.SizedBox(height: 16),
-          pw.Text('القطاع: ${_sectorCtrl.text}   |   الدولة: ${_countryCtrl.text}', style: pw.TextStyle(fontSize: 13)),
-          pw.Text('رأس المال: ${_capitalCtrl.text}   |   سنوات الدراسة: ${_yearsCtrl.text}', style: pw.TextStyle(fontSize: 13)),
-          pw.SizedBox(height: 16),
-          pw.Text('نتائج التحليل المالي', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 10),
-          pw.Text('صافي القيمة الحالية (NPV): ${npv.toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 14, color: npv > 0 ? PdfColors.green : PdfColors.red)),
-          pw.Text('معدل العائد الداخلي (IRR): ${(irr * 100).toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 14)),
-          pw.Text('العائد على الاستثمار (ROI): ${roi.toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 14)),
-          pw.Text('فترة الاسترداد: ${payback > 0 ? "$payback شهر" : "لا يسترد"}', style: pw.TextStyle(fontSize: 14)),
-          pw.Text('نسبة النجاح المتوقعة: ${success.toInt()}%', style: pw.TextStyle(fontSize: 14, color: PdfColors.deepPurple)),
+          pw.Center(child: pw.Text('تقرير دراسة الجدوى الاقتصادية', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.deepPurple))),
           pw.SizedBox(height: 20),
-          pw.Text('التدفقات النقدية:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 8),
+          pw.Text('المشروع: ${_nameCtrl.text}', style: pw.TextStyle(fontSize: 16)),
+          pw.Divider(),
+          pw.Text('النتائج الأساسية:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.Text('NPV: ${npv.toStringAsFixed(0)}'),
+          pw.Text('ROI: ${roi.toStringAsFixed(1)}%'),
+          pw.Text('IRR: ${(irr * 100).toStringAsFixed(1)}%'),
+          pw.Text('فترة الاسترداد: $payback شهر'),
+          pw.SizedBox(height: 20),
           pw.TableHelper.fromTextArray(
-            headers: ['السنة', 'التدفق السنوي', 'التراكمي'],
-            data: cashFlows.map((cf) => [
-              cf['year'] == 0 ? 'استثمار' : 'السنة ${cf['year']}',
-              (cf['net'] as double).toStringAsFixed(0),
-              (cf['cumulative'] as double).toStringAsFixed(0),
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
-            cellStyle: pw.TextStyle(fontSize: 10),
+            headers: ['السنة', 'التدفق', 'التراكمي'],
+            data: cashFlows.map((cf) => [cf['year'].toString(), cf['net'].toStringAsFixed(0), cf['cumulative'].toStringAsFixed(0)]).toList(),
           ),
-          pw.SizedBox(height: 30), pw.Divider(),
-          pw.Text('حساباتي ERP - ${DateTime.now().toString().substring(0, 16)}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
         ]),
       ));
-      await Printing.layoutPdf(onLayout: (_) async => pdf.save(), name: 'Feasibility_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await Printing.layoutPdf(onLayout: (_) async => pdf.save());
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
-  }
-
-  // ═══════════════════════════════════════════════════
-  // Helpers
-  // ═══════════════════════════════════════════════════
-
-  Widget _buildInput(TextEditingController ctrl, String hint, {bool isNumber = false}) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: TextStyle(color: context.textColor),
-      decoration: InputDecoration(
-        hintText: hint, hintStyle: TextStyle(color: context.mutedText, fontSize: 13),
-        filled: true, fillColor: context.cardSurface.withValues(alpha: 0.3),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(String title, String value, String subtitle, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
-        const SizedBox(height: 8),
-        FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
-          child: Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color))),
-        Text(subtitle, style: TextStyle(color: context.mutedText, fontSize: 10)),
-      ]),
-    );
-  }
-
-  Widget _buildScenarioChip(String label, String value, Color color) {
-    final sel = _selectedScenario == value;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedScenario = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: sel ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: sel ? color : context.cardBorder),
-        ),
-        child: Text(label, style: TextStyle(color: sel ? Colors.white : context.mutedText, fontWeight: FontWeight.bold, fontSize: 13)),
-      ),
-    );
   }
 }

@@ -29,24 +29,11 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final db = await _db.database;
+      // Get sales agents using the new method
+      final agents = await _db.getSalesAgentsWithStats();
 
-      // Get sales agents
-      final agents = await db.rawQuery('''
-        SELECT a.id, a.name, 'مندوب مبيعات' as department, a.commission_rate,
-          COALESCE((SELECT SUM(i.total) FROM invoices i WHERE i.salesperson_id = a.id AND i.is_deleted = 0), 0) as total_sales,
-          COALESCE((SELECT COUNT(*) FROM invoices i WHERE i.salesperson_id = a.id AND i.is_deleted = 0), 0) as invoice_count
-        FROM sales_agents a
-        WHERE a.status = 'active'
-        ORDER BY total_sales DESC
-      ''');
-
-      // Get commissions log
-      final comms = await db.rawQuery('''
-        SELECT c.*, a.name as employee_name FROM commissions c
-        LEFT JOIN sales_agents a ON c.employee_id = a.id
-        ORDER BY c.created_at DESC LIMIT 50
-      ''');
+      // Get commissions log using the new method
+      final comms = await _db.getCommissionsLog();
 
       if (mounted) setState(() {
         _salespeople = agents.map((a) => Map<String, dynamic>.from(a)).toList();
@@ -62,29 +49,59 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
   Future<void> _calculateCommissions() async {
     try {
       final db = await _db.database;
-      for (var sp in _salespeople) {
-        final totalSales = (sp['total_sales'] as num?)?.toDouble() ?? 0;
-        final ratePercent = (sp['commission_rate'] as num?)?.toDouble() ?? 5.0; // Default 5%
-        final commissionRate = ratePercent / 100;
+      // 1. Get all invoices that have a sales agent but NO commission record yet
+      final invoices = await db.rawQuery('''
+        SELECT i.*, 
+               e.commission_rate as emp_rate, 
+               c.balance as client_rate 
+        FROM invoices i
+        LEFT JOIN employees e ON i.sales_agent_id = e.id
+        LEFT JOIN clients c ON i.sales_agent_id = c.id
+        WHERE i.sales_agent_id IS NOT NULL 
+          AND i.is_deleted = 0
+          AND i.id NOT IN (SELECT invoice_id FROM commissions WHERE invoice_id IS NOT NULL)
+      ''');
 
-        if (totalSales > 0) {
-          final commission = totalSales * commissionRate;
-          await db.insert('commissions', {
-            'id': 'COM_${DateTime.now().millisecondsSinceEpoch}_${sp['id']}',
-            'employee_id': sp['id'],
-            'amount': commission,
-            'rate': commissionRate,
-            'sales_amount': totalSales,
-            'period': '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
-            'status': 'pending',
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        }
+      if (invoices.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا توجد فواتير جديدة لحساب عمولاتها")));
+        return;
       }
+
+      int count = 0;
+      await db.transaction((txn) async {
+        for (var inv in invoices) {
+          final totalSales = (inv['total'] as num?)?.toDouble() ?? 0;
+          double rate = 0;
+          
+          if (inv['emp_rate'] != null) {
+            rate = (inv['emp_rate'] as num).toDouble() / 100;
+          } else if (inv['client_rate'] != null) {
+            rate = (inv['client_rate'] as num).toDouble(); // Client balance stores the rate as decimal (e.g., 0.1)
+          }
+
+          final commission = totalSales * rate;
+          if (commission > 0) {
+            await txn.insert('commissions', {
+              'id': 'COM_${DateTime.now().millisecondsSinceEpoch}_${inv['id']}',
+              'employee_id': inv['sales_agent_id'],
+              'invoice_id': inv['id'],
+              'amount': commission,
+              'rate': rate,
+              'sales_amount': totalSales,
+              'period': '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+              'status': 'pending',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            count++;
+          }
+        }
+      });
+
       await _loadData();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم حساب العمولات"), backgroundColor: Colors.green));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ تم حساب عمولات لـ $count فاتورة"), backgroundColor: Colors.green));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      debugPrint("Calc Error: $e");
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحساب: $e")));
     }
   }
 
@@ -140,6 +157,40 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
     );
   }
 
+  void _showEditRateDialog(Map<String, dynamic> sp) {
+    final rateCtrl = TextEditingController(text: ((sp['commission_rate'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1));
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
+      title: Text("تعديل عمولة: ${sp['name']}", style: const TextStyle(color: Colors.white, fontSize: 16)),
+      content: TextField(
+        controller: rateCtrl,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: "نسبة العمولة (%)",
+          labelStyle: const TextStyle(color: Colors.white54),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text("إلغاء", style: TextStyle(color: context.mutedText))),
+        ElevatedButton(
+          onPressed: () async {
+            final rate = double.tryParse(rateCtrl.text) ?? 5.0;
+            final db = await _db.database;
+            await db.update('employees', {'commission_rate': rate}, where: 'id = ?', whereArgs: [sp['id']]);
+            if (mounted) { Navigator.pop(ctx); _loadData(); }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black),
+          child: const Text("حفظ التغيير"),
+        ),
+      ],
+    ));
+  }
+
   Widget _buildSalespeopleTab() {
     if (_salespeople.isEmpty) return Center(child: Text("لا يوجد موظفين", style: TextStyle(color: context.mutedText)));
     return ListView.builder(
@@ -166,7 +217,14 @@ class _SalesCommissionsScreenState extends State<SalesCommissionsScreen> with Si
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text("${sales.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: context.bodySize + 1)),
-              Text("عمولة: ${((sp['commission_rate'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1)}%", style: TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+              Row(children: [
+                Text("عمولة: ${((sp['commission_rate'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1)}%", style: TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _showEditRateDialog(sp),
+                  child: const Icon(Icons.edit, size: 14, color: Colors.white54),
+                ),
+              ]),
             ]),
           ]),
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
+import '../services/approval_service.dart';
 import '../core/accounting/accounting_engine.dart';
 import '../theme/app_theme_extension.dart';
 import '../core/config/app_constants.dart';
@@ -14,8 +15,11 @@ class PurchaseOrderScreen extends StatefulWidget {
 class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
   final DatabaseHelper _db = DatabaseHelper();
   final AccountingEngine _engine = AccountingEngine();
+  final ApprovalService _approvalService = ApprovalService();
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
+  String? _currentBranchId;
+  bool _isMultiBranch = false;
 
   @override
   void initState() {
@@ -25,10 +29,17 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 
   Future<void> _loadOrders() async {
     try {
+      final contextData = await _db.getCurrentCompanyContext();
+      _currentBranchId = contextData['branch_id'];
+      _isMultiBranch = contextData['is_multi_branch'] == 1;
+
       final res = await _db.getPurchaseOrders();
       if (mounted) {
         setState(() {
-          _orders = res.where((o) => (o['is_deleted'] ?? 0) == 0).toList();
+          _orders = res.where((o) {
+            final matchesBranch = !_isMultiBranch || _currentBranchId == null || o['branch_id'] == _currentBranchId;
+            return matchesBranch && (o['is_deleted'] ?? 0) == 0;
+          }).toList();
           _isLoading = false;
         });
       }
@@ -195,7 +206,6 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
               ),
             ),
           ),
-          if (!isConverted)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -205,12 +215,20 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
-                    onPressed: () => _convertToInvoice(order['id']),
-                    icon: const Icon(Icons.swap_horiz, size: 18),
-                    label: const Text('تحويل لفاتورة مشتريات', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blueAccent),
-                  ),
+                  if (_isMultiBranch && order['status'] == 'sent')
+                    TextButton.icon(
+                      onPressed: () => _requestApproval(order['id']),
+                      icon: const Icon(Icons.security, size: 18),
+                      label: const Text('طلب اعتماد', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                    )
+                  else if (order['status'] == 'approved' || !_isMultiBranch)
+                    TextButton.icon(
+                      onPressed: () => _convertToInvoice(order['id']),
+                      icon: const Icon(Icons.swap_horiz, size: 18),
+                      label: const Text('تحويل لفاتورة مشتريات', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(foregroundColor: Colors.blueAccent),
+                    ),
                 ],
               ),
             ),
@@ -222,6 +240,8 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
   Widget _buildStatusChip(String status, Color color) {
     String label = 'مسودة';
     if (status == 'sent') label = 'تم الإرسال';
+    if (status == 'pending_approval') label = 'بانتظار الاعتماد';
+    if (status == 'approved') label = 'معتمد';
     if (status == 'received') label = 'تم الاستلام';
 
     return Container(
@@ -240,8 +260,30 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 
   Color _getStatusColor(String? status) {
     if (status == 'sent') return Colors.blue;
+    if (status == 'pending_approval') return Colors.orange;
+    if (status == 'approved') return Colors.teal;
     if (status == 'received') return Colors.green;
     return Colors.orange;
+  }
+
+  Future<void> _requestApproval(String poId) async {
+    // In a real scenario, we'd get the current user ID
+    await _approvalService.requestApproval(
+      entityType: 'purchase_order',
+      entityId: poId,
+      requesterId: 'CURRENT_USER',
+      comments: 'يرجى اعتماد أمر الشراء للبدء في التوريد',
+    );
+    
+    // Update PO status to pending_approval
+    await _db.updatePurchaseOrderStatus(poId, 'pending_approval');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال طلب الاعتماد بنجاح'), backgroundColor: Colors.orange),
+      );
+      _loadOrders();
+    }
   }
 
   Future<void> _convertToInvoice(String poId) async {
@@ -307,6 +349,7 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                 'expected_date': DateTime.now().add(const Duration(days: 7)).toIso8601String().split('T')[0],
                 'total': double.tryParse(totalCtrl.text) ?? 0,
                 'status': 'sent',
+                'branch_id': _currentBranchId,
                 'is_deleted': 0,
               }, []);
               if (mounted) {

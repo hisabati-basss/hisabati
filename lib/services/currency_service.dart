@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
 
 class CurrencyService {
-  // Base rates relative to 1 USD (Updated/Reference rates for offline use)
-  static const Map<String, double> baseRatesUSD = {
+  // Base rates relative to 1 USD (Reference rates for offline use)
+  static Map<String, double> baseRatesUSD = {
     'SAR': 3.75,
     'AED': 3.67,
     'EGP': 50.5,
@@ -59,38 +61,47 @@ class CurrencyService {
     
     if (fromRate == null || toRate == null) return amount;
     
-    // (Amount / BaseRateUSD of 'from') gives USD value, then multiply by 'to' rate
     final amountInUSD = amount / fromRate;
     return amountInUSD * toRate;
   }
 
-  /// Returns the symbol for the given currency code (e.g., 'SAR' -> 'ر.س')
+  /// Returns the symbol for the given currency code
   static String getSymbol(String code) {
     return currencySymbols[code.toUpperCase()] ?? code.toUpperCase();
   }
 
-  /// Formats the amount for display with the currency symbol and 2 decimal places.
+  /// Formats the amount for display
   static String format(double amount, String currencyCode) {
     final symbol = getSymbol(currencyCode);
     final formatter = NumberFormat("#,##0.00", "en_US");
     return "${formatter.format(amount)} $symbol";
   }
 
-  /// PRO VISION: Dummy Framework for future Online Sync
-  /// This can be replaced with an actual API call (e.g., exchangerate-api.com)
+  /// PRO VISION: Online Sync with ExchangeRate-API
   Future<Map<String, double>> updateRatesOnline() async {
-    // Boilerplate for future API implementation
-    // try {
-    //   final response = await http.get(Uri.parse('https://v6.exchangerate-api.com/v6/YOUR_API_KEY/latest/USD'));
-    //   ... logic to update local cache ...
-    // } catch (e) {
-    //   debugPrint("Failed to update rates: $e");
-    // }
+    try {
+      debugPrint("CurrencyService: Syncing with live exchange rates...");
+      final response = await http.get(Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final Map<String, dynamic> rates = data['rates'];
+        
+        // Update our baseRatesUSD map with live values
+        rates.forEach((key, value) {
+          if (baseRatesUSD.containsKey(key)) {
+            baseRatesUSD[key] = (value as num).toDouble();
+          }
+        });
+        
+        debugPrint("CurrencyService: Successfully updated ${rates.length} rates.");
+        return baseRatesUSD;
+      }
+    } catch (e) {
+      debugPrint("CurrencyService Error: Failed to update rates: $e");
+    }
     
-    debugPrint("CurrencyService: Syncing with simulated cloud endpoint...");
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network latency
-    
-    return baseRatesUSD; // Currently returning the static offline map
+    return baseRatesUSD;
   }
 }
 

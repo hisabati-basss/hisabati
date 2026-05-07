@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/database_helper.dart';
@@ -30,11 +31,15 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
     try {
       _investments = await _db.getInvestments();
       final db = await _db.database;
-      _transactions = (await db.rawQuery('''
-        SELECT it.*, inv.name as investment_name FROM investment_transactions it
-        LEFT JOIN investments inv ON it.investment_id = inv.id
-        ORDER BY it.date DESC LIMIT 50
-      ''')).map((t) => Map<String, dynamic>.from(t)).toList();
+      try {
+        _transactions = (await db.rawQuery('''
+          SELECT it.*, inv.name as investment_name FROM investment_transactions it
+          LEFT JOIN investments inv ON it.investment_id = inv.id
+          ORDER BY it.date DESC LIMIT 50
+        ''')).map((t) => Map<String, dynamic>.from(t)).toList();
+      } catch (_) {
+        _transactions = [];
+      }
     } catch (e) { debugPrint("Investments: $e"); }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -42,64 +47,128 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
   void _showAddDialog() {
     final nameCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
-    final returnCtrl = TextEditingController(text: "8");
     String type = 'stock';
 
-    showDialog(context: context, builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setDialogState) => AlertDialog(
-        backgroundColor: context.obsidianGlass,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: context.cardBorder, width: 1.5)),
-        title: Text("استثمار جديد", style: TextStyle(fontWeight: FontWeight.bold, color: context.textColor)),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          _input(nameCtrl, "اسم الاستثمار *"),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _input(amountCtrl, "المبلغ المستثمر", isNum: true)),
-            const SizedBox(width: 8),
-            // Expanded(child: _input(returnCtrl, "العائد المتوقع %", isNum: true)), // Removed to prevent DB Schema Error
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            _typeChip("أسهم", 'stock', type, (v) => setDialogState(() => type = v)),
-            const SizedBox(width: 6),
-            _typeChip("عقارات", 'real_estate', type, (v) => setDialogState(() => type = v)),
-            const SizedBox(width: 6),
-            _typeChip("صناديق", 'fund', type, (v) => setDialogState(() => type = v)),
-            const SizedBox(width: 6),
-            _typeChip("أخرى", 'other', type, (v) => setDialogState(() => type = v)),
-          ]),
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("إلغاء", style: TextStyle(color: context.mutedText))),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.trim().isEmpty) return;
-              final amount = double.tryParse(amountCtrl.text) ?? 0;
-              try {
-                await _db.addInvestment({
-                  'name': nameCtrl.text.trim(),
-                  'type': type,
-                  'initial_amount': amount,
-                  'current_value': amount,
-                  'status': 'active',
-                });
-                if (mounted) { 
-                  Navigator.pop(ctx); 
-                  _loadData(); 
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح"), backgroundColor: Colors.green));
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحفظ: $e"), backgroundColor: Colors.red));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black87),
-            child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (ctx, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        final curve = Curves.easeInOutBack.transform(anim1.value);
+        return Transform.scale(
+          scale: curve,
+          child: Opacity(
+            opacity: anim1.value,
+            child: StatefulBuilder(
+              builder: (context, setDialogState) => AlertDialog(
+                backgroundColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                content: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: (Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.white 
+                          : Colors.black).withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1.5),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Center(
+                            child: Text(
+                              "إضافة استثمار جديد", 
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                color: context.textColor, 
+                                fontSize: 18
+                              )
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _input(nameCtrl, "اسم الاستثمار *"),
+                          const SizedBox(height: 12),
+                          _input(amountCtrl, "المبلغ المستثمر (ر.س)", isNum: true),
+                          const SizedBox(height: 16),
+                          Text("نوع الاستثمار", style: TextStyle(color: context.mutedText, fontSize: 11)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.end,
+                            children: [
+                              _typeChip("أسهم", 'stock', type, (v) => setDialogState(() => type = v)),
+                              _typeChip("عقارات", 'real_estate', type, (v) => setDialogState(() => type = v)),
+                              _typeChip("صناديق", 'fund', type, (v) => setDialogState(() => type = v)),
+                              _typeChip("أخرى", 'other', type, (v) => setDialogState(() => type = v)),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: Text("إلغاء", style: TextStyle(color: context.mutedText)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    if (nameCtrl.text.trim().isEmpty) return;
+                                    final amount = double.tryParse(amountCtrl.text) ?? 0;
+                                    try {
+                                      await _db.addInvestment({
+                                        'name': nameCtrl.text.trim(),
+                                        'type': type,
+                                        'initial_amount': amount,
+                                        'current_value': amount,
+                                        'status': 'active',
+                                      });
+                                      if (mounted) { 
+                                        Navigator.pop(ctx); 
+                                        _loadData(); 
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح"), backgroundColor: Colors.green));
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ أثناء الحفظ: $e"), backgroundColor: Colors.red));
+                                      }
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryOrange, 
+                                    foregroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text("حفظ الاستثمار", style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
-    ));
+        );
+      },
+    );
   }
 
   @override
@@ -211,17 +280,43 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with SingleTicker
 
   Widget _typeChip(String label, String value, String sel, Function(String) onTap) {
     final s = sel == value;
-    return GestureDetector(onTap: () => onTap(value), child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: s ? primaryOrange : Colors.transparent, borderRadius: BorderRadius.circular(6), border: Border.all(color: s ? primaryOrange : context.cardBorder)),
-      child: Text(label, style: TextStyle(color: s ? Colors.black87 : context.mutedText, fontWeight: FontWeight.bold, fontSize: 11)),
-    ));
+    return GestureDetector(
+      onTap: () => onTap(value), 
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: s ? primaryOrange : Colors.white.withValues(alpha: 0.05), 
+          borderRadius: BorderRadius.circular(10), 
+          border: Border.all(color: s ? primaryOrange : Colors.white.withValues(alpha: 0.1))
+        ),
+        child: Text(
+          label, 
+          style: TextStyle(
+            color: s ? Colors.black : Colors.white70, 
+            fontWeight: FontWeight.bold, 
+            fontSize: 11
+          )
+        ),
+      )
+    );
   }
 
   Widget _input(TextEditingController c, String h, {bool isNum = false}) => TextField(
-    controller: c, keyboardType: isNum ? TextInputType.number : TextInputType.text, style: TextStyle(color: context.textColor, fontSize: 13),
-    decoration: InputDecoration(hintText: h, hintStyle: TextStyle(color: context.mutedText, fontSize: 12), filled: true, fillColor: Colors.black.withValues(alpha: 0.2),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+    controller: c, 
+    keyboardType: isNum ? TextInputType.number : TextInputType.text, 
+    style: const TextStyle(color: Colors.white, fontSize: 14),
+    textAlign: TextAlign.right,
+    decoration: InputDecoration(
+      hintText: h, 
+      hintStyle: const TextStyle(color: Colors.white38, fontSize: 13), 
+      filled: true, 
+      fillColor: Colors.white.withValues(alpha: 0.05),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryOrange)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)
+    ),
   );
 
   Color _typeColor(String t) { switch(t) { case 'stock': return Colors.blue; case 'real_estate': return Colors.teal; case 'fund': return Colors.purple; default: return Colors.grey; } }

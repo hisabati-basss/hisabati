@@ -6,7 +6,8 @@ import '../services/database_helper.dart';
 import '../core/accounting/accounting_engine.dart';
 
 class QuotationScreen extends StatefulWidget {
-  const QuotationScreen({super.key});
+  final String? quotationId;
+  const QuotationScreen({super.key, this.quotationId});
 
   @override
   State<QuotationScreen> createState() => _QuotationScreenState();
@@ -88,8 +89,34 @@ class _QuotationScreenState extends State<QuotationScreen> with SingleTickerProv
           if (clients.isNotEmpty) _selectedClientId = clients.first['id']?.toString();
         });
       }
+
+      // Load specific quotation if provided
+      if (widget.quotationId != null) {
+        final quoteRes = await db.query('quotations', where: 'id = ?', whereArgs: [widget.quotationId]);
+        if (quoteRes.isNotEmpty) {
+          final quote = quoteRes.first;
+          final linesRes = await db.query('quotation_lines', where: 'quotation_id = ?', whereArgs: [widget.quotationId]);
+          if (mounted) {
+            setState(() {
+              _selectedClientId = quote['client_id']?.toString();
+              _lines.clear();
+              for (var row in linesRes) {
+                final price = (row['price'] as num?)?.toDouble() ?? 0.0;
+                _lines.add(_UILineItem(
+                  id: row['id']?.toString() ?? DateTime.now().toString(),
+                  itemId: row['item_id']?.toString(),
+                  name: row['name']?.toString() ?? '',
+                  price: price,
+                  quantity: (row['quantity'] as num?)?.toInt() ?? 1,
+                  taxAmount: (row['tax_amount'] as num?)?.toDouble() ?? (price * (_taxRate / 100)),
+                ));
+              }
+            });
+          }
+        }
+      }
     } catch (e) {
-      debugPrint("Error loading quotations: $e");
+      debugPrint("Error loading data: $e");
       if (mounted) {
         setState(() {
           _clients = [];
@@ -99,9 +126,9 @@ class _QuotationScreenState extends State<QuotationScreen> with SingleTickerProv
     }
   }
 
-  double get _subtotal => _lines.fold(0, (sum, item) => sum + (item.price * item.quantity));
-  double get _discountAmount => _lines.fold(0, (sum, item) => sum + item.discount);
-  double get _taxAmount => _lines.fold(0, (sum, item) => sum + item.taxAmount);
+  double get _subtotal => _lines.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+  double get _discountAmount => _lines.fold(0.0, (sum, item) => sum + item.discount);
+  double get _taxAmount => _lines.fold(0.0, (sum, item) => sum + item.taxAmount);
   double get _total => (_subtotal - _discountAmount) + _taxAmount;
 
   Future<void> _saveQuotation() async {
@@ -156,59 +183,73 @@ class _QuotationScreenState extends State<QuotationScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Scaffold(
-          backgroundColor: context.obsidianGlass,
-          appBar: PreferredSize(
-            preferredSize: Size.fromHeight(100 + context.headerSize),
-            child: Container(
-              padding: EdgeInsets.fromLTRB(context.cardPadding, 8, context.cardPadding, 0),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900.withValues(alpha: 0.7),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: PreferredSize(
+                preferredSize: Size.fromHeight(110 + context.headerSize),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(context.cardPadding, 8, context.cardPadding, 0),
+                  child: Column(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Container(
+                        width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2)),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(tr('sales_module.title'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
-                          Text(tr('quotations.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: context.textColor)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(tr('sales_module.title'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
+                              Text(tr('quotations.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: primaryOrange)),
+                            ],
+                          ),
+                          IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, color: context.mutedText)),
                         ],
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(Icons.close, color: context.mutedText),
+                      TabBar(
+                        controller: _tabController,
+                        indicatorColor: primaryOrange, labelColor: primaryOrange, unselectedLabelColor: context.mutedText,
+                        indicatorSize: TabBarIndicatorSize.label, dividerColor: Colors.transparent,
+                        labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold),
+                        tabs: [
+                          Tab(text: tr('quotations.new_tab'), height: 28),
+                          Tab(text: tr('quotations.history_tab'), height: 28),
+                        ],
                       ),
                     ],
                   ),
-              TabBar(
+                ),
+              ),
+              body: TabBarView(
                 controller: _tabController,
-                indicatorColor: primaryOrange,
-                labelColor: primaryOrange,
-                unselectedLabelColor: context.mutedText,
-                indicatorSize: TabBarIndicatorSize.label,
-                dividerColor: Colors.transparent,
-                labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold),
-                tabs: [
-                  Tab(text: tr('quotations.new_tab'), height: 28),
-                  Tab(text: tr('quotations.history_tab'), height: 28),
+                children: [
+                  _buildNewQuoteTab(isDark),
+                  _buildHistoryTab(isDark),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildNewQuoteTab(isDark),
-          _buildHistoryTab(isDark),
-        ],
-      ),
-    )));
+    );
   }
 
   Widget _buildNewQuoteTab(bool isDark) {
@@ -273,10 +314,11 @@ class _QuotationScreenState extends State<QuotationScreen> with SingleTickerProv
             value: _selectedClientId,
             decoration: InputDecoration(
               labelText: tr('quotations.client_label'),
-              labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
+              labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
               filled: true,
-              fillColor: Colors.black.withValues(alpha: 0.1),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              fillColor: Colors.black.withValues(alpha: 0.3),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
             ),
             dropdownColor: context.bgSurface,
             items: _clients.map((c) => DropdownMenuItem<String>(
@@ -299,8 +341,9 @@ class _QuotationScreenState extends State<QuotationScreen> with SingleTickerProv
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: Colors.black.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
               ),
               child: Row(
                 children: [

@@ -47,17 +47,13 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Premium Glow
+          // Premium Glows
           Positioned(
             bottom: -50,
             left: -50,
             child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blueAccent.withValues(alpha: 0.1),
-              ),
+              width: 250, height: 250,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: primaryOrange.withValues(alpha: 0.05)),
             ),
           ),
 
@@ -75,12 +71,17 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                   children: [
                     Text(
                       tr('common.details'),
-                      style: TextStyle(color: context.textColor, fontWeight: FontWeight.bold, fontSize: 18),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     TextButton.icon(
                       onPressed: _processAll,
-                      icon: const Icon(Icons.play_circle_outline, color: Colors.greenAccent),
-                      label: Text('تشغيل الكل الآن', style: TextStyle(color: context.textColor)),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      icon: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 20),
+                      label: const Text('تشغيل الكل الآن', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -106,25 +107,19 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Row(
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios, color: context.textColor),
+        Text(
+          tr('recurring.title'),
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87, 
+            fontSize: 22, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tr('recurring.title'),
-              style: TextStyle(color: context.textColor, fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              tr('recurring.subtitle'),
-              style: TextStyle(color: context.mutedText, fontSize: 14),
-            ),
-          ],
+        Text(
+          tr('recurring.subtitle'),
+          style: TextStyle(color: context.mutedText, fontSize: 12),
         ),
       ],
     );
@@ -142,18 +137,24 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
   }
 
   Widget _buildStatCard(BuildContext context, String label, String value, Color color) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: context.cardSurface.withValues(alpha: 0.2),
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05), 
+              blurRadius: 10, offset: const Offset(0, 4)),
+          ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(label, style: TextStyle(color: context.mutedText, fontSize: 12)),
+            Text(label, style: TextStyle(color: context.mutedText, fontSize: 11, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
           ],
@@ -170,61 +171,85 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
         final s = _schedules[index];
         bool isActive = s['is_active'] == 1;
         
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: context.cardSurface.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.cardBorder.withValues(alpha: 0.1)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: (isActive ? Colors.blueAccent : Colors.grey).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isActive ? Icons.auto_mode : Icons.pause_circle_outline,
-                  color: isActive ? Colors.blueAccent : Colors.grey,
-                ),
+        bool isDark = Theme.of(context).brightness == Brightness.dark;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Stronger Blur
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s['description'] ?? 'بدون وصف',
-                      style: TextStyle(color: context.textColor, fontWeight: FontWeight.bold),
+              child: Row(
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                    onPressed: () => _deleteSchedule(s['id']),
+                  ),
+                  const SizedBox(width: 8),
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: isActive,
+                      onChanged: (v) => _toggleActive(s['id'], v),
+                      activeColor: primaryOrange,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${tr('recurring.frequency')}: ${tr('recurring.' + s['frequency'])}',
-                      style: TextStyle(color: context.mutedText, fontSize: 12),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          s['description'] ?? 'بدون وصف',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87, 
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${tr('recurring.next_run')}: ${s['next_run_date']}',
+                              style: const TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              tr('recurring.' + s['frequency'].toString().toLowerCase()),
+                              style: TextStyle(color: context.mutedText, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${tr('recurring.next_run')}: ${s['next_run_date']}',
-                      style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: (isActive ? primaryOrange : Colors.grey).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
-                ),
+                    child: Icon(
+                      isActive ? Icons.auto_mode : Icons.pause_circle_outline,
+                      color: isActive ? primaryOrange : Colors.grey,
+                      size: 18,
+                    ),
+                  ),
+                ],
               ),
-              Switch(
-                value: isActive,
-                onChanged: (v) => _toggleActive(s['id'], v),
-                activeColor: sunsetStart,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                onPressed: () => _deleteSchedule(s['id']),
-              ),
-            ],
+            ),
           ),
         );
-      },
+  },
     );
   }
 
@@ -250,54 +275,99 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(tr('recurring.add')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(labelText: 'الوصف (مثلاً: إيجار المكتب)'),
+        builder: (context, setDialogState) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.4,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade900.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: frequency,
-                  items: ['daily', 'weekly', 'monthly', 'yearly']
-                      .map((f) => DropdownMenuItem(value: f, child: Text(tr('recurring.' + f))))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => frequency = v!),
-                  decoration: InputDecoration(labelText: tr('recurring.frequency')),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.schedule_send, color: primaryOrange, size: 48),
+                    const SizedBox(height: 16),
+                    Text(tr('recurring.add'), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: descController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'الوصف (مثلاً: إيجار المكتب)',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: Colors.black.withValues(alpha: 0.2),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: frequency,
+                      dropdownColor: Colors.grey.shade900,
+                      style: const TextStyle(color: Colors.white),
+                      items: ['daily', 'weekly', 'monthly', 'yearly']
+                          .map((f) => DropdownMenuItem(value: f, child: Text(tr('recurring.' + f))))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => frequency = v!),
+                      decoration: InputDecoration(
+                        labelText: tr('recurring.frequency'),
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: Colors.black.withValues(alpha: 0.2),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: Text(tr('common.cancel'), style: const TextStyle(color: Colors.white54)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryOrange,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () async {
+                              if (descController.text.isNotEmpty) {
+                                await _db.addRecurringTransaction({
+                                  'description': descController.text,
+                                  'frequency': frequency,
+                                  'type': 'journal',
+                                  'next_run_date': DateTime.now().toIso8601String().split('T')[0],
+                                  'template_data': jsonEncode({
+                                    'lines': [
+                                      {'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': 100.0},
+                                      {'account_id': 'ACC_EXPENSE', 'debit': 100.0, 'credit': 0.0},
+                                    ]
+                                  }),
+                                });
+                                Navigator.pop(ctx);
+                                _loadData();
+                              }
+                            },
+                            child: Text(tr('common.save'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                const Text('نوع العملية: قيد يومي تلقائي', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
-            ElevatedButton(
-              onPressed: () async {
-                if (descController.text.isNotEmpty) {
-                  await _db.addRecurringTransaction({
-                    'description': descController.text,
-                    'frequency': frequency,
-                    'type': 'journal',
-                    'next_run_date': DateTime.now().toIso8601String().split('T')[0],
-                    'template_data': jsonEncode({
-                      'lines': [
-                        {'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': 100.0},
-                        {'account_id': 'ACC_EXPENSE', 'debit': 100.0, 'credit': 0.0},
-                      ]
-                    }),
-                  });
-                  Navigator.pop(ctx);
-                  _loadData();
-                }
-              },
-              child: Text(tr('common.save')),
-            ),
-          ],
         ),
       ),
     );

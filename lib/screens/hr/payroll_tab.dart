@@ -41,9 +41,9 @@ class PayrollTab extends StatelessWidget {
           icon: Icon(Icons.download_rounded, color: context.mutedText),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('جاري تصدير كشف الرواتب إلى PDF...'),
-                backgroundColor: Color(0xFFFF6B00),
+              SnackBar(
+                content: Text(tr('hr.payroll.exporting_pdf')),
+                backgroundColor: const Color(0xFFFF6B00),
                 behavior: SnackBarBehavior.floating,
               ),
             );

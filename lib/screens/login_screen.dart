@@ -1,11 +1,16 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:hisabati_app/core/config/app_constants.dart';
+import 'package:crypto/crypto.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/permission_service.dart';
+import 'auth/setup_wizard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onGuestLogin;
@@ -24,11 +29,22 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _slugController = TextEditingController();
+  
   bool _showManualCode = false;
+  int _step = 1; // 1: Slug, 2: Credentials
+  bool _isLoading = false;
+  
+  // Tenant Branding
+  String? _tenantId;
+  String? _tenantName;
+  String? _tenantLogo;
+  Color? _tenantPrimaryColor;
 
   @override
   void initState() {
     super.initState();
+
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -58,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen>
     _emailController.dispose();
     _passwordController.dispose();
     _codeController.dispose();
+    _slugController.dispose();
     super.dispose();
   }
 
@@ -112,7 +129,22 @@ class _LoginScreenState extends State<LoginScreen>
                     opacity: _formFade,
                     child: SlideTransition(
                       position: _formSlide,
-                      child: _buildLoginForm(),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 500),
+                        transitionBuilder: (Widget child, Animation<double> animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.1, 0),
+                                end: Offset.zero,
+                              ).animate(animation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _step == 1 ? _buildSlugForm() : _buildLoginForm(),
+                      ),
                     ),
                   ),
                 ],
@@ -160,8 +192,171 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Widget _buildSlugForm() {
+    return _buildBaseForm(
+      key: const ValueKey('slug_form'),
+      title: tr('login.workspace_title') ?? 'مساحة العمل',
+      subtitle: tr('login.workspace_subtitle') ?? 'أدخل رمز الشركة للمتابعة',
+      children: [
+        _buildTextField(
+          Icons.business_outlined,
+          tr('login.workspace_slug') ?? 'رمز المساحة (Slug)',
+          controller: _slugController,
+        ),
+        const SizedBox(height: 20),
+        _buildActionButton(
+          label: tr('common.continue') ?? 'متابعة',
+          onPressed: _handleVerifyWorkspace,
+          isLoading: _isLoading,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: Divider(color: context.cardBorder)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(tr('login.or_continue_with') ?? 'أو سجل باستخدام', style: TextStyle(color: context.mutedText, fontSize: 10)),
+            ),
+            Expanded(child: Divider(color: context.cardBorder)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: OutlinedButton.icon(
+            onPressed: _handleGoogleLogin,
+            icon: const Icon(Icons.g_mobiledata_rounded, color: Colors.white, size: 22),
+            label: Text(tr('login.google') ?? 'جوجل', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: context.cardBorder),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 15),
+        Align(
+          alignment: Alignment.center,
+          child: TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SetupWizardScreen(
+                  onSetupComplete: widget.onGuestLogin,
+                )),
+              );
+            },
+            child: Text(
+              tr('login.create_new_company') ?? 'إنشاء شركة جديدة بدون إنترنت؟',
+              style: const TextStyle(color: primaryOrange, fontSize: 11),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLoginForm() {
+    return _buildBaseForm(
+      key: const ValueKey('login_form'),
+      title: _tenantName ?? tr('login.welcome_back'),
+      subtitle: tr('login.sign_in_to_continue') ?? 'سجل دخولك للمتابعة',
+      children: [
+        _buildTextField(
+          Icons.person_outline,
+          tr('login.email'),
+          controller: _emailController,
+        ),
+        const SizedBox(height: 12),
+        _buildTextField(
+          Icons.lock_outline,
+          tr('login.password'),
+          isPassword: true,
+          controller: _passwordController,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: () => setState(() => _step = 1),
+              child: Text(
+                tr('common.back') ?? 'رجوع',
+                style: TextStyle(color: context.mutedText, fontSize: 11),
+              ),
+            ),
+            TextButton(
+              onPressed: _showForgotPasswordDialog,
+              child: Text(
+                tr('login.forgot_password'),
+                style: const TextStyle(color: primaryOrange, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
+          label: tr('login.sign_in'),
+          onPressed: _handleLogin,
+          isLoading: _isLoading,
+          color: _tenantPrimaryColor,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: Divider(color: context.cardBorder)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(tr('login.or_continue_with'), style: TextStyle(color: context.mutedText, fontSize: 10)),
+            ),
+            Expanded(child: Divider(color: context.cardBorder)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: OutlinedButton.icon(
+            onPressed: _handleGoogleLogin,
+            icon: const Icon(Icons.g_mobiledata_rounded, color: Colors.white, size: 22),
+            label: Text(tr('login.google'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: context.cardBorder),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+        if (_showManualCode) ...[
+          const SizedBox(height: 16),
+          _buildTextField(Icons.vpn_key_outlined, tr('login.manual_code_label'), controller: _codeController),
+          const SizedBox(height: 8),
+          _buildActionButton(
+            label: tr('login.activate_btn'),
+            onPressed: _handleManualCodeExchange,
+            isLoading: _isLoading,
+          ),
+        ],
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.center,
+          child: TextButton.icon(
+            onPressed: () => setState(() => _showManualCode = !_showManualCode),
+            icon: const Icon(Icons.help_outline, size: 10, color: primaryOrange),
+            label: Text(tr('login.browser_not_returning'), style: const TextStyle(color: primaryOrange, fontSize: 9)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBaseForm({
+    required Key key,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
     return ClipRRect(
+      key: key,
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
@@ -176,8 +371,18 @@ class _LoginScreenState extends State<LoginScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_tenantLogo != null) ...[
+                Center(
+                  child: Image.network(
+                    _tenantLogo!,
+                    height: 40,
+                    errorBuilder: (c, e, s) => const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Text(
-                tr('login.welcome_back'),
+                title,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -186,110 +391,43 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               const SizedBox(height: 2),
               Text(
-                tr('login.subtitle'),
+                subtitle,
                 style: TextStyle(color: context.mutedText, fontSize: 11),
               ),
               const SizedBox(height: 18),
-
-              _buildTextField(Icons.person_outline, tr('login.email'), controller: _emailController),
-              const SizedBox(height: 12),
-              _buildTextField(
-                Icons.lock_outline,
-                tr('login.password'),
-                isPassword: true,
-                controller: _passwordController,
-              ),
-
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _showForgotPasswordDialog,
-                  child: Text(
-                    tr('login.forgot_password'),
-                    style: const TextStyle(color: primaryOrange, fontSize: 11),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: ElevatedButton(
-                  onPressed: _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryOrange,
-                    foregroundColor: Colors.black87,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 3,
-                    shadowColor: primaryOrange.withValues(alpha: 0.2),
-                  ),
-                  child: Text(
-                    tr('login.sign_in'),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: context.cardBorder)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(tr('login.or_continue_with'), style: TextStyle(color: context.mutedText, fontSize: 10)),
-                  ),
-                  Expanded(child: Divider(color: context.cardBorder)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: OutlinedButton.icon(
-                  onPressed: _handleGoogleLogin,
-                  icon: const Icon(Icons.g_mobiledata_rounded, color: Colors.white, size: 22),
-                  label: Text(tr('login.google'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: context.cardBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              
-              if (_showManualCode) ...[
-                const SizedBox(height: 16),
-                _buildTextField(Icons.vpn_key_outlined, tr('login.manual_code_label'), controller: _codeController),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: _handleManualCodeExchange,
-                    style: ElevatedButton.styleFrom(backgroundColor: context.cardBorder),
-                    child: Text(tr('login.activate_btn'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.center,
-                child: Column(
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => setState(() => _showManualCode = !_showManualCode),
-                      icon: const Icon(Icons.help_outline, size: 10, color: primaryOrange),
-                      label: Text(tr('login.browser_not_returning'), style: const TextStyle(color: primaryOrange, fontSize: 9)),
-                    ),
-                  ],
-                ),
-              ),
+              ...children,
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required String label,
+    required VoidCallback onPressed,
+    bool isLoading = false,
+    Color? color,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 42,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? primaryOrange,
+          foregroundColor: (color?.computeLuminance() ?? 0.5) > 0.5 ? Colors.black87 : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          elevation: 3,
+        ),
+        child: isLoading
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Text(
+                label,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
       ),
     );
   }
@@ -321,6 +459,46 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Future<void> _handleVerifyWorkspace() async {
+    final slug = _slugController.text.trim();
+    if (slug.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('login.enter_workspace_slug') ?? 'يرجى إدخال رمز مساحة العمل')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      // Offline-First: Lookup company in local SQLite by slug
+      final db = await DatabaseHelper().database;
+      final results = await db.query(
+        'companies',
+        where: 'slug = ? AND is_deleted = 0',
+        whereArgs: [slug],
+        limit: 1,
+      );
+
+      if (results.isNotEmpty) {
+        final company = results.first;
+        setState(() {
+          _tenantId = company['id'] as String?;
+          _tenantName = company['name'] as String?;
+          _tenantLogo = company['logo_path'] as String?;
+          _step = 2;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('مساحة العمل غير موجودة. تأكد من الرمز الصحيح.')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في التحقق: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _handleLogin() async {
     final inputEmail = _emailController.text.trim();
     final inputPass = _passwordController.text.trim();
@@ -330,36 +508,60 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: primaryOrange)));
+    setState(() => _isLoading = true);
 
     try {
-      final response = await AuthService().signInWithEmailAndPassword(inputEmail, inputPass);
-      final userMeta = response.user?.userMetadata ?? {};
-      
+      // Offline-First: Verify credentials against local SQLite
       final db = await DatabaseHelper().database;
-      await db.insert('system_users', {
-        'id': response.user?.id ?? 'EMP_1',
-        'username': inputEmail,
-        'name': userMeta['full_name'] ?? 'موظف',
-        'role': userMeta['job_title'] ?? 'موظف',
-        'is_active': 1,
-        'created_at': DateTime.now().toIso8601String()
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      final passwordHash = sha256.convert(utf8.encode(inputPass)).toString();
+      
+      // Search by username or email, ensure they belong to the selected company
+      final users = await db.query(
+        'system_users',
+        where: '(username = ? OR email = ?) AND password_hash = ? AND company_id = ? AND is_active = 1 AND is_deleted = 0',
+        whereArgs: [inputEmail, inputEmail, passwordHash, _tenantId],
+        limit: 1,
+      );
+
+      if (users.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('login.invalid_login'))),
+          );
+        }
+        return;
+      }
+
+      final user = users.first;
+      final userId = user['id'] as String;
+      final userName = user['name'] as String? ?? 'موظف';
+      final userRole = user['role'] as String? ?? 'employee';
+      final userPerms = user['permissions'] as String?;
+
+      // Set User Context
+      PermissionService().setUserContext(userId, userRole, userPerms, null);
+
+      // Save session locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('token', userId);
+      await prefs.setString('user_id', userId);
+      await prefs.setString('user_name', userName);
+      await prefs.setString('user_role', userRole);
+      if (_tenantId != null) {
+        await prefs.setString('tenant_id', _tenantId!);
+        await prefs.setString('current_company_id', _tenantId!);
+      }
 
       if (mounted) {
-        Navigator.pop(context);
-        if (userMeta['is_force_reset'] == true) {
-          _showForcePasswordResetDialog(context, inputEmail);
-        } else {
-          widget.onGuestLogin();
-        }
+        widget.onGuestLogin();
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context);
-        if (inputEmail == 'admin' && inputPass == 'admin') { widget.onGuestLogin(); return; }
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بيانات الدخول غير صحيحة.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -367,11 +569,77 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: primaryOrange)));
       await AuthService().signInWithGoogle();
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Close loading
+
+      final user = AuthService().currentUser;
+      // If we got a user, check subscription and save locally
+      if (user != null) {
+        final userMeta = user.userMetadata ?? {};
+        
+        // --- Subscription Check ---
+        // TODO: Replace with real check. For now, assume active if user exists.
+        final bool isSubscribed = userMeta['subscription_status'] == 'active' || true; 
+        
+        if (!isSubscribed) {
+          AuthService().signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('عفواً، ليس لديك اشتراك نشط. يرجى الاشتراك من الموقع أولاً.')),
+            );
+          }
+          return;
+        }
+
+        final db = await DatabaseHelper().database;
+        final userId = user.id;
+
+        await db.insert('system_users', {
+          'id': userId,
+          'username': user.email ?? '',
+          'name': userMeta['full_name'] ?? userMeta['name'] ?? 'مستخدم',
+          'email': user.email ?? '',
+          'role': userMeta['role'] ?? 'admin',
+          'is_active': 1,
+          'permissions': userMeta['permissions_json'],
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+          'sync_status': 1,
+          'device_id': 'cloud',
+          'is_deleted': 0,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('user_id', userId);
+        await prefs.setString('user_name', userMeta['full_name'] ?? 'مستخدم');
+        await prefs.setString('user_role', userMeta['role'] ?? 'admin');
+        
+        // FOR TESTING: Commented out so you always go to Onboarding even with an old email
+        /*
+        final existingCompanyId = userMeta['company_id'];
+        if (existingCompanyId != null) {
+          await prefs.setString('current_company_id', existingCompanyId);
+          await prefs.setString('tenant_id', existingCompanyId);
+        }
+        */
+
+        PermissionService().setUserContext(userId, userMeta['role'] ?? 'admin', userMeta['permissions_json'], null);
+
+        if (mounted) widget.onGuestLogin();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("فشل تسجيل الدخول: لم يتم استرجاع بيانات المستخدم من جوجل.")),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+        // Pop the loading dialog if it's still showing
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في تسجيل الدخول بجوجل: $e")));
       }
     }
   }
@@ -382,7 +650,10 @@ class _LoginScreenState extends State<LoginScreen>
       if (code.isEmpty) return;
       showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: primaryOrange)));
       await AuthService().exchangeCodeForSession(code);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onGuestLogin();
+      }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
@@ -418,7 +689,15 @@ class _LoginScreenState extends State<LoginScreen>
               onPressed: () async {
                 if (newPassCtrl.text != confirmPassCtrl.text) return;
                 try {
-                  await AuthService().updatePasswordAndClearResetFlag(newPassCtrl.text);
+                  // Try Supabase first, fallback to local
+                  try {
+                    await AuthService().updatePasswordAndClearResetFlag(newPassCtrl.text);
+                  } catch (_) {
+                    // Offline fallback: update password in local SQLite
+                    final newHash = sha256.convert(utf8.encode(newPassCtrl.text)).toString();
+                    final db = await DatabaseHelper().database;
+                    await db.update('system_users', {'password_hash': newHash}, where: 'email = ?', whereArgs: [email]);
+                  }
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                     widget.onGuestLogin();
@@ -506,6 +785,7 @@ class _LoginScreenState extends State<LoginScreen>
                   );
                 }
               } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

@@ -67,69 +67,91 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     final isBalanced = (_totalDebit - _totalCredit).abs() < 0.01;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(context.sectionPadding, 8, context.sectionPadding, 0),
-          child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr('reports.trial_balance.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
-              Text(isBalanced ? tr('reports.trial_balance.balanced') : tr('reports.trial_balance.unbalanced'), style: TextStyle(
-                color: isBalanced ? Colors.green : Colors.red, fontSize: context.bodySize - 1, fontWeight: FontWeight.bold)),
-            ])),
-            GestureDetector(
-              onTap: _exportPDF,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.picture_as_pdf, size: 14, color: Colors.black87),
-                  SizedBox(width: 4),
-                  Text("PDF", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12)),
-                ]),
-              ),
+      body: Column(
+        children: [
+          // Ultra Slim Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          tr('reports.trial_balance.title'),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87, 
+                            fontSize: 16, 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.auto_awesome, color: Colors.orangeAccent, size: 14),
+                      ],
+                    ),
+                    Text(
+                      isBalanced ? tr('reports.trial_balance.balanced') : tr('reports.trial_balance.unbalanced'),
+                      style: TextStyle(color: isBalanced ? Colors.green : Colors.red, fontSize: 9),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: _exportPDF,
+                  constraints: const BoxConstraints(maxHeight: 24, maxWidth: 24),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(Icons.picture_as_pdf_outlined, color: primaryOrange, size: 16),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(Icons.close, color: context.mutedText),
+          ),
+          const SizedBox(height: 8),
+          
+          // Compact Summary KPIs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Expanded(child: _buildKPI(tr('reports.trial_balance.total_debit'), _totalDebit, Colors.green)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildKPI(tr('reports.trial_balance.total_credit'), _totalCredit, Colors.red)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildKPI(tr('reports.trial_balance.difference'), (_totalDebit - _totalCredit).abs(), isBalanced ? Colors.green : Colors.red)),
+              ],
             ),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        
-        // Summary KPIs
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.sectionPadding),
-          child: Row(children: [
-            Expanded(child: _buildKPI(tr('reports.trial_balance.total_debit'), _totalDebit, Colors.green)),
-            const SizedBox(width: 8),
-            Expanded(child: _buildKPI(tr('reports.trial_balance.total_credit'), _totalCredit, Colors.red)),
-            const SizedBox(width: 8),
-            Expanded(child: _buildKPI(tr('reports.trial_balance.difference'), (_totalDebit - _totalCredit).abs(), isBalanced ? Colors.green : Colors.red)),
-          ]),
-        ),
-        const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 8),
         
         // Table Header
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.sectionPadding),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: primaryOrange.withValues(alpha: 0.1), 
+              borderRadius: BorderRadius.circular(6)
+            ),
             child: Row(children: [
-              SizedBox(width: 48, child: Text(tr('reports.trial_balance.code_col'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2))),
-              Expanded(flex: 2, child: Text(tr('reports.trial_balance.name_col'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2))),
-              Expanded(child: Text(tr('reports.trial_balance.type_col'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2))),
-              Expanded(child: Text(tr('reports.trial_balance.debit_col'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2, color: Colors.green))),
-              Expanded(child: Text(tr('reports.trial_balance.credit_col'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2, color: Colors.red))),
+              SizedBox(width: 40, child: Text(tr('reports.trial_balance.code_col'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9))),
+              Expanded(flex: 3, child: Text(tr('reports.trial_balance.name_col'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9))),
+              Expanded(child: Text(tr('reports.trial_balance.debit_col'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9, color: Colors.green))),
+              Expanded(child: Text(tr('reports.trial_balance.credit_col'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9, color: Colors.red))),
             ]),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         
         // Table Body
         Expanded(
@@ -138,7 +160,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
             : _accounts.isEmpty
               ? Center(child: Text(tr('reports.trial_balance.no_accounts'), style: TextStyle(color: context.mutedText)))
               : ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: context.sectionPadding),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   itemCount: _accounts.length + 1, // +1 for totals
                   itemBuilder: (_, i) {
                     if (i == _accounts.length) return _buildTotalRow();
@@ -158,21 +180,16 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
     final credit = !isDebitNature && balance > 0 ? balance : (isDebitNature && balance < 0 ? balance.abs() : 0.0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3), // 📉 Reduced padding
       decoration: BoxDecoration(
-        color: index.isEven ? Colors.transparent : context.cardSurface.withValues(alpha: 0.15),
-        border: Border(bottom: BorderSide(color: context.cardBorder.withValues(alpha: 0.05))),
+        color: index.isEven ? Colors.transparent : Colors.white.withValues(alpha: 0.02),
+        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.03))),
       ),
       child: Row(children: [
-        SizedBox(width: 48, child: Text(acc['code']?.toString() ?? '', style: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold, color: _typeColor(type)))),
-        Expanded(flex: 2, child: Text(acc['name']?.toString() ?? '', style: TextStyle(fontSize: context.bodySize - 2), maxLines: 1, overflow: TextOverflow.ellipsis)),
-        Expanded(child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(color: _typeColor(type).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(4)),
-          child: Text(_typeLabel(type), style: TextStyle(fontSize: 9, color: _typeColor(type), fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        )),
-        Expanded(child: Text(debit > 0 ? debit.toStringAsFixed(2) : "-", style: TextStyle(fontSize: context.bodySize - 2, color: Colors.green))),
-        Expanded(child: Text(credit > 0 ? credit.toStringAsFixed(2) : "-", style: TextStyle(fontSize: context.bodySize - 2, color: Colors.red))),
+        SizedBox(width: 40, child: Text(acc['code']?.toString() ?? '', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _typeColor(type)))),
+        Expanded(flex: 3, child: Text(acc['name']?.toString() ?? '', style: const TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis)),
+        Expanded(child: Text(debit > 0 ? debit.toStringAsFixed(2) : "-", style: const TextStyle(fontSize: 10, color: Colors.green))),
+        Expanded(child: Text(credit > 0 ? credit.toStringAsFixed(2) : "-", style: const TextStyle(fontSize: 10, color: Colors.red))),
       ]),
     );
   }
@@ -193,14 +210,22 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
   }
 
   Widget _buildKPI(String title, double value, Color color) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.15))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(color: context.mutedText, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        FittedBox(child: Text(value.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color))),
-      ]),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(title, style: TextStyle(color: context.mutedText, fontSize: 9)),
+          const SizedBox(height: 2),
+          FittedBox(child: Text(value.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color))),
+        ],
+      ),
     );
   }
 

@@ -178,17 +178,29 @@ class CashFlowService {
     ''');
     double currentCash = (currentCashRes.first['balance'] as num?)?.toDouble() ?? 0.0;
 
-    // Expected Inflows (e.g., Receivable Cheques, unpaid invoices)
-    final inflowRes = await db.rawQuery('''
+    // Expected Inflows (e.g., Receivable Cheques + Unpaid Sales Invoices)
+    final chequeInRes = await db.rawQuery('''
       SELECT SUM(amount) as total FROM cheques WHERE type = 'receivable' AND status = 'pending'
     ''');
-    double expectedInflow = (inflowRes.first['total'] as num?)?.toDouble() ?? 0.0;
+    final invoiceInRes = await db.rawQuery('''
+      SELECT SUM(total - COALESCE((SELECT SUM(amount) FROM payments WHERE partner_id = invoices.client_id AND type = 'receipt'), 0)) as pending
+      FROM invoices WHERE status != 'paid' AND is_return = 0
+    ''');
+    
+    double expectedInflow = ((chequeInRes.first['total'] as num?)?.toDouble() ?? 0.0) +
+                           ((invoiceInRes.first['pending'] as num?)?.toDouble() ?? 0.0);
 
-    // Expected Outflows (e.g., Payable Cheques, pending maintenance)
-    final outflowRes = await db.rawQuery('''
+    // Expected Outflows (e.g., Payable Cheques + Unpaid Purchase Invoices)
+    final chequeOutRes = await db.rawQuery('''
       SELECT SUM(amount) as total FROM cheques WHERE type = 'payable' AND status = 'pending'
     ''');
-    double expectedOutflow = (outflowRes.first['total'] as num?)?.toDouble() ?? 0.0;
+    final invoiceOutRes = await db.rawQuery('''
+      SELECT SUM(total - COALESCE((SELECT SUM(amount) FROM payments WHERE partner_id = purchase_invoices.supplier_id AND type = 'payment'), 0)) as pending
+      FROM purchase_invoices WHERE is_return = 0
+    ''');
+    
+    double expectedOutflow = ((chequeOutRes.first['total'] as num?)?.toDouble() ?? 0.0) +
+                            ((invoiceOutRes.first['pending'] as num?)?.toDouble() ?? 0.0);
 
     double projectedCash = currentCash + expectedInflow - expectedOutflow;
 

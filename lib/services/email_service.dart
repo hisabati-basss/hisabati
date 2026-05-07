@@ -153,9 +153,9 @@ class EmailService {
     File? logoFile;
     try {
       final tempDir = await getTemporaryDirectory();
-      logoFile = File('${tempDir.path}/HBASSS.png');
+      logoFile = File('${tempDir.path}/hisabati.png');
       if (!await logoFile.exists()) {
-        final byteData = await rootBundle.load('assets/image/HBASSS.png');
+        final byteData = await rootBundle.load('assets/image/hisabati.png');
         await logoFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
       }
     } catch (e) {
@@ -172,7 +172,7 @@ class EmailService {
     if (logoFile != null && await logoFile.exists()) {
       final attachment = FileAttachment(logoFile)
         ..location = Location.inline
-        ..cid = '<hbasss_logo>';
+        ..cid = '<hisabati_logo>';
       message.attachments.add(attachment);
     }
 
@@ -229,7 +229,7 @@ class EmailService {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:hbasss_logo" alt="HBASSS" class="logo">
+          <img src="cid:hisabati_logo" alt="Hisabati" class="logo">
           <h1>أهلاً بك في $companyName</h1>
         </div>
         <div class="content">
@@ -254,7 +254,7 @@ class EmailService {
         </div>
         <div class="footer">
           <p>هذه الرسالة تم توليدها تلقائياً من نظام <strong>حساباتي ERP (Enterprise)</strong></p>
-          <p>Powered by <strong>Bassem Sabri</strong> | للتواصل مع المطور: <a href="mailto:bassemsabri@outlook.sa" style="color: #2a5298;">bassemsabri@outlook.sa</a></p>
+          <p>نظام محاسبي متكامل لإدارة الأعمال</p>
         </div>
       </div>
     </body>

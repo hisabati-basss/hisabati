@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/database_helper.dart';
+import '../services/audit_alert_service.dart';
+import '../widgets/premium_card.dart';
 
 class AuditingScreen extends StatefulWidget {
   const AuditingScreen({super.key});
@@ -17,6 +20,8 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
   late TabController _tabController;
   bool _isLoading = true;
 
+  List<Map<String, dynamic>> _auditRisks = [];
+  List<Map<String, dynamic>> _activeAlerts = [];
   Map<String, dynamic> _auditSummary = {};
   final Map<int, bool> _checklist = {
     0: false, 1: false, 2: false, 3: false, 4: false, 5: false,
@@ -43,9 +48,35 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      _auditSummary = await _db.getAuditSummary();
-    } catch (e) { debugPrint("Audit load error: $e"); }
-    if (mounted) setState(() => _isLoading = false);
+      final summary = await _db.getAuditSummary();
+      final alerts = await AuditAlertService().getActiveAlerts();
+      if (mounted) {
+        setState(() {
+          _auditSummary = summary;
+          _auditRisks = (summary['audit_risks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _activeAlerts = alerts;
+          _isLoading = false;
+        });
+      }
+    } catch (e) { 
+      debugPrint("Audit load error: $e"); 
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _runAnomaliesScan() async {
+    setState(() => _isLoading = true);
+    await AuditAlertService().runFullAudit();
+    await _loadData();
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ اكتمل الفحص العميق. تم تحديث لوحة المخاطر."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   @override
@@ -76,8 +107,11 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
               borderRadius: BorderRadius.circular(8),
             ),
             child: TabBar(
-              controller: _tabController, isScrollable: false,
-              labelColor: Colors.black87, unselectedLabelColor: context.mutedText,
+              controller: _tabController, 
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: isDark ? Colors.white : Colors.black87, 
+              unselectedLabelColor: context.mutedText,
               indicator: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)),
               indicatorSize: TabBarIndicatorSize.tab,
               labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1),
@@ -100,9 +134,51 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Tab 0: لوحة المخاطر
-  // ═══════════════════════════════════════════════════
+  Widget _buildScoreBadge(double score) {
+    final color = score >= 90 ? Colors.green : score >= 70 ? Colors.orange : Colors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.3))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.security, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text("${score.toInt()}%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
+      ]),
+    );
+  }
+
+  Widget _buildRiskCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.15))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Expanded(child: Text(title, 
+            style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 4, fontWeight: FontWeight.bold),
+            maxLines: 1, overflow: TextOverflow.ellipsis)),
+        ]),
+        const SizedBox(height: 8),
+        Text(value, style: TextStyle(fontSize: context.bodySize + 6, fontWeight: FontWeight.bold, color: color)),
+      ]),
+    );
+  }
+
+  Widget _buildReportRow(String label, String value, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.15))),
+      child: Row(children: [
+        Icon(Icons.circle, size: 8, color: color),
+        const SizedBox(width: 10),
+        Expanded(child: Text(label, style: TextStyle(fontSize: context.bodySize))),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize)),
+      ]),
+    );
+  }
+
   Widget _buildRiskDashboard() {
     final unbalanced = (_auditSummary['unbalanced_entries'] as List?)?.length ?? 0;
     final duplicates = (_auditSummary['duplicate_payments'] as List?)?.length ?? 0;
@@ -115,6 +191,20 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     return SingleChildScrollView(
       padding: EdgeInsets.all(context.sectionPadding),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // AI Scan Button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("الفحص الذكي والأنماط المشبوهة", style: TextStyle(fontWeight: FontWeight.bold)),
+            TextButton.icon(
+              onPressed: _runAnomaliesScan,
+              icon: const Icon(Icons.psychology, size: 18, color: Colors.cyanAccent),
+              label: const Text("تشغيل فحص الثغرات", style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
         // KPI Row
         Row(children: [
           Expanded(child: _buildRiskCard("قيود غير متوازنة", "$unbalanced", Icons.warning, unbalanced > 0 ? Colors.red : Colors.green)),
@@ -132,37 +222,64 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
           Expanded(child: _buildRiskCard("نسبة الأمان", "${score.toInt()}%", Icons.security, score >= 90 ? Colors.green : score >= 70 ? Colors.orange : Colors.red)),
         ]),
         
-        if (largeTransactions.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text("عمليات كبيرة (أعلى من 10,000)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
-          const SizedBox(height: 8),
-          ...largeTransactions.take(5).map((t) => Container(
-            margin: const EdgeInsets.only(bottom: 6),
+        const SizedBox(height: 24),
+        
+        // Active Alerts
+        if (_activeAlerts.isNotEmpty) ...[
+          const Text("تنبيهات النظام المكتشفة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orangeAccent)),
+          const SizedBox(height: 12),
+          ..._activeAlerts.map((alert) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.15)),
+              color: alert['severity'] == 'high' ? Colors.redAccent.withOpacity(0.05) : Colors.orangeAccent.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: alert['severity'] == 'high' ? Colors.redAccent.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.2)),
             ),
-            child: Row(children: [
-              Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.attach_money, size: 14, color: Colors.orange)),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t['description']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text("${t['account_name']} • ${t['date']}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
-              ])),
-              Text("${((t['debit'] as num?)?.toDouble() ?? (t['credit'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}", 
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize, color: Colors.orange)),
-            ]),
+            child: Row(
+              children: [
+                Icon(alert['severity'] == 'high' ? Icons.report_problem : Icons.warning_amber, 
+                  color: alert['severity'] == 'high' ? Colors.redAccent : Colors.orangeAccent, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(alert['description'], style: const TextStyle(fontSize: 12, color: Colors.white70))),
+                IconButton(
+                  icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.greenAccent),
+                  onPressed: () async {
+                    await AuditAlertService().resolveAlert(alert['id']);
+                    _loadData();
+                  },
+                ),
+              ],
+            ),
           )),
+          const SizedBox(height: 24),
         ],
+
+        const Text("سجل الحركات الكبيرة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 12),
+        ...largeTransactions.take(5).map((t) => Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.orange.withValues(alpha: 0.15)),
+          ),
+          child: Row(children: [
+            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.attach_money, size: 14, color: Colors.orange)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t['description']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text("${t['account_name']} • ${t['date']}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
+            ])),
+            Text("${((t['debit'] as num?)?.toDouble() ?? (t['credit'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}", 
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize, color: Colors.orange)),
+          ]),
+        )),
       ]),
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Tab 1: الفحوصات التلقائية
-  // ═══════════════════════════════════════════════════
   Widget _buildInspectionsTab() {
     final unbalanced = (_auditSummary['unbalanced_entries'] as List?) ?? [];
     final duplicates = (_auditSummary['duplicate_payments'] as List?) ?? [];
@@ -172,22 +289,15 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     return SingleChildScrollView(
       padding: EdgeInsets.all(context.sectionPadding),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Audit Risks (Fraud/Errors)
         _buildInspectionSection("كشف التلاعب والأخطاء", "تحليل عميق للعمليات المشبوهة", Icons.security, Colors.red, risks, (e) =>
           "${e['title']}: ${e['description']}"),
         const SizedBox(height: 12),
-
-        // Unbalanced Entries
         _buildInspectionSection("القيود غير المتوازنة", "قيود محاسبية حيث المدين ≠ الدائن", Icons.warning, Colors.red, unbalanced, (e) =>
           "القيد: ${e['id']?.toString().substring(0, 8) ?? ''} | فرق: ${((e['imbalance'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} | ${e['date'] ?? ''}"),
         const SizedBox(height: 12),
-        
-        // Duplicate Payments
         _buildInspectionSection("مدفوعات مكررة محتملة", "فواتير بنفس المبلغ والتاريخ والمورد", Icons.copy, Colors.orange, duplicates, (e) =>
           "المورد: ${e['supplier_name']} | المبلغ: ${e['total']} | التكرار: ${e['occurrence_count']}×"),
         const SizedBox(height: 12),
-        
-        // Budget Overruns
         _buildInspectionSection("تجاوزات الميزانية", "حسابات تجاوز فعليها الميزانية المحددة", Icons.trending_up, Colors.deepOrange, overruns, (e) =>
           "${e['account_name']} | الميزانية: ${e['budget_amount']} | الفعلي: ${e['actual_amount']} | تجاوز: ${e['overrun']}"),
       ]),
@@ -232,9 +342,6 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Tab 2: قائمة مهام المدقق
-  // ═══════════════════════════════════════════════════
   Widget _buildChecklistTab() {
     final completed = _checklist.values.where((v) => v).length;
     final total = _checklist.length;
@@ -251,7 +358,6 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
           ),
         ]),
         const SizedBox(height: 4),
-        // Progress bar
         ClipRRect(
           borderRadius: BorderRadius.circular(100),
           child: LinearProgressIndicator(value: total > 0 ? completed / total : 0, minHeight: 6, backgroundColor: context.cardSurface, valueColor: const AlwaysStoppedAnimation(primaryOrange)),
@@ -287,9 +393,6 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Tab 3: التقرير
-  // ═══════════════════════════════════════════════════
   Widget _buildReportTab() {
     final score = (_auditSummary['safety_score'] as double?) ?? 100;
     final unbalanced = (_auditSummary['unbalanced_entries'] as List?)?.length ?? 0;
@@ -300,7 +403,6 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     return SingleChildScrollView(
       padding: EdgeInsets.all(context.sectionPadding),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Score indicator
         Center(child: Column(children: [
           Stack(alignment: Alignment.center, children: [
             SizedBox(width: 120, height: 120, child: CircularProgressIndicator(value: score / 100, strokeWidth: 8, backgroundColor: context.cardSurface, valueColor: AlwaysStoppedAnimation(score >= 90 ? Colors.green : score >= 70 ? Colors.orange : Colors.red))),
@@ -313,13 +415,10 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
           Text(score >= 90 ? "الوضع المالي ممتاز" : score >= 70 ? "يحتاج مراجعة بسيطة" : "يحتاج تدخل عاجل", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize + 1)),
         ])),
         const SizedBox(height: 20),
-
-        // Summary table
         _buildReportRow("القيود غير المتوازنة", "$unbalanced", unbalanced == 0 ? Colors.green : Colors.red),
         _buildReportRow("مدفوعات مكررة", "$duplicates", duplicates == 0 ? Colors.green : Colors.orange),
         _buildReportRow("تجاوزات الميزانية", "$overruns", overruns == 0 ? Colors.green : Colors.red),
         _buildReportRow("مهام المدقق المكتملة", "$completed / ${_checklist.length}", completed == _checklist.length ? Colors.green : Colors.orange),
-        
         const SizedBox(height: 20),
         SizedBox(width: double.infinity, child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -362,52 +461,5 @@ class _AuditingScreenState extends State<AuditingScreen> with SingleTickerProvid
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
-  }
-
-  // ═══════════════════════════════════════════════════
-  // Helper Widgets
-  // ═══════════════════════════════════════════════════
-
-  Widget _buildScoreBadge(double score) {
-    final color = score >= 90 ? Colors.green : score >= 70 ? Colors.orange : Colors.red;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.3))),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.security, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text("${score.toInt()}%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
-      ]),
-    );
-  }
-
-  Widget _buildRiskCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.15))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Expanded(child: Text(title, style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3, fontWeight: FontWeight.bold))),
-        ]),
-        const SizedBox(height: 8),
-        Text(value, style: TextStyle(fontSize: context.bodySize + 6, fontWeight: FontWeight.bold, color: color)),
-      ]),
-    );
-  }
-
-  Widget _buildReportRow(String label, String value, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.15))),
-      child: Row(children: [
-        Icon(Icons.circle, size: 8, color: color),
-        const SizedBox(width: 10),
-        Expanded(child: Text(label, style: TextStyle(fontSize: context.bodySize))),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: context.bodySize)),
-      ]),
-    );
   }
 }

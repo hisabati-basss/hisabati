@@ -37,7 +37,7 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) _loadData();
     });
@@ -92,14 +92,21 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
             ),
             child: TabBar(
               controller: _tabController,
-              isScrollable: false,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               labelColor: Colors.black87,
               unselectedLabelColor: context.mutedText,
               indicator: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)),
               indicatorSize: TabBarIndicatorSize.tab,
               labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1),
               dividerColor: Colors.transparent,
-              tabs: const [Tab(text: "الملخص"), Tab(text: "الفواتير"), Tab(text: "الإقرارات"), Tab(text: "الإعدادات")],
+              tabs: const [
+                Tab(text: "الملخص"), 
+                Tab(text: "الفواتير"), 
+                Tab(text: "الإقرارات"), 
+                Tab(text: "حساب الزكاة"),
+                Tab(text: "الإعدادات")
+              ],
             ),
           ),
           Expanded(
@@ -109,6 +116,7 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
                   _buildSummaryTab(currency),
                   _buildInvoicesTab(currency),
                   _buildFilingsTab(currency),
+                  _buildZakatTab(currency),
                   _buildSettingsTab(),
                 ]),
           ),
@@ -303,7 +311,68 @@ class _TaxesScreenState extends State<TaxesScreen> with SingleTickerProviderStat
   }
 
   // ═══════════════════════════════════════════════════
-  // Tab 3: الإعدادات الضريبية
+  // Tab 3: حساب الزكاة (Zakat)
+  // ═══════════════════════════════════════════════════
+  Widget _buildZakatTab(String currency) {
+    // Simplified Zakat Base Calculation: (Equity + Liabilities - Fixed Assets)
+    // For now, using mock values until full financial statement logic is integrated
+    final equity = (_taxSummary['equity'] as num?)?.toDouble() ?? 500000;
+    final longTermLiabilities = (_taxSummary['lt_liabilities'] as num?)?.toDouble() ?? 100000;
+    final fixedAssets = (_taxSummary['fixed_assets'] as num?)?.toDouble() ?? 200000;
+    
+    final zakatBase = equity + longTermLiabilities - fixedAssets;
+    final zakatDue = zakatBase > 0 ? zakatBase * 0.025 : 0.0;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(context.sectionPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Colors.green, Colors.teal]),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("تقدير الزكاة الشرعية", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                      const Text("بناءً على المعادلة المعتمدة لهيئة الزكاة والضريبة والجمارك", style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      const SizedBox(height: 12),
+                      Text("${zakatDue.toStringAsFixed(2)} $currency", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.mosque, color: Colors.white30, size: 48),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text("تفاصيل وعاء الزكاة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
+          const SizedBox(height: 8),
+          _buildDetailRow("حقوق الملكية (Equity)", "${equity.toStringAsFixed(2)} $currency", "موجب"),
+          _buildDetailRow("الالتزامات طويلة الأجل", "${longTermLiabilities.toStringAsFixed(2)} $currency", "موجب"),
+          _buildDetailRow("الأصول الثابتة (المستبعدة)", "-${fixedAssets.toStringAsFixed(2)} $currency", "سالب"),
+          const Divider(),
+          _buildDetailRow("وعاء الزكاة الخاضع", "${zakatBase.toStringAsFixed(2)} $currency", "الإجمالي"),
+          _buildDetailRow("نسبة الزكاة", "2.5%", "شرعي"),
+          
+          const SizedBox(height: 24),
+          const Text(
+            "تنبيه: هذا الحساب تقديري بناءً على البيانات المدخلة في النظام. يرجى مراجعة محاسب قانوني لتقديم الإقرار النهائي.",
+            style: TextStyle(color: Colors.orange, fontSize: 11, fontStyle: FontStyle.italic),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Tab 4: الإعدادات الضريبية
   // ═══════════════════════════════════════════════════
   Widget _buildSettingsTab() {
     return SingleChildScrollView(

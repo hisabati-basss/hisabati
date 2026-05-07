@@ -7,6 +7,7 @@ class AttendanceTab extends StatelessWidget {
   final TextEditingController barcodeController;
   final FocusNode barcodeFocusNode;
   final Function(String, String) onScan;
+  final VoidCallback onGenerateReport;
 
   const AttendanceTab({
     super.key,
@@ -14,12 +15,31 @@ class AttendanceTab extends StatelessWidget {
     required this.barcodeController,
     required this.barcodeFocusNode,
     required this.onScan,
+    required this.onGenerateReport,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(tr('hr.attendance_today'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textColor)),
+            ElevatedButton.icon(
+              onPressed: () => onGenerateReport(),
+              icon: const Icon(Icons.assessment_outlined, size: 18),
+              label: Text(tr('hr.attendance.generate_report'), style: const TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryOrange.withValues(alpha: 0.1),
+                foregroundColor: primaryOrange,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: primaryOrange)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         _buildScannerArea(context),
         const SizedBox(height: 16),
         _buildAttendanceList(context),
@@ -66,8 +86,6 @@ class AttendanceTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(tr('hr.attendance_today'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textColor)),
-          const SizedBox(height: 8),
           Expanded(
             child: attendanceToday.isEmpty 
               ? Center(child: Text(tr('hr.no_attendance'), style: TextStyle(color: context.mutedText)))

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme_extension.dart';
-import 'manual_journal_screen.dart';
 import '../services/depreciation_service.dart';
 import '../services/asset_service.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:sqflite/sqflite.dart';
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({super.key});
@@ -21,55 +18,68 @@ class _AssetsScreenState extends State<AssetsScreen> {
   final DepreciationService _depService = DepreciationService();
   final AssetService _assetService = AssetService();
   List<Map<String, dynamic>> _assets = [];
-  List<Map<String, dynamic>> _costCenters = [];
   bool _isLoading = true;
   bool _isProcessingDep = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMetadata();
-    _loadAssets();
+    _initAssets();
   }
 
-  Future<void> _loadMetadata() async {
-    final cc = await DatabaseHelper().getCostCenters();
-    setState(() => _costCenters = cc);
+  Future<void> _initAssets() async {
+    await _ensureAssetSchema();
+    await _loadAssets();
+  }
+
+  Future<void> _ensureAssetSchema() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final tableInfo = await db.rawQuery('PRAGMA table_info(assets)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      
+      if (!columns.contains('purchase_date')) {
+        await db.execute('ALTER TABLE assets ADD COLUMN purchase_date TEXT');
+      }
+      if (!columns.contains('useful_life')) {
+        await db.execute('ALTER TABLE assets ADD COLUMN useful_life INTEGER DEFAULT 60');
+      }
+      if (!columns.contains('salvage_value')) {
+        await db.execute('ALTER TABLE assets ADD COLUMN salvage_value REAL DEFAULT 0.0');
+      }
+      if (!columns.contains('last_depreciation_date')) {
+        await db.execute('ALTER TABLE assets ADD COLUMN last_depreciation_date TEXT');
+      }
+      if (!columns.contains('accumulated_depreciation')) {
+        await db.execute('ALTER TABLE assets ADD COLUMN accumulated_depreciation REAL DEFAULT 0.0');
+      }
+    } catch (e) {
+      debugPrint("Asset Schema Migration Error: $e");
+    }
   }
 
   Future<void> _loadAssets([String query = '']) async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
     final db = await DatabaseHelper().database;
     
-    await Future.delayed(const Duration(milliseconds: 300));
-
     final String sqlQuery = '''
       SELECT a.*, e.name as employee_name, cc.name as cost_center_name
       FROM assets a
       LEFT JOIN employees e ON a.assigned_to = e.id
       LEFT JOIN cost_centers cc ON a.cost_center_id = cc.id
-      WHERE a.name LIKE ? OR a.barcode LIKE ? OR a.serial_number LIKE ?
+      WHERE (a.name LIKE ? OR a.barcode LIKE ? OR a.serial_number LIKE ?)
+      AND a.is_deleted = 0
       ORDER BY a.name ASC
     ''';
     
     try {
       final results = await db.rawQuery(sqlQuery, ['%$query%', '%$query%', '%$query%']);
-      
-      if (results.isEmpty && query.isEmpty) {
-        // Show empty state — user adds assets from the + button
-        setState(() => _assets = []);
-      } else {
-        setState(() => _assets = results);
-      }
+      if (mounted) setState(() => _assets = results);
     } catch (e) {
       debugPrint("Database error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('assets_module.error_load', args: [e.toString()]))));
     }
-
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
-
-  // Dummy data seeding removed — assets are now user-created only
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -81,379 +91,227 @@ class _AssetsScreenState extends State<AssetsScreen> {
     }
   }
 
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'available': return tr('assets_module.status_available');
-      case 'in_use': return tr('assets_module.status_in_use');
-      case 'maintenance': return tr('assets_module.status_maintenance');
-      case 'scrap': return tr('assets_module.status_scrap');
-      default: return tr('assets_module.status_unknown');
-    }
-  }
-
-  Future<void> _handleRunDepreciation() async {
-    setState(() => _isProcessingDep = true);
-    try {
-      final result = await _depService.processAllDepreciations();
-      if (mounted) {
-        _showDepreciationSummary(result);
-        _loadAssets();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في معالجة الإهلاك: $e")));
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessingDep = false);
-    }
-  }
-
-  void _showDepreciationSummary(Map<String, dynamic> result) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius)), // 📉 Reduced from 24
-        title: Text(tr('assets_module.dep_success_title'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)), // 📉 Reduced from default
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildSummaryRow(Icons.account_balance_wallet, tr('assets_module.total_dep_amount'), "${(result['total_amount'] as double).toStringAsFixed(2)} ${tr('ceo.currency.sar')}"),
-            _buildSummaryRow(Icons.category, tr('assets_module.assets_affected'), tr('hr.employees_processed') + ": ${result['assets_processed']}"),
-            _buildSummaryRow(Icons.article, tr('assets_module.entries_created'), "${result['entries_created']} " + tr('assets_module.entries_cost_centers')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('hr.success'))),
-        ],
-      )
-    );
-  }
-
-  Widget _buildSummaryRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0), // 📉 Reduced from 8
-      child: Row(
-        children: [
-          Icon(icon, size: context.iconSize - 6, color: primaryOrange), // 📉 Reduced
-          const SizedBox(width: 6), // 📉 Reduced from 8
-          Text(label, style: TextStyle(fontSize: context.bodySize - 2)), // 📉 Reduced
-          const Spacer(),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)), // 📉 Reduced
-        ],
-      ),
-    );
-  }
-
-  void _showAssetDetails(Map<String, dynamic> asset) async {
-    final String assetId = asset['id'];
-    final tco = await _assetService.getAssetTCO(assetId);
-    
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: BoxDecoration(
-          color: context.bgSurface.withValues(alpha: 0.95),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(context.cardRadius + 8)), // 📉 Adjusted from 40
-          border: Border.all(color: context.cardBorder),
-        ),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(context.sectionPadding), // 📉 Reduced from 32
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(child: Text(asset['name'], style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold))), // 📉 Reduced from 24
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, size: context.iconSize)), // 📉 Reduced size
-                  ],
-                ),
-                const SizedBox(height: 12), // 📉 Reduced from 24
-                _buildTCODashboard(tco, asset),
-                const SizedBox(height: 24), // 📉 Reduced from 48
-                Text(tr('assets_module.accounting_tracking'), style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)), // 📉 Reduced from 18
-                const SizedBox(height: 16),
-                _buildDetailRow(tr('assets_module.cost_center'), asset['cost_center_name'] ?? tr('hr.select_center')),
-                _buildDetailRow(tr('assets_module.purchase_date'), asset['purchase_date']),
-                _buildDetailRow(tr('assets_module.useful_life'), tr('assets_module.months', args: [ (asset['useful_life_months'] ?? 60).toString()])),
-                _buildDetailRow(tr('assets_module.dep_method'), tr('assets_module.dep_method_val')),
-                _buildDetailRow(tr('assets_module.last_dep_date'), asset['last_depreciation_date'] ?? tr('assets_module.not_started')),
-                const SizedBox(height: 24), // 📉 Reduced from 48
-                if (asset['status'] != 'scrap')
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-                        foregroundColor: Colors.redAccent,
-                        padding: EdgeInsets.all(context.cardPadding + 4), // 📉 Reduced from 20
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius)), // 📉 Reduced from 16
-                        side: const BorderSide(color: Colors.redAccent, width: 0.5),
-                      ),
-                      onPressed: () => _handleDisposal(assetId, asset['name']),
-                      icon: Icon(Icons.no_crash, size: context.iconSize), // 📉 Reduced size
-                      label: Text(tr('assets_module.disposal_btn'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)), // 📉 Reduced size
-                    ),
-                  ),
-                const SizedBox(height: 100),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTCODashboard(Map<String, double> tco, Map<String, dynamic> asset) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("إجمالي تكلفة الملكية (TCO Analytics)", style: TextStyle(fontSize: context.bodySize, fontWeight: FontWeight.bold, color: primaryOrange)), // 📉 Reduced from 16
-        const SizedBox(height: 12), // 📉 Reduced from 16
-        Row(
-          children: [
-            _buildStatCard(tr('assets_module.purchase_price'), tco['purchase_price']!, Colors.white70),
-            const SizedBox(width: 8), // 📉 Reduced from 12
-            _buildStatCard(tr('assets_module.maintenance_cost'), tco['maintenance']!, Colors.orangeAccent),
-          ],
-        ),
-        const SizedBox(height: 8), // 📉 Reduced from 12
-        Row(
-          children: [
-            _buildStatCard(tr('assets_module.acc_depreciation'), tco['depreciation']!, Colors.redAccent),
-            const SizedBox(width: 8), // 📉 Reduced from 12
-            _buildStatCard(tr('assets_module.book_value'), tco['nbv']!, Colors.greenAccent),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String label, double value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: EdgeInsets.all(context.cardPadding), // 📉 Reduced from 16
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 20
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(color: color.withValues(alpha: 0.6), fontSize: context.bodySize - 2)), // 📉 Reduced from 10
-            const SizedBox(height: 2), // 📉 Reduced from 4
-            Text("${value.toStringAsFixed(0)} ${tr('ceo.currency.sar')}", style: TextStyle(color: color, fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)), // 📉 Reduced from 18
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: context.mutedText)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleDisposal(String assetId, String name) async {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius)), // 📉 Reduced from 24
-        title: Text("تخريد الأصل: $name", style: TextStyle(color: Colors.redAccent, fontSize: context.subHeaderSize)), // 📉 Reduced size
-        content: Text("سيقوم النظام بإنشاء قيود محاسبية لإغلاق حساب الأصل وإهلاك كامل القيمة الدفترية المتبقية. هل تريد المتابعة؟", style: TextStyle(fontSize: context.bodySize)), // 📉 Added size
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () async {
-              await _assetService.disposeAsset(assetId: assetId, reason: "تكهين إداري", proceeds: 0);
-              Navigator.pop(ctx); // Close dialog
-              Navigator.pop(ctx); // Close sheet
-              _loadAssets();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تنفيذ عملية التخريد وإصدار القيود المحاسبية بنجاح.")));
-            },
-            child: const Text("تأكيد التخريد", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(context.sectionPadding), // 📉 Reduced from 24
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
         children: [
-          _buildTopDashboard(),
-          const SizedBox(height: 12), // 📉 Reduced from 24
-          _buildActionBar(),
-          const SizedBox(height: 12), // 📉 Reduced from 24
-          Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator(color: primaryOrange))
-              : _assets.isEmpty
-                ? Center(child: Text(tr('assets_module.no_assets_found'), style: TextStyle(color: context.mutedText)))
-                : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 380, // 📉 Reduced from 450
-                      childAspectRatio: 1.8, // 📉 Adjusted for density
-                      crossAxisSpacing: 8, // 📉 Reduced from 16
-                      mainAxisSpacing: 8, // 📉 Reduced from 16
-                    ),
-                    itemCount: _assets.length,
-                    itemBuilder: (context, index) => _buildAssetCard(_assets[index]),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopDashboard() {
-    double totalValue = _assets.fold(0, (sum, a) => sum + (a['cost_price'] as num).toDouble());
-    int count = _assets.length;
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: context.cardPadding, vertical: 8), // 📉 Reduced from 24
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryOrange.withValues(alpha: 0.08), Colors.white.withValues(alpha: 0.01)]), // 📉 Lighter
-        borderRadius: BorderRadius.circular(context.cardRadius / 2), // 📉 Sharper
-        border: Border.all(color: primaryOrange.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          _buildStatHeader(tr('assets_module.title'), count.toString(), Icons.handyman), // 📉 Shortened
-          const VerticalDivider(width: 16, color: Colors.white10), // 📉 Reduced from 24
-          _buildStatHeader(tr('assets_module.total_value'), "${totalValue.toStringAsFixed(0)}", Icons.account_balance), // 📉 Shortened
-          const Spacer(),
-          _isProcessingDep 
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: primaryOrange, strokeWidth: 1.5))
-            : IconButton.filled(
-                onPressed: _handleRunDepreciation,
-                style: IconButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black, minimumSize: const Size(28, 28), padding: EdgeInsets.zero),
-                icon: Icon(Icons.bolt, size: context.iconSize - 4),
-              ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatHeader(String label, String value, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: context.iconSize - 8, color: primaryOrange), // 📉 Reduced
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)), // 📉 Reduced
-          ],
-        ),
-        const SizedBox(height: 1), // 📉 Reduced
-        Text(value, style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)), // 📉 Reduced from headerSize
-      ],
-    );
-  }
-
-  Widget _buildActionBar() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _searchController,
-            style: TextStyle(fontSize: context.bodySize),
-            onChanged: (val) => _loadAssets(val),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: tr('assets_module.search_hint'),
-              prefixIcon: Icon(Icons.search, size: context.iconSize),
-              filled: true,
-              fillColor: context.cardSurface,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.cardRadius), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.all(8), // 📉 Reduced from 12
-          decoration: BoxDecoration(color: context.cardSurface, borderRadius: BorderRadius.circular(context.cardRadius)),
-          child: Icon(Icons.filter_list, size: context.iconSize),
-        )
-      ],
-    );
-  }
-
-  Widget _buildAssetCard(Map<String, dynamic> asset) {
-    final statusColor = _getStatusColor(asset['status']);
-    
-    return Container(
-      padding: const EdgeInsets.all(6), // 📉 Reduced from cardPadding
-      decoration: BoxDecoration(
-        color: context.cardSurface.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(context.cardRadius / 2), // 📉 Reduced from 24
-        border: Border.all(color: context.cardBorder, width: 0.5),
-      ),
-      child: InkWell(
-        onTap: () => _showAssetDetails(asset),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          // Slim Glass Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                CircleAvatar(backgroundColor: statusColor.withValues(alpha: 0.08), radius: 12, child: Icon(Icons.handyman, color: statusColor, size: context.iconSize - 6)), // 📉 Reduced from 16
-                const SizedBox(width: 6), // 📉 Reduced from 8
+                IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back_ios, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(asset['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1), maxLines: 1), // 📉 Reduced
-                      Text("SN: ${asset['serial_number'] ?? '-'}", style: TextStyle(fontSize: context.bodySize - 4, color: context.mutedText)), // 📉 Shortened/Reduced
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              tr('assets_module.title'),
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.inventory_rounded, color: primaryOrange, size: 16),
+                        ],
+                      ),
+                      Text(
+                        "${_assets.length} ${tr('assets_module.assets_count')}",
+                        style: TextStyle(color: context.mutedText, fontSize: 9),
+                      ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), // 📉 Reduced
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(4)),
-                  child: Text(_getStatusText(asset['status']), style: TextStyle(color: statusColor, fontSize: context.bodySize - 4, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 16),
+                // Refresh/Depreciation Action
+                GestureDetector(
+                  onTap: () async {
+                    if (_isProcessingDep) return;
+                    setState(() => _isProcessingDep = true);
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Row(
+                        children: [
+                          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                          const SizedBox(width: 16),
+                          Text(tr('common.loading')),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ));
+
+                    try {
+                      final results = await _depService.processAllDepreciations();
+                      await _loadAssets();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text("${tr('assets_module.dep_success_title')}: ${results['assets_processed']} ${tr('assets_module.assets_affected')}"),
+                          backgroundColor: Colors.green,
+                        ));
+                      }
+                    } catch (e) {
+                      debugPrint("Depreciation error: $e");
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text("${tr('common.error')}: $e"),
+                          backgroundColor: Colors.redAccent,
+                        ));
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isProcessingDep = false);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(6)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_isProcessingDep ? Icons.hourglass_empty : Icons.bolt, size: 12, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(tr('assets_module.dep_btn'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("${asset['cost_price']}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)),
-                  ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Glass Stats Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(fontSize: 11),
+                          onChanged: _loadAssets,
+                          decoration: InputDecoration(
+                            hintText: tr('assets_module.search_hint'),
+                            hintStyle: TextStyle(color: context.mutedText, fontSize: 11),
+                            isDense: true,
+                            prefixIcon: Icon(Icons.search, size: 14, color: context.mutedText),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${_assets.fold(0.0, (sum, a) => sum + ((a['cost_price'] as num?)?.toDouble() ?? 0.0)).toStringAsFixed(0)} ${tr('ceo.currency.sar')}",
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: primaryOrange),
+                      ),
+                    ],
+                  ),
                 ),
-                Icon(Icons.chevron_right, size: context.iconSize - 6, color: primaryOrange.withValues(alpha: 0.5)), // 📉 Simplified
-              ],
+              ),
             ),
-          ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Assets Grid
+          Expanded(
+            child: _isLoading 
+              ? const Center(child: CircularProgressIndicator(color: primaryOrange))
+              : GridView.builder(
+                  padding: const EdgeInsets.only(left: 24, right: 24, bottom: 20),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 220,
+                    mainAxisExtent: 90,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: _assets.length,
+                  itemBuilder: (context, index) => _buildAssetGlassCard(_assets[index], isDark),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssetGlassCard(Map<String, dynamic> asset, bool isDark) {
+    final statusColor = _getStatusColor(asset['status']?.toString() ?? 'available');
+    final name = asset['name']?.toString() ?? 'صنف غير معروف';
+    final price = (asset['cost_price'] as num?)?.toDouble() ?? 0.0;
+    final sn = asset['serial_number']?.toString() ?? '-';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 6, height: 6,
+                    decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                  ),
+                  Expanded(
+                    child: Text(
+                      name, 
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text("SN: $sn", style: TextStyle(color: context.mutedText, fontSize: 8)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                   Text(
+                    "${price.toStringAsFixed(0)} ${tr('ceo.currency.sar')}", 
+                    style: TextStyle(color: context.mutedText, fontSize: 9, fontWeight: FontWeight.bold)
+                  ),
+                  Icon(Icons.arrow_forward_ios, size: 10, color: context.mutedText.withValues(alpha: 0.3)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

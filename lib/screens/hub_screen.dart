@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/industry_provider.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme_extension.dart';
+import '../core/config/module_definitions.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class HubScreen extends StatelessWidget {
@@ -12,251 +13,161 @@ class HubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
-    final industryProvider = Provider.of<IndustryProvider>(context);
+    bool isMobile = MediaQuery.of(context).size.width < 800;
+    final isDark = context.isDark;
+    final perm = PermissionService();
+
+    // Grouping logic
+    Map<ModuleCategory, List<ModuleDef>> grouped = {};
+    for (var mod in AppModules.allModules) {
+      // Only show top-level modules (respecting showInSidebar) to avoid HR duplication
+      if (mod.showInSidebar && perm.isVisible(mod.id)) {
+        grouped.putIfAbsent(mod.category, () => []).add(mod);
+      }
+    }
+
+    final categoryNames = {
+      ModuleCategory.core: 'الأنظمة الرئيسية والأساسية',
+      ModuleCategory.finance: 'المالية والمحاسبة المتقدمة',
+      ModuleCategory.support: 'الدعم الفني والرقابة الإدارية',
+      ModuleCategory.hr: 'الموارد البشرية وشؤون الموظفين',
+      ModuleCategory.operations: 'العمليات والتجارة وسلاسل الإمداد',
+      ModuleCategory.entities: 'القطاعات والكيانات التجارية',
+      ModuleCategory.industries: 'القطاعات المتخصصة والخدمات',
+      ModuleCategory.extensions: 'الإضافات الذكية والذكاء الاصطناعي',
+    };
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(), // Apple feel
-        padding: EdgeInsets.fromLTRB(
-          context.sectionPadding,
-          context.sectionPadding,
-          context.sectionPadding,
-          100,
-        ), // Extra bottom padding for Dock
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context, isMobile, industryProvider),
-            const SizedBox(height: 16), // 📉 Reduced from 20
-
-            _buildCategory(context, tr('hub.categories.smart_assets'), [
-              if (PermissionService().isVisible('warehouse')) _buildHubTile(context, 19, tr('hub.tiles.warehouse'), Icons.warehouse_rounded, Colors.orangeAccent, isFeatured: true),
-              if (PermissionService().isVisible('cloud_inbox')) _buildHubTile(context, 20, tr('hub.tiles.cloud_inbox'), Icons.cloud_download_rounded, Colors.blueAccent, isFeatured: true),
-              if (PermissionService().isVisible('tools')) _buildHubTile(context, 14, tr('hub.tiles.tools'), Icons.handyman_rounded, Colors.redAccent, isFeatured: true),
-              if (PermissionService().isVisible('pos')) _buildHubTile(context, 21, tr('hub.tiles.pos'), Icons.point_of_sale, Colors.greenAccent, isFeatured: true),
-            ], isMobile),
-
-            const SizedBox(height: 16),
-
-            _buildCategory(context, tr('hub.categories.manufacturing'), [
-              if (PermissionService().isVisible('manufacturing')) _buildHubTile(context, 26, tr('hub.tiles.bom'), Icons.precision_manufacturing, Colors.deepPurpleAccent, isFeatured: true),
-              if (PermissionService().isVisible('manufacturing')) _buildHubTile(context, 25, tr('hub.tiles.manufacturing'), Icons.factory_rounded, Colors.brown, isFeatured: true),
-            ], isMobile),
-
-            const SizedBox(height: 16),
-
-            _buildCategory(context, tr('hub.categories.admin'), [
-              if (PermissionService().isVisible('bi')) _buildHubTile(context, 24, tr('hub.tiles.bi'), Icons.dashboard_customize_rounded, Colors.purpleAccent, isFeatured: true),
-              if (PermissionService().isVisible('hr')) _buildHubTile(context, 4, tr('hub.tiles.hr'), Icons.people, Colors.blue),
-              if (PermissionService().isVisible('custody')) _buildHubTile(context, 28, tr('hub.tiles.custody'), Icons.work_history_outlined, Colors.indigoAccent, isFeatured: true),
-              if (PermissionService().isVisible('feasibility')) _buildHubTile(context, 6, tr('hub.tiles.feasibility'), Icons.lightbulb, Colors.yellow),
-              if (PermissionService().isVisible('users')) _buildHubTile(context, 7, tr('hub.tiles.users'), Icons.group_work, Colors.teal),
-              if (PermissionService().isVisible('projects')) _buildHubTile(context, 11, tr('hub.tiles.projects'), Icons.assignment, Colors.cyan),
-            ], isMobile),
-
-            const SizedBox(height: 16), // Reduced from 32
-
-            _buildCategory(context, tr('hub.categories.growth'), [
-              if (PermissionService().isVisible('marketing')) _buildHubTile(context, 8, tr('hub.tiles.marketing'), Icons.monetization_on, Colors.purple),
-              if (PermissionService().isVisible('subscriptions')) _buildHubTile(context, 30, tr('hub.tiles.subscriptions'), Icons.card_membership, Colors.indigo),
-              if (PermissionService().isVisible('cheques')) _buildHubTile(context, 27, tr('hub.tiles.cheques'), Icons.account_balance_wallet, Colors.greenAccent, isFeatured: true),
-              if (PermissionService().isVisible('accounting')) _buildHubTile(context, 35, tr('hub.tiles.trial_balance'), Icons.balance, Colors.amberAccent, isFeatured: true),
-            ], isMobile),
-
-            const SizedBox(height: 16),
-
-            _buildCategory(context, tr('hub.categories.ai'), [
-              if (PermissionService().isVisible('ai_chat')) _buildHubTile(context, 0, tr('hub.tiles.ai_chat'), Icons.chat_bubble_rounded, primaryOrange, isFeatured: true),
-              if (PermissionService().isVisible('internal_chat')) _buildHubTile(context, 40, "شات الموظفين الداخلي", Icons.forum_rounded, Colors.tealAccent, isFeatured: true),
-            ], isMobile),
-
-            const SizedBox(height: 16),
-
-            _buildCategory(context, "الرقابة والتحليل", [
-               _buildHubTile(context, 47, "الرقابة والمتابعة", Icons.monitor_heart_rounded, Colors.redAccent),
-               _buildHubTile(context, 48, "تدقيق الفواتير", Icons.fact_check_rounded, Colors.lightBlueAccent),
-               _buildHubTile(context, 49, "قائمة التدفقات", Icons.account_tree_rounded, Colors.green),
-               _buildHubTile(context, 50, "كشوفات سريعة", Icons.quick_contacts_mail_rounded, Colors.orange),
-               _buildHubTile(context, 51, "القيود المشتركة", Icons.merge_type_rounded, Colors.blueGrey),
-               _buildHubTile(context, 52, "إدارة المصروفات", Icons.money_off_rounded, Colors.pinkAccent),
-               _buildHubTile(context, 53, "محاسبة التكاليف", Icons.calculate_rounded, Colors.deepOrangeAccent),
-            ], isMobile),
-          ],
-        ),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+              child: _buildHeader(context, isMobile),
+            ),
+          ),
+          ...categoryNames.keys.map((cat) {
+            final mods = grouped[cat];
+            if (mods == null || mods.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+            
+            return SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      categoryNames[cat]!,
+                      style: TextStyle(
+                        color: context.primaryOrange.withValues(alpha: 0.9),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isMobile ? 2 : 4,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: isMobile ? 2.2 : 2.5,
+                      ),
+                      itemCount: mods.length,
+                      itemBuilder: (ctx, i) => _buildHubTile(context, mods[i]),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isMobile, IndustryProvider provider) {
+  Widget _buildHeader(BuildContext context, bool isMobile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: primaryOrange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: primaryOrange.withValues(alpha: 0.2)),
+            color: context.primaryOrange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.auto_awesome, size: 12, color: primaryOrange),
-              const SizedBox(width: 4),
-              Text(
-                provider.industryName,
-                style: const TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ],
+          child: Text(
+            "Enterprise Control Center",
+            style: TextStyle(color: context.primaryOrange, fontWeight: FontWeight.bold, fontSize: 10),
           ),
         ),
         const SizedBox(height: 8),
-        const SizedBox(height: 8),
         Text(
-          tr('hub.header.app_center'),
+          "جميع تطبيقات Hisabati ERP",
           style: TextStyle(
-            fontSize: context.headerSize, // 📉 Reduced from 28
+            color: context.textColor,
+            fontSize: isMobile ? 20 : 28,
             fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
           ),
+        ),
+        Text(
+          "الوصول السريع لجميع الوحدات الـ ${AppModules.allModules.length} في مكان واحد",
+          style: TextStyle(color: context.mutedText, fontSize: 12),
         ),
       ],
     );
   }
 
-  Widget _buildCategory(
-    BuildContext context,
-    String title,
-    List<Widget> items,
-    bool isMobile,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: context.bodySize - 1, // 📉 Reduced from 14
-            color: context.textColor.withValues(alpha: 0.6),
-          ),
-        ),
-        const SizedBox(height: 8), // 📉 Reduced from 12
-        GridView.count(
-          crossAxisCount: isMobile ? 2 : 4,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 8, // 📉 Reduced from 12
-          mainAxisSpacing: 8, // 📉 Reduced from 12
-          childAspectRatio: isMobile ? 1.2 : 1.4, // More compact aspect ratio
-          children: items,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHubTile(
-    BuildContext context,
-    int index,
-    String label,
-    IconData icon,
-    Color color, {
-    bool isFeatured = false,
-  }) {
-    return _HubTile(
-      index: index,
-      label: label,
-      icon: icon,
-      color: color,
-      isFeatured: isFeatured,
-      onTap: () => onNavigate(index),
-    );
-  }
-}
-
-class _HubTile extends StatefulWidget {
-  final int index;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isFeatured;
-  final VoidCallback onTap;
-
-  const _HubTile({
-    required this.index,
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.isFeatured,
-    required this.onTap,
-  });
-
-  @override
-  State<_HubTile> createState() => _HubTileState();
-}
-
-class _HubTileState extends State<_HubTile> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHovered ? 1.05 : 1.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutBack,
+  Widget _buildHubTile(BuildContext context, ModuleDef module) {
+    final isDark = context.isDark;
+    return GestureDetector(
+      onTap: () => onNavigate(module.index),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             decoration: BoxDecoration(
-              color: context.cardSurface,
-              borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 24
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: widget.isFeatured ? widget.color.withValues(alpha: 0.4) : context.cardBorder,
-                width: 1, // 📉 Normalized
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                width: 0.5,
               ),
-              boxShadow: _isHovered ? [
-                BoxShadow(
-                  color: widget.color.withValues(alpha: 0.15),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                )
-              ] : [],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(context.cardRadius), // 📉 Reduced from 24
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3), // 📉 Reduced from 5
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8), // 📉 Reduced from 12
-                        decoration: BoxDecoration(
-                          color: widget.color.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(widget.icon, color: widget.color, size: context.iconSize), // 📉 Reduced from 22
-                      ),
-                      const SizedBox(height: 4), // 📉 Reduced from 8
-                      Text(
-                        widget.label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: context.bodySize, // 📉 Reduced from 12
-                        ),
-                      ),
-                    ],
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: module.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(module.icon, color: module.color, size: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    module.localizedName,
+                    style: TextStyle(
+                      color: context.textColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
+                Icon(Icons.chevron_left, size: 14, color: context.mutedText.withValues(alpha: 0.5)),
+                const SizedBox(width: 8),
+              ],
             ),
           ),
         ),

@@ -116,7 +116,7 @@ class PayrollService {
     double loanDeductions = 0.0;
     for (var loan in activeLoans) {
       double balance = (loan['balance'] as num?)?.toDouble() ?? 0;
-      double installment = (loan['installment'] as num?)?.toDouble() ?? 0;
+      double installment = (loan['monthly_installment'] as num?)?.toDouble() ?? (loan['installment'] as num?)?.toDouble() ?? 0;
       if (balance > 0) {
         loanDeductions += installment > balance ? balance : installment;
       }
@@ -208,12 +208,32 @@ class PayrollService {
         'cost_center_id': emp['cost_center_id'],
       });
 
+      // Update loan balances and record installments (Phase 4.2)
+      for (var loan in activeLoans.where((l) => l['status'] == 'ACTIVE')) {
+        double balance = (loan['balance'] as num?)?.toDouble() ?? 0;
+        double installment = (loan['monthly_installment'] as num?)?.toDouble() ?? (loan['installment'] as num?)?.toDouble() ?? 0;
+        if (balance > 0) {
+          double deduction = installment > balance ? balance : installment;
+          if (deduction > 0) {
+            await _db.updateLoanBalance(loan['id'], balance - deduction);
+            await _db.recordLoanInstallment({
+              'loan_id': loan['id'],
+              'amount': deduction,
+              'payment_date': DateTime.now().toIso8601String(),
+              'month': month,
+            });
+          }
+        }
+      }
+
       // Journal: Salary Payable with Cost Center (Phase 7.3)
       final String? costCenter = emp['cost_center_id']?.toString();
       await _db.saveManualJournalEntry(
-        date: DateTime.now().toIso8601String().split('T')[0],
-        description: 'استحقاق رواتب شهر $month - ${emp['name']}',
-        lines: [
+        {
+          'date': DateTime.now().toIso8601String().split('T')[0],
+          'description': 'استحقاق رواتب شهر $month - ${emp['name']}',
+        },
+        [
           {'account_id': 'ACC_SALARY_EXPENSE', 'debit': breakdown['gross'], 'credit': 0.0, 'cost_center_id': costCenter},
           {'account_id': 'ACC_PAYABLE_SALARY', 'debit': 0.0, 'credit': netAmount, 'cost_center_id': costCenter},
           {'account_id': 'ACC_PAYABLE_TAXES', 'debit': 0.0, 'credit': breakdown['tax'], 'cost_center_id': costCenter},

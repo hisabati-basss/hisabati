@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 // Global Notifier for Theme Toggle
-final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 // Apple-style Premium Palette
 const primaryOrange = Color(0xFFFF6B00);
@@ -19,6 +19,8 @@ extension AppThemeExtension on BuildContext {
 
   // Background Surfaces
   Color get bgSurface => isDark ? const Color(0xFF0F0F12) : const Color(0xFFF3F4F6);
+  Color get scaffoldBackground => bgSurface;
+  Color get primaryOrange => const Color(0xFFFF6B00);
   
   // Premium Glassmorphism & Performance Fallbacks
   Color get cardSurface {
@@ -65,26 +67,26 @@ extension AppThemeExtension on BuildContext {
   double get glassBlurHigh => 20.0;
 
   // --- COMPACT MODE TOKENS (NEW) ---
-  double get headerSize => 18.0;     // 📉 Reduced from 20.0
-  double get subHeaderSize => 14.0;  // 📉 Reduced from 18.0
-  double get bodySize => 11.0;       // 📉 Reduced from 12.0
-  double get cardPadding => 8.0;     // 📉 Reduced from 12.0
-  double get cardRadius => 12.0;     // 📉 Reduced from 16.0
-  double get sectionPadding => 12.0; // 📉 Reduced from 16.0
-  double get iconSize => 18.0;        // 🧊 NEW: Ultra-Compact Icon Size
+  double get headerSize => 18.0;     
+  double get subHeaderSize => 14.0;  
+  double get bodySize => 10.0;       
+  double get cardPadding => 6.0;     
+  double get cardRadius => 10.0;     
+  double get sectionPadding => 10.0; 
+  double get iconSize => 16.0;        
 
   // THEME REACTIVE OBSIDIAN GLASS
   Color get obsidianGlass {
     return isDark 
-      ? const Color(0xFF1A1A2E).withValues(alpha: 0.65) // 🌑 Dark frosted
-      : Colors.white.withValues(alpha: 0.75);           // ☀️ Light frosted
+      ? const Color(0xFF1A1A1E).withValues(alpha: 0.92) // 🌑 Deep Obsidian
+      : const Color(0xFFFFFFFF).withValues(alpha: 0.45); // ☀️ True Glass Light
   }
 
   // LIGHTER GLASS FOR FORMS & LISTS
   Color get sheetGlass {
     return isDark 
-      ? const Color(0xFF1A1A2E).withValues(alpha: 0.50)
-      : Colors.white.withValues(alpha: 0.85);
+      ? const Color(0xFF2C2C2E).withValues(alpha: 0.50)
+      : const Color(0xFFF2F2F7).withValues(alpha: 0.55); // ☀️ True Glass Light
   }
 
 
@@ -93,4 +95,20 @@ extension AppThemeExtension on BuildContext {
       : Colors.black.withValues(alpha: 0.08);
 
   double get glassBlurLevel => 25.0; // 📉 Deep Blur Constant
+
+  // --- NEW UNIFIED DECORATIONS ---
+  BoxDecoration get glassDecoration => BoxDecoration(
+    color: cardSurface,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: cardBorder),
+    boxShadow: isDark ? [] : [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.05),
+        blurRadius: 10,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
+
+  Color get primaryColor => primaryOrange;
 }

@@ -36,7 +36,6 @@ class _AiCoreScreenState extends State<AiCoreScreen> {
     };
 
     _controller.onReportRequested = (type) async {
-
        await ReportingService().generateAndShareReport(type);
     };
 
@@ -67,13 +66,16 @@ class _AiCoreScreenState extends State<AiCoreScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "HBASSS - وكيلك المالي الذكي",
-                    style: TextStyle(
-                      color: context.mutedText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+                  Expanded(
+                    child: Text(
+                      tr('ai.title'),
+                      style: TextStyle(
+                        color: context.mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
@@ -150,7 +152,7 @@ class _AiCoreScreenState extends State<AiCoreScreen> {
                             ),
                           ),
                           
-                          // ✨ RETRY BUTTON (Visible only on failure)
+                          // ?? RETRY BUTTON (Visible only on failure)
                           if (_controller.isLastRequestFailed)
                             Padding(
                               padding: const EdgeInsets.only(top: 8),

@@ -236,12 +236,19 @@ CREATE TABLE IF NOT EXISTS public.assets (
     id TEXT PRIMARY KEY,
     name TEXT,
     barcode TEXT,
+    serial_number TEXT,
     cost_price REAL DEFAULT 0,
-    status TEXT,
+    status TEXT DEFAULT 'available',
+    assigned_to TEXT,
+    cost_center_id TEXT,
+    purchase_date TEXT,
+    useful_life_months INTEGER DEFAULT 60,
+    last_depreciation_date TEXT,
     device_id TEXT,
     updated_at TEXT,
     is_deleted INTEGER DEFAULT 0
 );
+
 
 -- 10. النظام والأمان (System & Security)
 CREATE TABLE IF NOT EXISTS public.system_users (
@@ -273,6 +280,32 @@ CREATE TABLE IF NOT EXISTS public.financial_custodies (id TEXT PRIMARY KEY, empl
 CREATE TABLE IF NOT EXISTS public.real_estate_units (id TEXT PRIMARY KEY, name TEXT, rent_amount REAL, status TEXT, device_id TEXT, updated_at TEXT, is_deleted INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS public.real_estate_contracts (id TEXT PRIMARY KEY, tenant_name TEXT, annual_rent REAL, status TEXT, device_id TEXT, updated_at TEXT, is_deleted INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS public.investments (id TEXT PRIMARY KEY, name TEXT, current_value REAL, risk_level TEXT, status TEXT, device_id TEXT, updated_at TEXT, is_deleted INTEGER DEFAULT 0);
+
+-- 12. إدارة الملفات (File Management)
+CREATE TABLE IF NOT EXISTS public.company_files (
+    id TEXT PRIMARY KEY,
+    company_id TEXT,
+    file_name TEXT,
+    file_url TEXT,
+    file_type TEXT,
+    uploaded_by TEXT,
+    device_id TEXT,
+    updated_at TEXT,
+    is_deleted INTEGER DEFAULT 0
+);
+
+-- 13. الدردشة الداخلية (Employee Chat)
+CREATE TABLE IF NOT EXISTS public.employee_chats (
+    id TEXT PRIMARY KEY,
+    sender_id TEXT,
+    sender_name TEXT,
+    content TEXT,
+    attachment_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    device_id TEXT,
+    is_deleted INTEGER DEFAULT 0
+);
+
 
 -- ==============================================================================
 -- إعطاء الصلاحيات للجميع للمزامنة السلسة

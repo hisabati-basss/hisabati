@@ -479,9 +479,8 @@ class _CommercialHubScreenState extends State<CommercialHubScreen> with SingleTi
             onPressed: () async {
               final discount = double.tryParse(discountController.text) ?? 20;
               await _dbHelper.createExpiryPromotion(
-                itemId: item['id']?.toString() ?? '',
-                discountPercent: discount,
-                campaignDays: 30,
+                item['id']?.toString() ?? '',
+                discount,
               );
               Navigator.pop(ctx);
               _loadData();

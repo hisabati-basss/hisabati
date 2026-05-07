@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:easy_localization/easy_localization.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme_extension.dart';
+import '../services/unified_pdf_export_service.dart';
 import 'purchase_invoice_screen.dart';
 
 class SupplierDetailsScreen extends StatefulWidget {
@@ -14,6 +15,15 @@ class SupplierDetailsScreen extends StatefulWidget {
     required this.supplierId, 
     required this.supplierName,
   });
+
+  static void show(BuildContext context, String id, String name) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SupplierDetailsScreen(supplierId: id, supplierName: name),
+    );
+  }
 
   @override
   State<SupplierDetailsScreen> createState() => _SupplierDetailsScreenState();
@@ -48,138 +58,266 @@ class _SupplierDetailsScreenState extends State<SupplierDetailsScreen> {
     }
   }
 
+  Future<void> _printStatement() async {
+    setState(() => _isLoading = true);
+    try {
+      final company = await _db.getCompanyInfo();
+      final headers = [
+        tr('suppliers.details.pdf.date'),
+        tr('suppliers.details.pdf.description'),
+        tr('suppliers.details.pdf.financial_item'),
+        tr('suppliers.details.pdf.total_value'),
+      ];
+
+      final data = _transactions.map((tx) {
+        final isOut = tx['direction'] == 'out';
+        return [
+          tx['date'] ?? '',
+          tx['type'] ?? '',
+          isOut ? tr('suppliers.details.new_purchase') : tr('suppliers.details.pay_action'),
+          "${isOut ? '-' : '+'}${tx['amount']}",
+        ];
+      }).toList();
+
+      final summaryItems = [
+        {'label': tr('suppliers.details.total_debt'), 'value': _summary['balance']?.toStringAsFixed(2) ?? '0.00'},
+        {'label': tr('suppliers.details.overdue_invoices'), 'value': _summary['overdue']?.toStringAsFixed(2) ?? '0.00'},
+      ];
+
+      await UnifiedPdfExportService.generateModuleReport(
+        title: "${tr('suppliers.details.statement')}: ${widget.supplierName}",
+        headers: headers,
+        data: data,
+        company: company,
+        summaryItems: summaryItems,
+        isArabic: context.locale.languageCode == 'ar',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${tr('common.error')}: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _showPaymentDialog() {
     final amountController = TextEditingController();
     final notesController = TextEditingController();
     String selectedAccount = 'ACC_CASH';
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: context.bgSurface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.cardRadius)),
-          title: Text(tr('suppliers.details.register_payment'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: tr('suppliers.details.payment_amount'),
-                  prefixIcon: const Icon(Icons.payments_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Container(
+            width: 500,
+            padding: EdgeInsets.all(context.cardPadding * 2),
+            decoration: BoxDecoration(
+              color: context.isDark ? const Color(0xFF1A1A1F) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: context.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, 10)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  Text(tr('suppliers.details.register_payment'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize + 2, color: context.textColor)),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: context.textColor),
+                    decoration: InputDecoration(
+                      labelText: tr('suppliers.details.payment_amount'),
+                      prefixIcon: const Icon(Icons.payments_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedAccount,
+                    decoration: InputDecoration(
+                      labelText: tr('suppliers.details.payment_account'),
+                      prefixIcon: const Icon(Icons.account_balance_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    dropdownColor: context.bgSurface,
+                    style: TextStyle(color: context.textColor),
+                    items: [
+                      DropdownMenuItem(value: 'ACC_CASH', child: Text(tr('accounts.cash'))),
+                      DropdownMenuItem(value: 'ACC_BANK', child: Text(tr('accounts.bank'))),
+                    ],
+                    onChanged: (val) => setDialogState(() => selectedAccount = val!),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: notesController,
+                    style: TextStyle(color: context.textColor),
+                    decoration: InputDecoration(
+                      labelText: tr('suppliers.details.notes'),
+                      prefixIcon: const Icon(Icons.note_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text(tr('common.cancel')),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final amount = double.tryParse(amountController.text) ?? 0;
+                          if (amount <= 0) return;
+                          
+                          Navigator.pop(ctx);
+                          setState(() => _isLoading = true);
+                          
+                          try {
+                            await _db.registerSupplierPayment(
+                              widget.supplierId,
+                              amount,
+                              DateTime.now().toIso8601String(),
+                              selectedAccount,
+                            );
+                            await _loadData();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(tr('suppliers.details.payment_success')), backgroundColor: Colors.green),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("${tr('suppliers.details.payment_error')}: $e"), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.check, color: Colors.black),
+                        label: Text(tr('suppliers.details.confirm_payment'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, padding: const EdgeInsets.symmetric(vertical: 12)),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedAccount,
-                decoration: InputDecoration(
-                  labelText: tr('suppliers.details.from_account'),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                dropdownColor: context.bgSurface,
-                items: [
-                  DropdownMenuItem(value: 'ACC_CASH', child: Text(tr('suppliers.details.cash_account'))),
-                  DropdownMenuItem(value: 'ACC_BANK_1', child: Text(tr('suppliers.details.bank_1'))),
-                  DropdownMenuItem(value: 'ACC_BANK_2', child: Text(tr('suppliers.details.bank_2'))),
-                ],
-                onChanged: (val) => setDialogState(() => selectedAccount = val!),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: notesController,
-                decoration: InputDecoration(
-                  labelText: tr('suppliers.details.notes'),
-                  prefixIcon: const Icon(Icons.note_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(tr('common.cancel')),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text) ?? 0;
-                if (amount <= 0) return;
-                
-                Navigator.pop(ctx);
-                setState(() => _isLoading = true);
-                
-                try {
-                  await _db.registerSupplierPayment(
-                    supplierId: widget.supplierId,
-                    amount: amount,
-                    paymentAccountId: selectedAccount,
-                    notes: notesController.text.isNotEmpty ? notesController.text : null,
-                  );
-                  await _loadData();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(tr('suppliers.details.payment_success')), backgroundColor: Colors.green),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    setState(() => _isLoading = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("${tr('suppliers.details.payment_error')}: $e"), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.check, color: Colors.black),
-              label: Text(tr('suppliers.details.confirm_payment'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryOrange),
-            ),
-          ],
         ),
       ),
+    ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(widget.supplierName),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: primaryOrange))
-        : SingleChildScrollView(
-            padding: EdgeInsets.all(context.sectionPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSummaryCards(),
-                const SizedBox(height: 16),
-                _buildAgingAnalysis(),
-                const SizedBox(height: 16),
-                _buildActionButtons(),
-                const SizedBox(height: 16),
-                Text(tr('suppliers.details.statement'), style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _buildTransactionList(),
-              ],
-            ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        width: 800,
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+        decoration: BoxDecoration(
+          color: context.isDark ? const Color(0xFF0F0F12) : Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: context.cardBorder),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 40, offset: const Offset(0, 10)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(widget.supplierName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor)),
+                    IconButton(icon: Icon(Icons.close, color: context.mutedText), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              
+              Expanded(
+                child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: primaryOrange))
+                : SingleChildScrollView(
+                    padding: EdgeInsets.all(context.sectionPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildOverdueAlert(),
+                        _buildSummaryCards(),
+                        const SizedBox(height: 16),
+                        _buildSupplierInfo(),
+                        _buildAgingAnalysis(),
+                        const SizedBox(height: 16),
+                        _buildActionButtons(),
+                        const SizedBox(height: 24),
+                        Text(tr('suppliers.details.statement'), style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold, color: context.textColor)),
+                        const SizedBox(height: 12),
+                        _buildTransactionList(),
+                      ],
+                    ),
+                  ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
   Widget _buildSummaryCards() {
-    return Row(
+    return Column(
       children: [
-        _buildStatCard(tr('suppliers.details.total_debt'), "${_summary['balance']?.toStringAsFixed(2) ?? '0.00'}", Colors.redAccent, Icons.account_balance_wallet),
-        const SizedBox(width: 8),
-        _buildStatCard(tr('suppliers.details.overdue_invoices'), "${_summary['overdue']?.toStringAsFixed(2) ?? '0.00'}", Colors.orangeAccent, Icons.error_outline),
+        Row(
+          children: [
+            _buildStatCard(tr('suppliers.details.total_debt'), "${_summary['balance']?.toStringAsFixed(2) ?? '0.00'}", Colors.redAccent, Icons.account_balance_wallet),
+            const SizedBox(width: 8),
+            _buildStatCard(tr('suppliers.details.overdue_invoices'), "${_summary['overdue']?.toStringAsFixed(2) ?? '0.00'}", Colors.orangeAccent, Icons.error_outline),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildStatCard(tr('suppliers.details.total_paid_title'), "${_summary['total_paid']?.toStringAsFixed(2) ?? '0.00'}", Colors.greenAccent, Icons.check_circle_outline),
+          ],
+        ),
       ],
     );
   }
@@ -312,16 +450,7 @@ class _SupplierDetailsScreenState extends State<SupplierDetailsScreen> {
         Container(
           decoration: BoxDecoration(color: context.cardSurface, border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(context.cardRadius)),
           child: IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('جاري تصدير كشف حساب ${widget.supplierName} إلى PDF...'),
-                  backgroundColor: primaryOrange,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
-            },
+            onPressed: _printStatement,
             icon: Icon(Icons.print_outlined, size: context.iconSize),
             padding: const EdgeInsets.all(8),
             constraints: const BoxConstraints(),
@@ -364,7 +493,13 @@ class _SupplierDetailsScreenState extends State<SupplierDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(tx['type'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)),
-                    Text(tx['date'] ?? '', style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 2)),
+                    Row(
+                      children: [
+                        Text("${tr('suppliers.details.id')}: ${tx['id']}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
+                        const SizedBox(width: 8),
+                        Text(tx['date']?.toString().split('T')[0] ?? '', style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -376,6 +511,69 @@ class _SupplierDetailsScreenState extends State<SupplierDetailsScreen> {
           ),
         );
       },
+    );
+  }
+  Widget _buildOverdueAlert() {
+    final double overdue = _summary['overdue'] ?? 0;
+    if (overdue <= 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              tr('suppliers.details.overdue_alert'),
+              style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+          Text(
+            "${overdue.toStringAsFixed(2)}",
+            style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplierInfo() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(context.cardPadding),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(context.cardRadius),
+        border: Border.all(color: context.cardBorder.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          _buildInfoRow(Icons.phone_outlined, tr('suppliers.contact_label'), _summary['contact_info'] ?? '-'),
+          const Divider(height: 16),
+          _buildInfoRow(Icons.receipt_outlined, tr('suppliers.details.tax_id'), _summary['tax_id'] ?? '-'),
+          const Divider(height: 16),
+          _buildInfoRow(Icons.history_outlined, tr('suppliers.details.last_payment'), _summary['last_payment_date']?.toString().split('T')[0] ?? '-'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: context.mutedText),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 3)),
+        const Spacer(),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.bodySize - 2)),
+      ],
     );
   }
 }

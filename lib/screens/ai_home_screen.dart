@@ -34,16 +34,7 @@ class _AiHomeScreenState extends State<AiHomeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.auto_awesome, size: 80, color: Colors.white12),
-                  const SizedBox(height: 16),
-                  Text(
-                    tr('screens.ai_welcome'), 
-                    style: TextStyle(
-                      color: context.mutedText, 
-                      fontSize: 16, 
-                      letterSpacing: 1.2
-                    )
-                  ),
+                  const SizedBox.shrink(),
                 ],
               ),
             ),

@@ -48,22 +48,37 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
     final TextEditingController contactController = TextEditingController();
     final TextEditingController taxIdController = TextEditingController();
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.of(context).viewInsets.bottom + 24),
           child: Container(
+            width: 500,
             padding: EdgeInsets.all(context.cardPadding * 1.5),
             decoration: BoxDecoration(
-              color: context.obsidianGlass,
-              borderRadius: BorderRadius.circular(context.cardRadius),
+              color: context.isDark ? const Color(0xFF1A1A1F) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
               border: Border.all(color: context.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, 10)),
+              ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -137,13 +152,14 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
                     child: const Text("حفظ", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -196,68 +212,52 @@ class _SuppliersDirectoryScreenState extends State<SuppliersDirectoryScreen> {
               itemBuilder: (context, index) {
                 final s = _suppliers[index];
                 return InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context, 
-                      MaterialPageRoute(
-                        builder: (context) => SupplierDetailsScreen(
-                          supplierId: s['id'], 
-                          supplierName: s['name'],
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => SupplierDetailsScreen.show(context, s['id'], s['name']),
                   borderRadius: BorderRadius.circular(context.cardRadius),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(context.cardRadius),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: EdgeInsets.all(context.cardPadding),
-                        decoration: BoxDecoration(
-                          color: context.cardSurface,
-                          borderRadius: BorderRadius.circular(context.cardRadius),
-                          border: Border.all(color: context.cardBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Container(
+                    padding: EdgeInsets.all(context.cardPadding),
+                    decoration: BoxDecoration(
+                      color: context.cardSurface,
+                      borderRadius: BorderRadius.circular(context.cardRadius),
+                      border: Border.all(color: context.cardBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(color: Colors.pink.withValues(alpha: 0.2), shape: BoxShape.circle),
+                              child: Icon(Icons.business, color: Colors.pink, size: context.iconSize),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(s['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize), maxLines: 1),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(color: Colors.pink.withValues(alpha: 0.2), shape: BoxShape.circle),
-                                  child: Icon(Icons.business, color: Colors.pink, size: context.iconSize),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(s['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize), maxLines: 1),
-                                ),
+                                Text(tr('suppliers.supplier_balance'), style: TextStyle(color: context.mutedText, fontSize: 10)),
+                                Text("${s['balance'] ?? 0} ${tr('onboarding.currency_hint')}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize + 1, color: Colors.redAccent)),
                               ],
                             ),
-                            const Spacer(),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(tr('suppliers.supplier_balance'), style: TextStyle(color: context.mutedText, fontSize: 10)),
-                                    Text("${s['balance'] ?? 0} ${tr('onboarding.currency_hint')}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize + 1, color: Colors.redAccent)),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(tr('suppliers.contact_label'), style: TextStyle(color: context.mutedText, fontSize: 10)),
-                                    Text("${s['contact_info'] ?? '-'}", style: TextStyle(fontSize: context.bodySize - 1)),
-                                  ],
-                                )
+                                Text(tr('suppliers.contact_label'), style: TextStyle(color: context.mutedText, fontSize: 10)),
+                                Text("${s['contact_info'] ?? '-'}", style: TextStyle(fontSize: context.bodySize - 1)),
                               ],
                             )
                           ],
-                        ),
-                      ),
+                        )
+                      ],
                     ),
                   ),
                 );

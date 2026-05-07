@@ -81,10 +81,33 @@ class SyncService with ChangeNotifier {
     'commissions',
     'job_applications',
     'system_users',
+    'roles',
     'security_audit',
     'performance_reviews',
     'employee_contracts',
+    'currency_rates',
+    'fiscal_years',
+    'recurring_transactions',
+    'quotations',
+    'quotation_lines',
+    'receipt_vouchers',
+    'payment_vouchers',
+    'credit_notes',
   ];
+
+  /// Columns that exist only in local SQLite but not in Supabase.
+  /// These must be stripped before uploading to avoid PostgrestException.
+  static const Map<String, List<String>> _localOnlyColumns = {
+    'items': ['amount'],
+    'companies': ['is_multi_branch'],
+    'journal_entries': ['branch_id'],
+    'journal_entry_lines': ['branch_id'],
+    'purchase_invoices': ['branch_id'],
+    'system_users': ['branch_id'],
+    'cost_centers': ['branch_id'],
+    'budgets': ['branch_id'],
+    'invoices': ['branch_id'],
+  };
 
   /// Performs incremental sync: pushes dirty records to Supabase,
   /// then pulls remote changes.
@@ -98,6 +121,9 @@ class SyncService with ChangeNotifier {
       final db = await _dbHelper.database;
       final String deviceId = await _dbHelper.getDeviceFingerprint();
       final String lastSync = await _dbHelper.getLastSyncTimestamp();
+
+      final currentCompanyContext = await _dbHelper.getCurrentCompanyContext();
+      final String currentCompanyId = currentCompanyContext?['company_id'] ?? 'default_company';
 
       // UPLOAD: Push all dirty records (sync_status = 0) to Supabase
       // Process in batches of 5 to avoid overwhelming the connection
@@ -114,7 +140,7 @@ class SyncService with ChangeNotifier {
 
             final dirtyRecords = await db.query(
               table,
-              where: 'sync_status = ?',
+              where: 'sync_status = ? AND (is_deleted IS NULL OR is_deleted = 0)',
               whereArgs: [0],
             );
 
@@ -122,6 +148,16 @@ class SyncService with ChangeNotifier {
               final cleanRecords = dirtyRecords.map((r) {
                 final clean = Map<String, dynamic>.from(r);
                 clean.remove('sync_status');
+                // Remove local-only columns that don't exist in Supabase
+                final localOnly = _localOnlyColumns[table];
+                if (localOnly != null) {
+                  for (final col in localOnly) {
+                    clean.remove(col);
+                  }
+                }
+                if (table != 'companies' && table != 'system_users' && table != 'sync_queue') {
+                   clean['company_id'] = currentCompanyId;
+                }
                 return clean;
               }).toList();
 
@@ -129,12 +165,14 @@ class SyncService with ChangeNotifier {
 
               // Mark as synced locally
               for (final record in dirtyRecords) {
-                await db.update(
-                  table,
-                  {'sync_status': 1},
-                  where: 'id = ?',
-                  whereArgs: [record['id']],
-                );
+                if (record['id'] != null) {
+                  await db.update(
+                    table,
+                    {'sync_status': 1},
+                    where: 'id = ?',
+                    whereArgs: [record['id']],
+                  );
+                }
               }
             }
           } catch (e) {
@@ -149,18 +187,27 @@ class SyncService with ChangeNotifier {
         final batch = _syncTables.sublist(i, i + 8 > _syncTables.length ? _syncTables.length : i + 8);
         await Future.wait(batch.map((table) async {
           try {
+            final isGlobalTable = table == 'companies' || table == 'system_users';
+            final tablesWithCreatedAtOnly = ['currency_rates', 'fiscal_years', 'quotation_lines'];
             final remoteUpdates = await _supabaseService.fetchUpdates(
               table,
               lastSync,
               deviceId,
+              companyId: isGlobalTable ? null : currentCompanyId,
+              timestampColumn: tablesWithCreatedAtOnly.contains(table) ? 'created_at' : 'updated_at',
             ).timeout(const Duration(seconds: 15));
 
             if (remoteUpdates.isNotEmpty) {
               for (final remote in remoteUpdates) {
+                final localRecord = Map<String, dynamic>.from(remote);
+                // Remove remote company_id before inserting locally as SQLite schema might not have it
+                if (!isGlobalTable) {
+                  localRecord.remove('company_id');
+                }
                 // Ensure table has sync columns before insertion
                 await db.insert(
                   table,
-                  {...remote, 'sync_status': 1},
+                  {...localRecord, 'sync_status': 1},
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
               }

@@ -93,7 +93,7 @@ class DesktopMenuBar extends StatelessWidget {
           label: 'مساعدة',
           menus: [
             PlatformMenuItem(
-              label: 'الذكاء المالي (HBASSS)',
+              label: 'الذكاء المالي (المساعد الذكي)',
               shortcut: const SingleActivator(LogicalKeyboardKey.space, control: true, shift: true),
               onSelected: () {},
             ),

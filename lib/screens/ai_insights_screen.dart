@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme_extension.dart';
 import '../services/ai_forecasting_service.dart';
+import 'package:easy_localization/easy_localization.dart';
+import '../core/config/app_constants.dart';
 
 class AiInsightsScreen extends StatefulWidget {
   const AiInsightsScreen({super.key});
@@ -54,14 +56,14 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, color: primaryOrange, size: context.iconSize + 4),
+              Icon(Icons.auto_awesome, color: AppConstants.primaryOrange, size: context.iconSize + 4),
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("ملخص الذكاء الاصطناعي", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 2)),
+                  Text("ai.insights_summary".tr(), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 2)),
                   const SizedBox(height: 2),
-                  Text("تحليل ذكي للأداء", style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
+                  Text("ai.insights_performance".tr(), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -72,8 +74,8 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
           if (_cashFlowData != null)
             _buildInsightCard(
               context,
-              "توقعات السيولة (٣٠ يوم)",
-              _cashFlowData!['warning_message'] ?? "السيولة المتوقعة تبدو مستقرة.",
+              "ai.liquidity_prediction".tr(),
+              _cashFlowData!['warning_message'] ?? "ai.liquidity_stable".tr(),
               _cashFlowData!['is_healthy'] ? Icons.account_balance_wallet : Icons.warning_amber_rounded,
               _cashFlowData!['is_healthy'] ? Colors.green : Colors.orange,
             ),
@@ -86,8 +88,8 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
               children: [
                 _buildInsightCard(
                   context,
-                  "تنبيه المخزون: ${alert['item_name']}",
-                  "المخزون سينفد خلال ${alert['days_left']} أيام بناءً على معدل الاستهلاك الحالي.",
+                  "${"inventory.stock_alert".tr()}: ${alert['item_name']}",
+                  "ai.stock_depletion_warning".tr(args: [alert['days_left'].toString()]),
                   Icons.inventory_2_outlined,
                   alert['severity'] == 'critical' ? Colors.redAccent : Colors.orangeAccent,
                 ),
@@ -97,7 +99,7 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
 
           const SizedBox(height: 16),
           Text(
-            "توصيات ذكية",
+            "ai.smart_recommendations".tr(),
             style: TextStyle(fontSize: context.subHeaderSize, fontWeight: FontWeight.bold, color: context.textColor),
           ),
           const SizedBox(height: 12),
@@ -112,18 +114,18 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
             children: [
               _buildRecommendation(
                 context,
-                "تحسين التدفق النقدي",
+                "ai.optimize_cashflow".tr(),
                 _cashFlowData!['is_healthy'] 
-                  ? "السيولة جيدة، ينصح باستثمار الفائض في أصول قصيرة الأجل."
-                  : "ينصح بتقليل المصاريف غير الضرورية أو تقديم خصومات للعملاء لتحصيل الديون.",
+                  ? "ai.cashflow_good_hint".tr()
+                  : "ai.cashflow_bad_hint".tr(),
                 Icons.lightbulb,
               ),
               _buildRecommendation(
                 context,
-                "إعادة طلب المخزون",
+                "ai.reorder_stock".tr(),
                 _stockAlerts.isEmpty 
-                  ? "مستويات المخزون مستقرة حالياً."
-                  : "هناك أصناف تقترب من النفاذ، يرجى مراجعة طلبات الشراء.",
+                  ? "ai.stock_stable_hint".tr()
+                  : "ai.stock_depleting_hint".tr(),
                 Icons.shopping_cart,
               ),
             ],
@@ -188,7 +190,7 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: primaryOrange, size: context.iconSize),
+          Icon(icon, color: AppConstants.primaryOrange, size: context.iconSize),
           const SizedBox(height: 12),
           Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize)),
           const SizedBox(height: 4),

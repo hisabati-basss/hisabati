@@ -135,59 +135,73 @@ class _PaymentVoucherScreenState extends State<PaymentVoucherScreen> with Single
     // Using a reddish shade to differentiate Payment from Receipt
     Color primaryVoucherColor = Colors.redAccent;
     
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Scaffold(
-          backgroundColor: context.obsidianGlass,
-          appBar: PreferredSize(
-            preferredSize: Size.fromHeight(100 + context.headerSize),
-            child: Container(
-              padding: EdgeInsets.fromLTRB(context.cardPadding, 8, context.cardPadding, 0),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900.withValues(alpha: 0.7),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: PreferredSize(
+                preferredSize: Size.fromHeight(110 + context.headerSize),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(context.cardPadding, 8, context.cardPadding, 0),
+                  child: Column(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Container(
+                        width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2)),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(tr('accounting_module.tabs.financial_position'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
-                          Text(tr('vouchers.payment.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: primaryVoucherColor)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(tr('accounting_module.tabs.financial_position'), style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
+                              Text(tr('vouchers.payment.title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold, color: primaryVoucherColor)),
+                            ],
+                          ),
+                          IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, color: context.mutedText)),
                         ],
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(Icons.close, color: context.mutedText),
+                      TabBar(
+                        controller: _tabController,
+                        indicatorColor: primaryVoucherColor, labelColor: primaryVoucherColor, unselectedLabelColor: context.mutedText,
+                        indicatorSize: TabBarIndicatorSize.label, dividerColor: Colors.transparent,
+                        labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold),
+                        tabs: [
+                          Tab(text: tr('vouchers.payment.new_tab'), height: 28),
+                          Tab(text: tr('vouchers.payment.history_tab'), height: 28),
+                        ],
                       ),
                     ],
                   ),
-              TabBar(
+                ),
+              ),
+              body: TabBarView(
                 controller: _tabController,
-                indicatorColor: primaryVoucherColor,
-                labelColor: primaryVoucherColor,
-                unselectedLabelColor: context.mutedText,
-                indicatorSize: TabBarIndicatorSize.label,
-                dividerColor: Colors.transparent,
-                labelStyle: TextStyle(fontSize: context.bodySize - 2, fontWeight: FontWeight.bold),
-                tabs: [
-                  Tab(text: tr('vouchers.payment.new_tab'), height: 28),
-                  Tab(text: tr('vouchers.payment.history_tab'), height: 28),
+                children: [
+                  _buildNewVoucherTab(isDark, primaryVoucherColor),
+                  _buildHistoryTab(isDark, primaryVoucherColor),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildNewVoucherTab(isDark, primaryVoucherColor),
-          _buildHistoryTab(isDark, primaryVoucherColor),
-        ],
-      ),
-    )));
+    );
   }
 
   Widget _buildNewVoucherTab(bool isDark, Color primaryColor) {
@@ -252,8 +266,9 @@ class _PaymentVoucherScreenState extends State<PaymentVoucherScreen> with Single
                       labelText: tr('vouchers.payment.amount_label'),
                       labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
                       filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      fillColor: Colors.black.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
                       prefixIcon: Icon(Icons.payments_outlined, color: primaryColor),
                       suffixText: _currency,
                     ),
@@ -315,9 +330,10 @@ class _PaymentVoucherScreenState extends State<PaymentVoucherScreen> with Single
                       labelText: tr('vouchers.payment.notes_label'),
                       labelStyle: TextStyle(color: context.mutedText, fontSize: 13),
                       filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.notes),
+                      fillColor: Colors.black.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                      prefixIcon: const Icon(Icons.notes, color: Colors.white54),
                     ),
                   ),
                 ],

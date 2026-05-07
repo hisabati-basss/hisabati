@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'package:desktop_webview_auth/desktop_webview_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SupabaseOAuthArgs extends ProviderArgs {
   final String supabaseHost;
@@ -153,7 +154,7 @@ class AuthService {
   }
 
   /// Performs Email & Password Sign-In for Employees (Virtual Accounts)
-  Future<AuthResponse> signInWithEmailAndPassword(String email, String password) async {
+  Future<AuthResponse> signInWithEmailAndPassword(String email, String password, {String? tenantId}) async {
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email,
@@ -187,6 +188,14 @@ class AuthService {
     if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
       try { await GoogleSignIn().signOut(); } catch (_) {}
     }
+    
+    // Clear local session data
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    await prefs.remove('user_id');
+    await prefs.remove('company_id');
+    await prefs.remove('user_role');
+    
     await _supabase.auth.signOut();
   }
 

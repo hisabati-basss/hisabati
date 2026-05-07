@@ -9,6 +9,7 @@ import '../../services/email_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_admin_service.dart';
 import '../../services/payroll_service.dart';
+import '../../services/shift_service.dart';
 
 class EmployeeForm extends StatefulWidget {
   final Map<String, dynamic>? employee;
@@ -31,6 +32,7 @@ class EmployeeForm extends StatefulWidget {
 class _EmployeeFormState extends State<EmployeeForm> {
   final _formKey = GlobalKey<FormState>();
   final PayrollService _payrollService = PayrollService();
+  final ShiftService _shiftService = ShiftService();
   
   late TextEditingController _nameController;
   late TextEditingController _jobTitleController;
@@ -49,6 +51,8 @@ class _EmployeeFormState extends State<EmployeeForm> {
   DateTime? _passExpiry;
   DateTime? _hireDate;
   String? _selectedCC;
+  String? _selectedShiftId;
+  List<Map<String, dynamic>> _shifts = [];
   late String _selectedNationality;
 
   final Map<String, dynamic> _validationRules = {
@@ -92,10 +96,17 @@ class _EmployeeFormState extends State<EmployeeForm> {
       _selectedNationality = rawNat;
     }
     
-    // Safety check: if after healing it's still not in the rules, default to Saudi key
     if (!_validationRules.containsKey(_selectedNationality)) {
       _selectedNationality = "hr.nationalities.saudi";
     }
+    
+    _selectedShiftId = emp?['shift_id']?.toString();
+    _loadShifts();
+  }
+
+  Future<void> _loadShifts() async {
+    final shifts = await _shiftService.getShifts();
+    if (mounted) setState(() => _shifts = shifts);
   }
 
   @override
@@ -236,6 +247,8 @@ class _EmployeeFormState extends State<EmployeeForm> {
           const Divider(color: Colors.white10, height: 32),
           _buildFormField(tr('hr.form.fields.insurance_number'), _insuranceNumberController, Icons.verified_user_outlined, required: false),
           _buildFormField(tr('hr.form.fields.emergency_phone'), _emergencyPhoneController, Icons.support_agent_rounded, required: false),
+          const SizedBox(height: 16),
+          _buildShiftDropdown(),
         ],
       ),
     );
@@ -273,6 +286,23 @@ class _EmployeeFormState extends State<EmployeeForm> {
         items: _validationRules.keys.map((nat) => DropdownMenuItem(value: nat, child: Text(tr(nat)))).toList(),
         onChanged: (v) => setState(() => _selectedNationality = v!),
       ),
+    );
+  }
+
+  Widget _buildShiftDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _selectedShiftId,
+      decoration: InputDecoration(
+        labelText: tr('hr.form.fields.shift'),
+        prefixIcon: const Icon(Icons.timer_outlined, color: primaryOrange),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.03),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+      dropdownColor: const Color(0xFF1A1A1A),
+      style: const TextStyle(color: Colors.white),
+      items: _shifts.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name']?.toString() ?? '', style: const TextStyle(fontSize: 13)))).toList(),
+      onChanged: (val) => setState(() => _selectedShiftId = val),
     );
   }
 
@@ -333,6 +363,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
       'personal_email': _personalEmailController.text,
       'hiring_date': _hireDate?.toIso8601String(),
       'cost_center_id': _selectedCC,
+      'shift_id': _selectedShiftId,
       'sync_status': 0,
       'updated_at': DateTime.now().toIso8601String(),
     };

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme_extension.dart';
 
@@ -6,12 +7,14 @@ class AiChatBubble extends StatelessWidget {
   final String text;
   final bool isUser;
   final String? attachmentName;
+  final DateTime? timestamp;
 
   const AiChatBubble({
     super.key,
     required this.text,
     required this.isUser,
     this.attachmentName,
+    this.timestamp,
   });
 
   @override
@@ -85,10 +88,10 @@ class AiChatBubble extends StatelessWidget {
             ),
           ),
           
-          // Timestamp (Dummy for now)
+          // Timestamp
           const SizedBox(height: 4),
           Text(
-            "العاشرة مساءً", // Timestamp placeholder
+            timestamp != null ? DateFormat('HH:mm').format(timestamp!) : '',
             style: TextStyle(
               fontSize: 10,
               color: context.mutedText.withValues(alpha: 0.5),

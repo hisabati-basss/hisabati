@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../theme/app_theme_extension.dart';
@@ -11,189 +12,302 @@ class AffiliateScreen extends StatefulWidget {
 
 class _AffiliateScreenState extends State<AffiliateScreen> with SingleTickerProviderStateMixin {
   final DatabaseHelper _db = DatabaseHelper();
-  late TabController _tabController;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _affiliates = [];
-  List<Map<String, dynamic>> _referrals = [];
-  double _totalEarnings = 0;
+  List<Map<String, dynamic>> _clients = [];
+  String _searchQuery = "";
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
-
-  @override
-  void dispose() { _tabController.dispose(); super.dispose(); }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final db = await _db.database;
-      // Check if tables exist, create if not
-      await db.execute('''CREATE TABLE IF NOT EXISTS affiliates (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT,
-        referral_code TEXT UNIQUE, commission_rate REAL DEFAULT 0.1,
-        total_sales REAL DEFAULT 0, total_earned REAL DEFAULT 0,
-        status TEXT DEFAULT 'active', created_at TEXT
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS affiliate_referrals (
-        id TEXT PRIMARY KEY, affiliate_id TEXT, invoice_id TEXT,
-        amount REAL DEFAULT 0, commission REAL DEFAULT 0,
-        status TEXT DEFAULT 'pending', created_at TEXT,
-        FOREIGN KEY (affiliate_id) REFERENCES affiliates(id)
-      )''');
-
-      _affiliates = (await db.query('affiliates', orderBy: 'total_earned DESC')).map((a) => Map<String, dynamic>.from(a)).toList();
-      _referrals = (await db.rawQuery('''
-        SELECT ar.*, af.name as affiliate_name FROM affiliate_referrals ar
-        LEFT JOIN affiliates af ON ar.affiliate_id = af.id
-        ORDER BY ar.created_at DESC LIMIT 50
-      ''')).map((r) => Map<String, dynamic>.from(r)).toList();
-      _totalEarnings = _affiliates.fold<double>(0, (s, a) => s + ((a['total_earned'] as num?)?.toDouble() ?? 0));
-    } catch (e) { debugPrint("Affiliate: $e"); }
-    if (mounted) setState(() => _isLoading = false);
+      final clients = await _db.getClients();
+      setState(() {
+        _clients = clients;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Clients Error: $e");
+      setState(() => _isLoading = false);
+    }
   }
 
   void _showAddDialog() {
     final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    final rateCtrl = TextEditingController(text: "10");
+    final emailCtrl = TextEditingController();
+    final vatCtrl = TextEditingController();
+    final commissionRateCtrl = TextEditingController(text: "0");
+    final addressCtrl = TextEditingController();
 
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: context.cardSurface.withValues(alpha: 0.95),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(tr('affiliate.add_partner_title'), style: const TextStyle(fontWeight: FontWeight.bold)),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _input(nameCtrl, tr('affiliate.name_req')),
-        const SizedBox(height: 8),
-        _input(emailCtrl, tr('affiliate.email')),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: _input(phoneCtrl, tr('affiliate.phone'))),
-          const SizedBox(width: 8),
-          Expanded(child: _input(rateCtrl, tr('affiliate.commission_rate_label'), isNum: true)),
-        ]),
-      ])),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text("إلغاء", style: TextStyle(color: context.mutedText))),
-        ElevatedButton(
-          onPressed: () async {
-            if (nameCtrl.text.trim().isEmpty) return;
-            final db = await _db.database;
-            final code = "AFF${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}";
-            await db.insert('affiliates', {
-              'id': 'AFF_${DateTime.now().millisecondsSinceEpoch}',
-              'name': nameCtrl.text.trim(),
-              'email': emailCtrl.text.trim(),
-              'phone': phoneCtrl.text.trim(),
-              'referral_code': code,
-              'commission_rate': (double.tryParse(rateCtrl.text) ?? 10) / 100,
-              'status': 'active',
-              'created_at': DateTime.now().toIso8601String(),
-            });
-            if (mounted) { Navigator.pop(ctx); _loadData(); }
-          },
-          style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black87),
-          child: const Text("حفظ"),
+    showDialog(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24), 
+            side: const BorderSide(color: Colors.white10),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: primaryOrange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.person_add_rounded, color: primaryOrange),
+              ),
+              const SizedBox(width: 12),
+              const Text("إضافة عميل جديد", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildField(nameCtrl, "اسم العميل الكامل", Icons.person_outline),
+                const SizedBox(height: 12),
+                _buildField(phoneCtrl, "رقم الجوال", Icons.phone_android_outlined, isPhone: true),
+                const SizedBox(height: 12),
+                _buildField(emailCtrl, "البريد الإلكتروني", Icons.email_outlined),
+                const SizedBox(height: 12),
+                _buildField(vatCtrl, "الرقم الضريبي (إن وجد)", Icons.description_outlined),
+                const SizedBox(height: 12),
+                _buildField(commissionRateCtrl, "نسبة العمولة (%) - إذا كان شريكاً", Icons.percent_rounded, isPhone: true),
+                const SizedBox(height: 12),
+                _buildField(addressCtrl, "العنوان بالتفصيل", Icons.location_on_outlined),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text("إلغاء", style: TextStyle(color: context.mutedText)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty) return;
+                final db = await _db.database;
+                await db.insert('clients', {
+                  'id': 'CL_${DateTime.now().millisecondsSinceEpoch}',
+                  'name': nameCtrl.text.trim(),
+                  'phone': phoneCtrl.text.trim(),
+                  'email': emailCtrl.text.trim(),
+                  'tax_id': vatCtrl.text.trim(),
+                  'balance': (double.tryParse(commissionRateCtrl.text) ?? 0.0) / 100, // Re-purposing balance as commission rate for simple storage or using a dedicated column
+                  'address': addressCtrl.text.trim(),
+                  'updated_at': DateTime.now().toIso8601String(),
+                  'sync_status': 0,
+                  'is_deleted': 0,
+                });
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  _loadData();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("تمت إضافة العميل بنجاح"), backgroundColor: Colors.green),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryOrange,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                elevation: 0,
+              ),
+              child: const Text("حفظ العميل", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-      ],
-    ));
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController ctrl, String hint, IconData icon, {bool isPhone = false}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+        prefixIcon: Icon(icon, color: primaryOrange.withValues(alpha: 0.7), size: 20),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.03),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filteredClients = _clients.where((c) => 
+      c['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      c['phone'].toString().contains(_searchQuery)
+    ).toList();
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(context.sectionPadding, 8, context.sectionPadding, 0),
-          child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr('affiliate.program_title'), style: TextStyle(fontSize: context.headerSize, fontWeight: FontWeight.bold)),
-              Text("${_affiliates.length} ${tr('affiliate.partner_count_label')} • ${tr('affiliate.total_commissions_label')}: ${_totalEarnings.toStringAsFixed(0)}", style: TextStyle(color: context.mutedText, fontSize: context.bodySize - 1)),
-            ])),
-            GestureDetector(onTap: _showAddDialog, child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.person_add, size: 14, color: Colors.black87), const SizedBox(width: 4), Text(tr('affiliate.new_partner_btn'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12))]),
-            )),
-          ]),
-        ),
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 8),
-          decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(8)),
-          child: TabBar(controller: _tabController, isScrollable: false, labelColor: Colors.black87, unselectedLabelColor: context.mutedText,
-            indicator: BoxDecoration(color: primaryOrange, borderRadius: BorderRadius.circular(8)), indicatorSize: TabBarIndicatorSize.tab, dividerColor: Colors.transparent,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1),
-            tabs: [Tab(text: tr('affiliate.tabs.partners')), Tab(text: tr('affiliate.tabs.referrals'))]),
-        ),
-        Expanded(child: _isLoading ? const Center(child: CircularProgressIndicator(color: primaryOrange))
-          : TabBarView(controller: _tabController, children: [_buildAffiliatesTab(), _buildReferralsTab()])),
-      ]),
+      body: Column(
+        children: [
+          _buildHeader(),
+          _buildSearchAndFilters(),
+          Expanded(
+            child: _isLoading 
+              ? const Center(child: CircularProgressIndicator(color: primaryOrange))
+              : _buildClientsList(filteredClients),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAffiliatesTab() {
-    if (_affiliates.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(Icons.people, size: 48, color: context.mutedText.withValues(alpha: 0.2)), const SizedBox(height: 8),
-      Text(tr('affiliate.empty_state'), style: TextStyle(color: context.mutedText)),
-    ]));
-    return ListView.builder(padding: EdgeInsets.all(context.sectionPadding), itemCount: _affiliates.length, itemBuilder: (_, i) {
-      final a = _affiliates[i];
-      final earned = (a['total_earned'] as num?)?.toDouble() ?? 0;
-      final rate = ((a['commission_rate'] as num?)?.toDouble() ?? 0.1) * 100;
-      final status = a['status']?.toString() ?? 'active';
-      return Container(
-        margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: context.cardSurface.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(10), border: Border.all(color: context.cardBorder.withValues(alpha: 0.08))),
-        child: Row(children: [
-          Container(width: 36, height: 36, alignment: Alignment.center,
-            decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Text("${i + 1}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple))),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(a['name']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize)),
-            Text("${tr('affiliate.code_label')}: ${a['referral_code']} • ${tr('affiliate.commission_label')}: ${rate.toInt()}%", style: TextStyle(color: context.mutedText, fontSize: 10)),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text("${earned.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: context.bodySize + 1)),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(color: (status == 'active' ? Colors.green : Colors.red).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-              child: Text(status == 'active' ? "نشط" : "معطل", style: TextStyle(color: status == 'active' ? Colors.green : Colors.red, fontSize: 9, fontWeight: FontWeight.bold))),
-          ]),
-        ]),
-      );
-    });
+  Widget _buildHeader() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(context.sectionPadding, 12, context.sectionPadding, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("دليل العملاء الذكي", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text("إدارة قاعدة بيانات عملائك واحتياجاتهم", style: TextStyle(color: context.mutedText, fontSize: 11)),
+            ],
+          ),
+          ElevatedButton.icon(
+            onPressed: _showAddDialog,
+            icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+            label: const Text("عميل جديد", style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryOrange,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildReferralsTab() {
-    if (_referrals.isEmpty) return Center(child: Text(tr('affiliate.no_referrals'), style: TextStyle(color: context.mutedText)));
-    return ListView.builder(padding: EdgeInsets.all(context.sectionPadding), itemCount: _referrals.length, itemBuilder: (_, i) {
-      final r = _referrals[i];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 4), padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: context.cardSurface.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-        child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(r['affiliate_name']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)),
-            Text("${tr('accounting_module.actions.invoice')}: ${r['invoice_id'] ?? ''} • ${r['created_at']?.toString().substring(0, 10) ?? ''}", style: TextStyle(color: context.mutedText, fontSize: 10)),
-          ])),
-          Text("${((r['commission'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-        ]),
-      );
-    });
+  Widget _buildSearchAndFilters() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.sectionPadding, vertical: 8),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: TextField(
+          onChanged: (val) => setState(() => _searchQuery = val),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: const InputDecoration(
+            hintText: "ابحث باسم العميل أو رقم الجوال...",
+            hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+            prefixIcon: Icon(Icons.search_rounded, color: primaryOrange, size: 18),
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget _input(TextEditingController ctrl, String hint, {bool isNum = false}) => TextField(
-    controller: ctrl, keyboardType: isNum ? TextInputType.number : TextInputType.text,
-    style: TextStyle(color: context.textColor, fontSize: 13),
-    decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: context.mutedText, fontSize: 12),
-      filled: true, fillColor: context.cardSurface.withValues(alpha: 0.3),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
-  );
+  Widget _buildClientsList(List<Map<String, dynamic>> clients) {
+    if (clients.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline_rounded, size: 64, color: context.mutedText.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text("لا يوجد عملاء مسجلين حالياً", style: TextStyle(color: context.mutedText, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: context.sectionPadding),
+      itemCount: clients.length,
+      itemBuilder: (context, index) {
+        final client = clients[index];
+        final bool isDefault = client['id'] == 'CL_DEFAULT';
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDefault ? [Colors.blue, Colors.blue.shade900] : [primaryOrange, Colors.orange.shade900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.white, size: 22),
+                  ),
+                  title: Text(
+                    client['name'] ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 10, color: context.mutedText),
+                          const SizedBox(width: 4),
+                          Text(client['phone'] ?? 'بدون هاتف', style: TextStyle(color: context.mutedText, fontSize: 11)),
+                          const SizedBox(width: 10),
+                          Icon(Icons.location_on, size: 10, color: context.mutedText),
+                          const SizedBox(width: 4),
+                          Text(client['address'] ?? 'بدون عنوان', style: TextStyle(color: context.mutedText, fontSize: 11)),
+                        ],
+                      ),
+                      if (client['tax_id'] != null && client['tax_id'].toString().isNotEmpty)
+                         Padding(
+                           padding: const EdgeInsets.only(top: 2),
+                           child: Text("الرقم الضريبي: ${client['tax_id']}", style: const TextStyle(color: primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+                         ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(Icons.more_vert_rounded, color: context.mutedText, size: 20),
+                    onPressed: () {
+                      // Future: Edit/Delete actions
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

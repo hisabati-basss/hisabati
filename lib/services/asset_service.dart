@@ -1,144 +1,127 @@
+import 'package:flutter/foundation.dart';
 import 'database_helper.dart';
-import 'package:sqflite/sqflite.dart';
 
 class AssetService {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final DatabaseHelper _db = DatabaseHelper();
 
-  /// Calculates Total Cost of Ownership (TCO) for a specific asset.
-  /// TCO = Purchase Price + All Maintenance Costs - Accumulated Depreciation
-  Future<Map<String, double>> getAssetTCO(String assetId) async {
-    final db = await _dbHelper.database;
+  /// Calculates and records depreciation for all assets up to the current date.
+  /// This should be run monthly or upon request.
+  Future<void> runDepreciationCycle() async {
+    final db = await _db.database;
+    final assets = await db.query('assets', where: 'status = ? AND is_deleted = 0', whereArgs: ['active']);
+    final now = DateTime.now();
 
-    // 1. Get Asset Purchase Price
-    final asset = await db.query('assets', where: 'id = ?', whereArgs: [assetId]);
-    if (asset.isEmpty) return {'purchase_price': 0, 'maintenance': 0, 'depreciation': 0, 'nbv': 0};
-    
-    double purchasePrice = (asset.first['cost_price'] as num?)?.toDouble() ?? 0.0;
+    for (var asset in assets) {
+      final purchaseDateStr = asset['purchase_date'] as String?;
+      final lastDepDateStr = asset['last_depreciation_date'] as String?;
+      final costPrice = (asset['cost_price'] as num?)?.toDouble() ?? 0.0;
+      final salvageValue = (asset['salvage_value'] as num?)?.toDouble() ?? 0.0;
+      final usefulLifeMonths = (asset['useful_life_months'] as int?) ?? 60;
+      final method = asset['depreciation_method'] as String? ?? 'straight_line';
 
-    // 2. Get Maintenance Costs
-    final maintenanceRes = await db.rawQuery(
-      'SELECT SUM(total_cost) as total FROM maintenance_schedules WHERE asset_id = ?',
-      [assetId]
-    );
-    double totalMaintenance = (maintenanceRes.first['total'] as num?)?.toDouble() ?? 0.0;
+      if (purchaseDateStr == null || costPrice <= 0) continue;
 
-    // 3. Get Accumulated Depreciation
-    final depRes = await db.rawQuery(
-      'SELECT SUM(amount) as total FROM asset_depreciation_logs WHERE asset_id = ?',
-      [assetId]
-    );
-    double accDepreciation = (depRes.first['total'] as num?)?.toDouble() ?? 0.0;
+      DateTime startDate = lastDepDateStr != null 
+          ? DateTime.parse(lastDepDateStr) 
+          : DateTime.parse(purchaseDateStr);
 
-    // Net Book Value (NBV)
-    double nbv = purchasePrice - accDepreciation;
+      // Calculate months passed since last depreciation
+      int monthsToDepreciate = (now.year - startDate.year) * 12 + now.month - startDate.month;
+      
+      if (monthsToDepreciate <= 0) continue;
 
-    return {
-      'purchase_price': purchasePrice,
-      'maintenance': totalMaintenance,
-      'depreciation': accDepreciation,
-      'nbv': nbv,
-    };
-  }
+      double monthlyDepreciation = 0.0;
+      if (method == 'straight_line') {
+        monthlyDepreciation = (costPrice - salvageValue) / usefulLifeMonths;
+      }
 
-  /// Processes Asset Disposal (Scrap/Sale).
-  /// Generates accounting entries to close the asset account and record gain/loss.
-  Future<void> disposeAsset({
-    required String assetId,
-    required String reason,
-    required double proceeds, // Amount received if sold (0 if scrapped)
-  }) async {
-    final db = await _dbHelper.database;
-    final stats = await getAssetTCO(assetId);
-    final asset = await db.query('assets', where: 'id = ?', whereArgs: [assetId]);
-    final String assetName = asset.first['name'] as String;
-    final String? costCenterId = asset.first['cost_center_id'] as String?;
+      double totalDepreciationForPeriod = monthlyDepreciation * monthsToDepreciate;
 
-    double nbv = stats['nbv']!;
-    double gainLoss = proceeds - nbv;
+      // Ensure we don't depreciate below salvage value
+      final existingDepRes = await db.rawQuery(
+        'SELECT SUM(amount) as total FROM asset_depreciation_logs WHERE asset_id = ?', 
+        [asset['id']]
+      );
+      double alreadyDepreciated = (existingDepRes.first['total'] as num?)?.toDouble() ?? 0.0;
 
-    await db.transaction((txn) async {
-      final String entryId = 'JRN_DISP_${assetId}_${DateTime.now().millisecondsSinceEpoch}';
-      final String dateStr = DateTime.now().toIso8601String().split('T')[0];
+      if (alreadyDepreciated + totalDepreciationForPeriod > (costPrice - salvageValue)) {
+        totalDepreciationForPeriod = (costPrice - salvageValue) - alreadyDepreciated;
+      }
 
-      // 1. Create Journal Entry
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': dateStr,
-        'description': 'تخلص من أصل ($reason): $assetName ($assetId)',
-        'reference_id': assetId,
-      });
+      if (totalDepreciationForPeriod > 0) {
+        // 1. Log the depreciation
+        await db.insert('asset_depreciation_logs', {
+          'id': 'DEP_${asset['id']}_${now.millisecondsSinceEpoch}',
+          'asset_id': asset['id'],
+          'amount': totalDepreciationForPeriod,
+          'date': now.toIso8601String().substring(0, 10),
+          'notes': 'Automatic depreciation for $monthsToDepreciate months',
+          'sync_status': 0,
+        });
 
-      // 2. Close Accumulated Depreciation (Debit)
-      await txn.insert('journal_entry_lines', {
-        'id': '${entryId}_L1',
-        'entry_id': entryId,
-        'account_id': 'ACC_ACCUMULATED_DEPRECIATION',
-        'debit': stats['depreciation']!,
-        'credit': 0.0,
-        'cost_center_id': costCenterId,
-      });
+        // 2. Update the asset's last depreciation date
+        await db.update('assets', {
+          'last_depreciation_date': now.toIso8601String().substring(0, 10),
+        }, where: 'id = ?', whereArgs: [asset['id']]);
 
-      // 3. Record Proceeds/Cash (Debit)
-      if (proceeds > 0) {
-        await txn.insert('journal_entry_lines', {
+        // 3. Create a Journal Entry (Accounting Integration)
+        final entryId = 'JE_DEP_${asset['id']}_${now.millisecondsSinceEpoch}';
+        await db.insert('journal_entries', {
+          'id': entryId,
+          'date': now.toIso8601String().substring(0, 10),
+          'description': 'إهلاك آلي للأصل: ${asset['name']}',
+          'reference_id': asset['id'],
+        });
+
+        // Debit: Depreciation Expense
+        await db.insert('journal_entry_lines', {
+          'id': '${entryId}_L1',
+          'entry_id': entryId,
+          'account_id': 'ACC_EXP_DEP', // Depreciation Expense
+          'debit': totalDepreciationForPeriod,
+          'credit': 0.0,
+        });
+
+        // Credit: Accumulated Depreciation (Contra-Asset)
+        await db.insert('journal_entry_lines', {
           'id': '${entryId}_L2',
           'entry_id': entryId,
-          'account_id': 'ACC_BANK_1',
-          'debit': proceeds,
-          'credit': 0.0,
-          'cost_center_id': costCenterId,
+          'account_id': 'ACC_ASSET_ACC_DEP', // Accumulated Depreciation
+          'debit': 0.0,
+          'credit': totalDepreciationForPeriod,
         });
+
+        // 4. Update account balances
+        await db.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [totalDepreciationForPeriod, 'ACC_EXP_DEP']);
+        await db.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [totalDepreciationForPeriod, 'ACC_ASSET_ACC_DEP']);
+
+        debugPrint("AssetService: Recorded $totalDepreciationForPeriod depreciation for asset ${asset['id']}");
       }
-
-      // 4. Close Asset Cost (Credit)
-      // Note: We need a mapping from asset type to specific asset account, 
-      // but for now we assume assets are in a general Fixed Assets account or we use the contra-asset logic.
-      // Usually: Dr Cash, Dr AccDep, Cr Asset Cost. 
-      // Gain/Loss goes to P&L.
-      await txn.insert('journal_entry_lines', {
-        'id': '${entryId}_L3',
-        'entry_id': entryId,
-        'account_id': 'ACC_INVENTORY', // Placeholder for Fixed Asset account if not unique
-        'debit': 0.0,
-        'credit': stats['purchase_price']!,
-        'cost_center_id': costCenterId,
-      });
-
-      // 5. Record Gain or Loss
-      if (gainLoss != 0) {
-        await txn.insert('journal_entry_lines', {
-          'id': '${entryId}_L4',
-          'entry_id': entryId,
-          'account_id': gainLoss > 0 ? 'ACC_REVENUE_OTHER' : 'ACC_LOSS_ASSETS',
-          'debit': gainLoss < 0 ? gainLoss.abs() : 0.0,
-          'credit': gainLoss > 0 ? gainLoss : 0.0,
-          'cost_center_id': costCenterId,
-        });
-      }
-
-      // 6. Update Asset Status to 'scrap'
-      await txn.update('assets', 
-        {'status': 'scrap'},
-        where: 'id = ?',
-        whereArgs: [assetId]
-      );
-    });
+    }
   }
 
-  /// Creates a new asset/vehicle in the database.
-  Future<void> createAsset(Map<String, dynamic> assetData) async {
-    final db = await _dbHelper.database;
-    final String nowStr = DateTime.now().toIso8601String();
-    final deviceId = await _dbHelper.getDeviceFingerprint();
+  Future<void> transferAsset(String assetId, String employeeId, String location) async {
+    final db = await _db.database;
+    final now = DateTime.now().toIso8601String();
 
-    final Map<String, dynamic> data = Map<String, dynamic>.from(assetData);
-    data['id'] ??= 'ASSET_${DateTime.now().millisecondsSinceEpoch}';
-    data['sync_status'] = 0;
-    data['updated_at'] = nowStr;
-    data['device_id'] = deviceId;
-    data['is_deleted'] = 0;
-    data['status'] ??= 'available';
+    await db.transaction((txn) async {
+      // 1. Log the transfer
+      await txn.insert('asset_custody_logs', {
+        'id': 'CUST_${DateTime.now().millisecondsSinceEpoch}',
+        'asset_id': assetId,
+        'employee_id': employeeId,
+        'location': location,
+        'issued_date': now,
+        'status': 'transferred',
+        'sync_status': 0,
+      });
 
-    await db.insert('assets', data, conflictAlgorithm: ConflictAlgorithm.replace);
+      // 2. Update asset record
+      await txn.update('assets', {
+        'assigned_to': employeeId,
+        'location': location,
+        'updated_at': now,
+      }, where: 'id = ?', whereArgs: [assetId]);
+    });
   }
 }

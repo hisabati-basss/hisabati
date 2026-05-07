@@ -21,13 +21,13 @@ class _SecurityAuditScreenState extends State<SecurityAuditScreen> {
     setState(() => _isLoading = true);
     try {
       final db = await _db.database;
-      _auditLog = (await db.query('security_audit', orderBy: 'created_at DESC', limit: 50)).map((l) => Map<String, dynamic>.from(l)).toList();
+      _auditLog = (await db.rawQuery('SELECT * FROM security_audit ORDER BY created_at DESC LIMIT 50')).map((l) => Map<String, dynamic>.from(l)).toList();
 
       // Stats
       final totalUsers = await db.rawQuery('SELECT COUNT(*) as c FROM system_users');
-      final activeUsers = await db.rawQuery("SELECT COUNT(*) as c FROM system_users WHERE status = 'active'");
+      final activeUsers = await db.rawQuery("SELECT COUNT(*) as c FROM system_users WHERE is_active = 1");
       final totalActions = await db.rawQuery('SELECT COUNT(*) as c FROM security_audit');
-      final failedLogins = await db.rawQuery("SELECT COUNT(*) as c FROM security_audit WHERE action = 'login_failed'");
+      final failedLogins = await db.rawQuery("SELECT COUNT(*) as c FROM security_audit WHERE action = 'login_failed' OR action_type = 'login_failed'");
 
       _stats = {
         'total_users': (totalUsers.first['c'] as int?) ?? 0,
@@ -47,7 +47,7 @@ class _SecurityAuditScreenState extends State<SecurityAuditScreen> {
 
       // Check for users without passwords
       List<Map<String, dynamic>> findings = [];
-      final weakUsers = await db.rawQuery("SELECT COUNT(*) as c FROM system_users WHERE password IS NULL OR password = ''");
+      final weakUsers = await db.rawQuery("SELECT COUNT(*) as c FROM system_users WHERE password_hash IS NULL OR password_hash = ''");
       if ((weakUsers.first['c'] as int? ?? 0) > 0) findings.add({'type': 'warning', 'msg': 'يوجد ${weakUsers.first['c']} مستخدم بدون كلمة مرور'});
 
       // Check for admin accounts
@@ -102,11 +102,11 @@ class _SecurityAuditScreenState extends State<SecurityAuditScreen> {
         // KPIs
         Padding(padding: EdgeInsets.symmetric(horizontal: context.sectionPadding), child: Row(children: [
           Expanded(child: _buildKPI("المستخدمين", "${_stats['total_users'] ?? 0}", Colors.blue, Icons.people)),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(child: _buildKPI("نشطين", "${_stats['active_users'] ?? 0}", Colors.green, Icons.verified_user)),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(child: _buildKPI("العمليات", "${_stats['total_actions'] ?? 0}", Colors.purple, Icons.history)),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(child: _buildKPI("فشل دخول", "${_stats['failed_logins'] ?? 0}", failedLogins > 0 ? Colors.red : Colors.green, Icons.lock)),
         ])),
         const SizedBox(height: 12),
@@ -144,8 +144,8 @@ class _SecurityAuditScreenState extends State<SecurityAuditScreen> {
                       Icon(isError ? Icons.warning : Icons.check_circle, size: 14, color: isError ? Colors.red : Colors.green),
                       const SizedBox(width: 8),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(_actionLabel(action), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 1)),
-                        Text("${log['user_id'] ?? 'system'} • ${log['created_at']?.toString().substring(0, 16) ?? ''}", style: TextStyle(color: context.mutedText, fontSize: 10)),
+                        Text(_actionLabel(action.isEmpty ? log['action_type']?.toString() ?? '' : action), style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.bodySize - 2)),
+                        Text("${log['user_id'] ?? 'system'} • ${log['created_at']?.toString().substring(0, 16) ?? ''}", style: TextStyle(color: context.mutedText, fontSize: 9)),
                       ])),
                       if (log['ip_address'] != null) Text(log['ip_address'].toString(), style: TextStyle(color: context.mutedText, fontSize: 9)),
                     ]),
@@ -170,10 +170,11 @@ class _SecurityAuditScreenState extends State<SecurityAuditScreen> {
     );
   }
 
-  Widget _buildKPI(String t, String v, Color c, IconData icon) => Container(
-    padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: c.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(8), border: Border.all(color: c.withValues(alpha: 0.15))),
-    child: Row(children: [Icon(icon, color: c, size: 14), const SizedBox(width: 4),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: TextStyle(color: context.mutedText, fontSize: 8)), Text(v, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: c))]))]),
+   Widget _buildKPI(String t, String v, Color c, IconData icon) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8), 
+    decoration: BoxDecoration(color: c.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(8), border: Border.all(color: c.withValues(alpha: 0.15))),
+    child: Row(children: [Icon(icon, color: c, size: 12), const SizedBox(width: 2),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: TextStyle(color: context.mutedText, fontSize: 7), maxLines: 1, overflow: TextOverflow.ellipsis), Text(v, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: c))]))]),
   );
 
   String _actionLabel(String a) {

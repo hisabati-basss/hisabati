@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/cash_flow_service.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../services/reporting_service.dart';
 
 class CashFlowStatementScreen extends StatefulWidget {
   const CashFlowStatementScreen({super.key});
@@ -72,6 +73,14 @@ class _CashFlowStatementScreenState extends State<CashFlowStatementScreen> {
   double get _netCashChange => _sectionTotal('operating') + _sectionTotal('investing') + _sectionTotal('financing');
   double get _closingCash => _openingCash + _netCashChange;
 
+  final ReportingService _reportingService = ReportingService();
+  List<Map<String, dynamic>> _predictions = [];
+
+  Future<void> _loadPredictions() async {
+    final preds = await _reportingService.getPredictedCashFlow(3);
+    setState(() => _predictions = preds);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -85,6 +94,11 @@ class _CashFlowStatementScreenState extends State<CashFlowStatementScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_graph),
+            onPressed: _loadPredictions,
+            tooltip: 'توقع التدفقات',
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.calendar_month),
             onSelected: _updateRange,
@@ -139,9 +153,47 @@ class _CashFlowStatementScreenState extends State<CashFlowStatementScreen> {
             ),
             const SizedBox(height: 20),
 
+            // Predictions Section (If available)
+            if (_predictions.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.auto_graph, color: Colors.blueAccent, size: 20),
+                        const SizedBox(width: 10),
+                        const Text("تنبؤات التدفق النقدي المستقبلي (AI)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueAccent)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ..._predictions.map((p) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("شهر ${p['month']}", style: const TextStyle(fontSize: 12)),
+                          Text("${_formatNumber(p['predicted_revenue'])} ${tr('common.currency_symbol')}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // Operating Activities
             _buildSection('الأنشطة التشغيلية', 'Operating Activities', Icons.settings, _data['operating']!, isDark, brandColor),
             const SizedBox(height: 12),
+
 
             // Investing Activities
             _buildSection('الأنشطة الاستثمارية', 'Investing Activities', Icons.trending_up, _data['investing']!, isDark, brandColor),
@@ -261,17 +313,9 @@ class _CashFlowStatementScreenState extends State<CashFlowStatementScreen> {
   }
 
   String _formatNumber(double value) {
-    final prefix = value >= 0 ? '' : '-';
-    final absValue = value.abs();
-    if (absValue >= 1000000) return '$prefix${(absValue / 1000000).toStringAsFixed(1)}M';
-    if (absValue >= 1000) return '$prefix${(absValue / 1000).toStringAsFixed(0)}K';
-    return '$prefix${absValue.toStringAsFixed(0)}';
+    final formatter = NumberFormat('#,##0.00');
+    return formatter.format(value);
   }
 }
 
-class CashFlowLine {
-  final String nameAr;
-  final String nameEn;
-  final double amount;
-  CashFlowLine({required this.nameAr, required this.nameEn, required this.amount});
-}
+

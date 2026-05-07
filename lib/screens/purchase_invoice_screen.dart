@@ -6,13 +6,16 @@ import 'package:easy_localization/easy_localization.dart';
 
 class PurchaseInvoiceScreen extends StatefulWidget {
   final String? preSelectedSupplierId;
-  const PurchaseInvoiceScreen({super.key, this.preSelectedSupplierId});
+  final String? invoiceId;
+  const PurchaseInvoiceScreen({super.key, this.preSelectedSupplierId, this.invoiceId});
 
-  static Future<bool?> show(BuildContext context, {String? supplierId}) {
-    return showDialog<bool>(
+  static Future<bool?> show(BuildContext context, {String? supplierId, String? invoiceId}) {
+    return showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: true,
-      builder: (context) => PurchaseInvoiceScreen(preSelectedSupplierId: supplierId),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (context) => PurchaseInvoiceScreen(preSelectedSupplierId: supplierId, invoiceId: invoiceId),
     );
   }
 
@@ -31,12 +34,49 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
   String? _selectedSupplierId;
   String _paymentType = 'cash';
   bool _isLoading = true;
+  List<Map<String, dynamic>> _landedCosts = [];
+  final TextEditingController _landedCostAmountCtrl = TextEditingController();
+  final TextEditingController _landedCostDescCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _invoiceNumController.text = "PUR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
-    _loadMetadata();
+    if (widget.invoiceId != null) {
+      _loadInitialData();
+    } else {
+      _invoiceNumController.text = "PUR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
+      _loadMetadata();
+    }
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    final db = await _db.database;
+    final sups = await _db.getSuppliers();
+    
+    final invRes = await db.query('purchase_invoices', where: 'id = ?', whereArgs: [widget.invoiceId]);
+    if (invRes.isNotEmpty) {
+      final inv = invRes.first;
+      final lines = await db.query('purchase_invoice_lines', where: 'invoice_id = ?', whereArgs: [widget.invoiceId]);
+      
+      if (mounted) {
+        setState(() {
+          _suppliers = sups;
+          _invoiceNumController.text = inv['id']?.toString() ?? '';
+          _totalController.text = inv['total']?.toString() ?? '0';
+          _selectedSupplierId = inv['supplier_id']?.toString();
+          _paymentType = inv['payment_type']?.toString() ?? 'cash';
+          _selectedItems = lines.map((l) => {
+            'id': l['item_id'],
+            'name': l['name'],
+            'cost_price': l['price'],
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } else {
+      _loadMetadata();
+    }
   }
 
   Future<void> _loadMetadata() async {
@@ -124,10 +164,12 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
        }).toList();
 
       await _db.savePurchaseInvoice(
-        supplierId: _selectedSupplierId ?? '',
-        total: total,
-        paymentType: _paymentType,
-        lines: lines,
+        {
+          'supplier_id': _selectedSupplierId ?? '',
+          'total': total,
+          'payment_type': _paymentType,
+        },
+        lines,
       );
 
       if (mounted) {
@@ -158,84 +200,95 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+      child: Material(
+        color: Colors.transparent,
         child: Container(
-          width: 500,
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+          width: 520, // More compact width
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
           decoration: BoxDecoration(
-            color: context.obsidianGlass,
-            borderRadius: BorderRadius.circular(context.cardRadius),
+            color: context.isDark ? const Color(0xFF0F0F12) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: context.cardBorder),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, 10)),
+            ],
           ),
-          child: _isLoading 
-            ? const Padding(
-                padding: EdgeInsets.all(40),
-                child: Column(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: _isLoading 
+              ? const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: primaryOrange),
+                      const SizedBox(height: 12),
+                      Text("جاري المعالجة...", style: TextStyle(color: Colors.white, fontSize: 14)),
+                    ],
+                  ),
+                )
+              : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: primaryOrange),
-                    SizedBox(height: 16),
-                    Text("جاري المعالجة...", style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ],
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    width: 32, height: 3,
+                    decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                  ),
                 ),
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-              // Header
-              Padding(
-                padding: EdgeInsets.all(context.cardPadding),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(tr('purchases_module.title'), style: TextStyle(color: context.textColor, fontSize: context.headerSize, fontWeight: FontWeight.bold)),
-                    IconButton(icon: Icon(Icons.close, color: context.mutedText), onPressed: () => Navigator.pop(context)),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-
-              // Scrollable Body
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(context.cardPadding),
-                  child: Column(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildTextField(_invoiceNumController, tr('purchases_module.invoice_number'), Icons.numbers),
-                      const SizedBox(height: 16),
-                      _buildSupplierDropdown(),
-                      const SizedBox(height: 16),
-                      _buildTextField(_totalController, tr('purchases_module.total_invoice'), Icons.payments_outlined, isNumber: true),
-                      const SizedBox(height: 16),
-                      _buildPaymentDropdown(),
-                      const SizedBox(height: 24),
-                      _buildItemsSection(),
+                      const SizedBox(width: 40),
+                      Text(widget.invoiceId != null ? "تعديل فاتورة مشتريات" : tr('purchases_module.title'), 
+                        style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(icon: Icon(Icons.close, color: context.mutedText, size: 20), onPressed: () => Navigator.pop(context)),
                     ],
                   ),
                 ),
-              ),
-
-              // Footer Action
-              Padding(
-                padding: EdgeInsets.all(context.cardPadding),
-                child: SizedBox(
-                   width: double.infinity,
-                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _saveInvoice,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryOrange,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const Divider(height: 1),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Column(
+                      children: [
+                        _buildTextField(_invoiceNumController, tr('purchases_module.invoice_number'), Icons.numbers),
+                        const SizedBox(height: 12),
+                        _buildSupplierDropdown(),
+                        const SizedBox(height: 12),
+                        _buildTextField(_totalController, tr('purchases_module.total_invoice'), Icons.payments_outlined, isNumber: true),
+                        const SizedBox(height: 12),
+                        _buildPaymentDropdown(),
+                        const SizedBox(height: 16),
+                        _buildItemsSection(),
+                        const SizedBox(height: 12),
+                        _buildLandedCostsSection(),
+                      ],
                     ),
-                    child: Text(tr('purchases_module.save_approve'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                     width: double.infinity,
+                     child: ElevatedButton(
+                      onPressed: _isLoading ? null : _saveInvoice,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryOrange,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(tr('purchases_module.save_approve'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -246,13 +299,15 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: TextStyle(color: context.textColor),
+      style: TextStyle(color: context.textColor, fontSize: 13),
       decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         labelText: label,
-        labelStyle: TextStyle(color: context.mutedText),
-        prefixIcon: Icon(icon, color: primaryOrange, size: 20),
-        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: context.cardBorder), borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: primaryOrange), borderRadius: BorderRadius.circular(12)),
+        labelStyle: TextStyle(color: context.mutedText, fontSize: 12),
+        prefixIcon: Icon(icon, color: primaryOrange, size: 18),
+        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: context.cardBorder), borderRadius: BorderRadius.circular(10)),
+        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: primaryOrange), borderRadius: BorderRadius.circular(10)),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.03),
       ),
@@ -278,7 +333,9 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
               isExpanded: true,
               dropdownColor: const Color(0xFF1A1A1A),
               style: TextStyle(color: context.textColor),
-              items: _suppliers.map((s) => DropdownMenuItem(
+              items: _suppliers.isEmpty 
+                ? [DropdownMenuItem(value: null, child: Text("لا يوجد موردين - أضف مورد أولاً"))]
+                : _suppliers.map((s) => DropdownMenuItem(
                 value: s['id']?.toString(),
                 child: Text(s['name']?.toString() ?? ''),
               )).toList(),
@@ -321,12 +378,12 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
     );
   }
 
-  Widget _buildItemsSection() {
+  Widget _buildLandedCostsSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.cardBorder),
       ),
       child: Column(
@@ -335,8 +392,77 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(tr('purchases_module.selected_items'), style: TextStyle(color: context.textColor, fontWeight: FontWeight.bold)),
-              IconButton(onPressed: _showItemPicker, icon: const Icon(Icons.add_box, color: primaryOrange)),
+              const Text('التكاليف الإضافية (Landed Cost)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              IconButton(
+                onPressed: _showAddLandedCostDialog,
+                icon: const Icon(Icons.add_circle_outline, color: Colors.blueAccent, size: 20),
+              ),
+            ],
+          ),
+          const Divider(),
+          if (_landedCosts.isEmpty)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text("لا توجد تكاليف إضافية", style: TextStyle(color: Colors.white38, fontSize: 11))),
+          ..._landedCosts.map((lc) => ListTile(
+            dense: true,
+            title: Text(lc['description'], style: const TextStyle(color: Colors.white, fontSize: 12)),
+            trailing: Text("${lc['amount']} SAR", style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            onLongPress: () => setState(() => _landedCosts.remove(lc)),
+          )),
+        ],
+      ),
+    );
+  }
+
+  void _showAddLandedCostDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("إضافة تكلفة إضافية"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: _landedCostDescCtrl, decoration: const InputDecoration(labelText: "الوصف (مثلاً: شحن، جمارك)")),
+            TextField(controller: _landedCostAmountCtrl, decoration: const InputDecoration(labelText: "المبلغ"), keyboardType: TextInputType.number),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
+          ElevatedButton(
+            onPressed: () {
+              if (_landedCostAmountCtrl.text.isEmpty) return;
+              setState(() {
+                _landedCosts.add({
+                  'description': _landedCostDescCtrl.text,
+                  'amount': double.tryParse(_landedCostAmountCtrl.text) ?? 0.0,
+                });
+                _landedCostDescCtrl.clear();
+                _landedCostAmountCtrl.clear();
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text("إضافة"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(tr('purchases_module.selected_items'), style: TextStyle(color: context.textColor, fontWeight: FontWeight.bold, fontSize: 13)),
+              IconButton(onPressed: _showItemPicker, icon: const Icon(Icons.add_box, color: primaryOrange, size: 20)),
             ],
           ),
           const Divider(),

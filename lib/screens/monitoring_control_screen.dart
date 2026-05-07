@@ -130,24 +130,28 @@ class _MonitoringControlScreenState extends State<MonitoringControlScreen> with 
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: brandColor))
-        : TabBarView(
-            controller: _tabController,
-            children: _sections.map((section) {
-              final filteredItems = _searchQuery.isEmpty
-                  ? section.items
-                  : section.items.where((item) =>
-                      item.nameAr.contains(_searchQuery) ||
-                      item.nameEn.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        : RefreshIndicator(
+            onRefresh: _loadData,
+            color: brandColor,
+            child: TabBarView(
+                controller: _tabController,
+                children: _sections.map((section) {
+                  final filteredItems = _searchQuery.isEmpty
+                      ? section.items
+                      : section.items.where((item) =>
+                          item.nameAr.contains(_searchQuery) ||
+                          item.nameEn.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: filteredItems.length,
-                itemBuilder: (context, index) {
-                  final item = filteredItems[index];
-                  return _buildMonitoringCard(item, isDark, brandColor);
-                },
-              );
-            }).toList(),
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredItems.length,
+                    itemBuilder: (context, index) {
+                      final item = filteredItems[index];
+                      return _buildMonitoringCard(item, isDark, brandColor);
+                    },
+                  );
+                }).toList(),
+              ),
           ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showSummaryDialog(context, isDark, brandColor),

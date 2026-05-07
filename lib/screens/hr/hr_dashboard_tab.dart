@@ -25,56 +25,66 @@ class HRDashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
-        _buildStatCardsGrid(context),
+        _buildSlimGlassKPIBar(context, isDark),
         const SizedBox(height: 20),
-        _buildChartSection(context),
+        _buildGlassChartSection(context, isDark),
       ],
     );
   }
 
-  Widget _buildStatCardsGrid(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: isMobile ? 2 : 4,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      childAspectRatio: 2.5,
+  Widget _buildSlimGlassKPIBar(BuildContext context, bool isDark) {
+    return Column(
       children: [
-        _buildStatCard(context, tr('hr.stats.total_payroll'), "${totalPayrollMonthly.toStringAsFixed(0)} ${CurrencyService.getSymbol(currency)}", Icons.account_balance_wallet_outlined, Colors.greenAccent),
-        _buildStatCard(context, tr('hr.stats.attendance_rate'), "${attendanceRate.toStringAsFixed(1)} %", Icons.how_to_reg_outlined, Colors.blueAccent),
-        _buildStatCard(context, tr('hr.stats.expiring_docs'), "$expiringDocsCount", Icons.assignment_late_outlined, Colors.redAccent),
-        _buildStatCard(context, tr('hr.stats.pending_leaves'), "$pendingLeavesCount", Icons.event_busy_outlined, Colors.orangeAccent),
+        Row(
+          children: [
+             Expanded(child: _buildGlassKPI(context, tr('hr.stats.total_payroll'), "${totalPayrollMonthly.toStringAsFixed(0)} ${CurrencyService.getSymbol(currency)}", Icons.payments_rounded, Colors.greenAccent, isDark)),
+             const SizedBox(width: 8),
+             Expanded(child: _buildGlassKPI(context, tr('hr.stats.attendance_rate'), "${attendanceRate.toStringAsFixed(1)}%", Icons.how_to_reg_rounded, Colors.blueAccent, isDark)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+             Expanded(child: _buildGlassKPI(context, tr('hr.stats.expiring_docs'), "$expiringDocsCount", Icons.warning_amber_rounded, Colors.redAccent, isDark)),
+             const SizedBox(width: 8),
+             Expanded(child: _buildGlassKPI(context, tr('hr.stats.pending_leaves'), "$pendingLeavesCount", Icons.event_note_rounded, Colors.orangeAccent, isDark)),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+  Widget _buildGlassKPI(BuildContext context, String title, String value, IconData icon, Color color, bool isDark) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: context.sheetGlass,
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.15)),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
           ),
           child: Row(
             children: [
-              Icon(icon, color: color, size: 14),
-              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 14),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(title, style: TextStyle(color: context.mutedText, fontSize: 9, overflow: TextOverflow.ellipsis)),
-                    Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(title, style: TextStyle(color: context.mutedText, fontSize: 9, fontWeight: FontWeight.w500)),
+                    Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
                   ],
                 ),
               ),
@@ -85,23 +95,39 @@ class HRDashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildChartSection(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      height: 300,
-      decoration: BoxDecoration(
-        color: context.sheetGlass,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(tr('hr.charts.payroll_analytics'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          Text(tr('hr.charts.comparison_subtitle'), style: TextStyle(color: context.mutedText, fontSize: 12)),
-          const Expanded(child: Padding(padding: EdgeInsets.only(top: 24, right: 16), child: LineChartSample())),
-        ],
+  Widget _buildGlassChartSection(BuildContext context, bool isDark) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.02),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tr('hr.charts.payroll_analytics'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(tr('hr.charts.comparison_subtitle'), style: TextStyle(color: context.mutedText, fontSize: 10)),
+                    ],
+                  ),
+                  const Icon(Icons.analytics_outlined, color: primaryOrange, size: 20),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const SizedBox(height: 180, child: LineChartSample()),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -117,29 +143,29 @@ class LineChartSample extends StatelessWidget {
         gridData: const FlGridData(show: false),
         titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
-        minX: 0,
-        maxX: 7,
-        minY: 0,
-        maxY: 6,
         lineBarsData: [
           LineChartBarData(
             spots: const [
-              FlSpot(0, 3.44),
-              FlSpot(2.6, 3.44),
-              FlSpot(4.9, 3.44),
-              FlSpot(6.8, 3.44),
-              FlSpot(8, 3.44),
-              FlSpot(9.5, 3.44),
-              FlSpot(11, 3.44),
+              FlSpot(0, 3),
+              FlSpot(2.6, 2),
+              FlSpot(4.9, 5),
+              FlSpot(6.8, 3.1),
+              FlSpot(8, 4),
+              FlSpot(9.5, 3),
+              FlSpot(11, 4),
             ],
             isCurved: true,
             color: primaryOrange,
-            barWidth: 5,
+            barWidth: 3,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: primaryOrange.withValues(alpha: 0.1),
+              gradient: LinearGradient(
+                colors: [primaryOrange.withValues(alpha: 0.2), primaryOrange.withValues(alpha: 0)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
         ],

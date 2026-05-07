@@ -23,12 +23,12 @@ class _ThemeToggleCapsuleState extends State<ThemeToggleCapsule> {
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutBack,
             width: 70,
-            height: 36,
-            padding: const EdgeInsets.all(4),
+            height: 32,
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: widget.isDark ? const Color(0xFF1A1A2E).withValues(alpha: 0.65) : Colors.white.withValues(alpha: 0.70),
+              color: widget.isDark ? const Color(0xFF2C2C2E).withValues(alpha: 0.5) : const Color(0xFFE5E5EA).withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: widget.isDark ? Colors.white24 : Colors.black12),
+              border: Border.all(color: widget.isDark ? Colors.white10 : Colors.black12),
             ),
             child: Stack(
               children: [
@@ -37,22 +37,22 @@ class _ThemeToggleCapsuleState extends State<ThemeToggleCapsule> {
                   curve: Curves.easeOutBack,
                   alignment: widget.isDark ? Alignment.centerLeft : Alignment.centerRight,
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: widget.isDark ? Colors.indigoAccent : Colors.orangeAccent,
                       boxShadow: [
                         BoxShadow(
                           color: (widget.isDark ? Colors.indigoAccent : Colors.orangeAccent).withValues(alpha: 0.5),
-                          blurRadius: 10,
-                          spreadRadius: 2,
+                          blurRadius: 8,
+                          spreadRadius: 1,
                         )
                       ],
                     ),
                     child: Icon(
                       widget.isDark ? Icons.nightlight_round : Icons.wb_sunny_rounded,
-                      size: 16,
+                      size: 13,
                       color: Colors.white,
                     ),
                   ),

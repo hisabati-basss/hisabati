@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../services/module_config_service.dart';
 import '../theme/app_theme_extension.dart';
+import '../core/config/module_definitions.dart';
 
 class OnboardingModulesScreen extends StatefulWidget {
   final VoidCallback onCompleted;
@@ -14,6 +15,8 @@ class OnboardingModulesScreen extends StatefulWidget {
 class _OnboardingModulesScreenState extends State<OnboardingModulesScreen> {
   List<String> _selectedModules = ['accounting']; // Default to accounting
 
+  late final List<Map<String, dynamic>> _modules;
+
   @override
   void initState() {
     super.initState();
@@ -22,29 +25,17 @@ class _OnboardingModulesScreenState extends State<OnboardingModulesScreen> {
     if (active.isNotEmpty) {
       _selectedModules = List.from(active);
     }
+    _modules = AppModules.allModules
+        .where((def) => def.showInSidebar)
+        .map((def) => {
+      "id": def.id,
+      "name": def.localizedName,
+      "icon": def.icon,
+      "color": def.color,
+      "desc": def.localizedDescription,
+      "isNew": def.isNew,
+    }).toList();
   }
-
-  final List<Map<String, dynamic>> _modules = [
-    {"id": "accounting", "name": "برنامج الحسابات الشامل", "icon": Icons.account_balance_wallet, "color": Colors.blue, "desc": "المركز المالي، القيود، والأستاذ العام"},
-    {"id": "invoices", "name": "المبيعات والفواتير", "icon": Icons.receipt_long, "color": Colors.green, "desc": "إصدار الفواتير وعروض الأسعار"},
-    {"id": "hr", "name": "شؤون الموظفين (HR)", "icon": Icons.people, "color": Colors.teal, "desc": "الرواتب، الإجازات، والعهد"},
-    {"id": "inventory", "name": "إدارة المخازن", "icon": Icons.inventory_2, "color": Colors.brown, "desc": "الفروع، الجرد، والأصناف"},
-    {"id": "taxes", "name": "برنامج الضريبة", "icon": Icons.percent, "color": Colors.orange, "desc": "الإقرارات لجميع الدول"},
-    {"id": "auditing", "name": "تدقيق الحسابات", "icon": Icons.fact_check, "color": Colors.cyan, "desc": "مراجعة واعتماد القيود"},
-    {"id": "feasibility", "name": "دراسات الجدوى", "icon": Icons.trending_up, "color": Colors.purple, "desc": "تخطيط المشاريع الجديدة"},
-    {"id": "assets", "name": "إدارة العدد والأدوات", "icon": Icons.handyman, "color": Colors.blueGrey, "desc": "الأصول، التالف، والباركود", "isNew": true},
-    {"id": "purchases", "name": "إدارة المشتريات", "icon": Icons.shopping_cart, "color": Colors.pink, "desc": "الموردين وأوامر الشراء", "isNew": true},
-    {"id": "maintenance", "name": "الصيانة الشاملة", "icon": Icons.build_circle, "color": Colors.red, "desc": "معدات، سيارات، وشاحنات", "isNew": true},
-    {"id": "sales_commissions", "name": "المناديب والعمولات", "icon": Icons.assignment_ind, "color": Colors.blue, "desc": "تتبع المبيعات والتاجت", "isNew": true},
-    {"id": "expiry", "name": "رقابة الصلاحية", "icon": Icons.history_toggle_off, "color": Colors.orange, "desc": "مراقبة تواريخ انتهاء البضائع", "isNew": true},
-    {"id": "trial_balance", "name": "ميزان المراجعة", "icon": Icons.analytics, "color": Colors.indigo, "desc": "كشف الأرصدة والمجاميع", "isNew": true},
-    {"id": "financial_reports", "name": "التقارير المالية الختامية", "icon": Icons.bar_chart, "color": Colors.deepOrange, "desc": "الأرباح والخسائر والمركز المالي"},
-    {"id": "real_estate", "name": "إدارة العقارات", "icon": Icons.apartment, "color": Colors.amber, "desc": "الوحدات، وعقود الإيجار", "isNew": true},
-    {"id": "chat", "name": "التواصل الداخلي والمهام", "icon": Icons.forum, "color": Colors.deepPurpleAccent, "desc": "شات، قنوات، وتحويل لمهمة", "isNew": true},
-    {"id": "hub_commercial", "name": "المحور التجاري", "icon": Icons.storefront, "color": Colors.teal, "desc": "العروض الترويجية ونقاط البيع", "isNew": true},
-    {"id": "cloud_inbox", "name": "الوارد السحابي", "icon": Icons.cloud_queue, "color": Colors.lightBlue, "desc": "استلام الفواتير تلقائياً", "isNew": true},
-    {"id": "budgeting", "name": "إعداد الميزانية", "icon": Icons.pie_chart, "color": Colors.indigo, "desc": "رصد وتخطيط الموازنات"},
-  ];
 
   void _toggleModule(String id) {
     setState(() {

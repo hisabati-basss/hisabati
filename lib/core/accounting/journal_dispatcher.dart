@@ -30,8 +30,8 @@ class JournalDispatcher {
     String? attachmentPath,
   }) async {
     // Validate: Total Debits must equal Total Credits
-    double totalDebit = movements.fold(0, (s, m) => s + m.debit);
-    double totalCredit = movements.fold(0, (s, m) => s + m.credit);
+    double totalDebit = movements.fold(0.0, (s, m) => s + m.debit);
+    double totalCredit = movements.fold(0.0, (s, m) => s + m.credit);
 
     if ((totalDebit - totalCredit).abs() > 0.01) {
       throw Exception(
@@ -48,9 +48,12 @@ class JournalDispatcher {
     }).toList();
 
     await _db.saveManualJournalEntry(
-      date: date.toIso8601String().split('T')[0],
-      description: description,
-      lines: lines,
+      {
+        'date': date.toIso8601String().split('T')[0],
+        'description': description,
+        'reference_id': referenceId,
+      },
+      lines,
     );
 
     return 'JE_${DateTime.now().millisecondsSinceEpoch}';

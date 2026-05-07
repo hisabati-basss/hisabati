@@ -81,8 +81,8 @@ class AiForecastingService {
 
     // 3. Upcoming salaries
     final empRes = await db.rawQuery('''
-      SELECT COALESCE(SUM(salary + COALESCE(housing,0) + COALESCE(transport,0)), 0) as total
-      FROM employees WHERE status = 'active'
+      SELECT COALESCE(SUM(basic_salary + COALESCE(housing_allowance,0) + COALESCE(transport_allowance,0)), 0) as total
+      FROM employees WHERE status = 'active' AND is_deleted = 0
     ''');
     double upcomingSalaries = (empRes.first['total'] as num?)?.toDouble() ?? 0;
 

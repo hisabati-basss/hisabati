@@ -33,69 +33,146 @@ class _BudgetSetupScreenState extends State<BudgetSetupScreen> {
     final amountCtrl = TextEditingController(text: budget?['budget_amount']?.toString());
     String period = budget?['period']?.toString() ?? 'monthly';
 
-    showDialog(context: context, builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setDialogState) => AlertDialog(
-        backgroundColor: context.cardSurface.withValues(alpha: 0.95),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isEdit ? "تعديل الميزانية" : "ميزانية جديدة", style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(color: context.cardSurface.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(8)),
-            child: DropdownButton<String>(
-              isExpanded: true, underline: const SizedBox(), value: selectedAccountId,
-              hint: Text("اختر الحساب", style: TextStyle(color: context.mutedText, fontSize: 13)),
-              items: _accounts.map((a) => DropdownMenuItem(value: a['id'] as String, child: Text("${a['code']} ${a['name']}", style: const TextStyle(fontSize: 12)))).toList(),
-              onChanged: (v) => setDialogState(() => selectedAccountId = v),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Container(
+            width: 500,
+            padding: EdgeInsets.all(context.cardPadding * 2),
+            decoration: BoxDecoration(
+              color: context.isDark ? const Color(0xFF1A1A1F) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: context.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, 10)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(color: context.mutedText.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                Text(
+                  isEdit ? "تعديل الميزانية" : "ميزانية جديدة", 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.subHeaderSize + 2, color: context.textColor)
+                ),
+                const SizedBox(height: 24),
+                
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: context.cardSurface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.cardBorder),
+                  ),
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    value: selectedAccountId,
+                    dropdownColor: context.bgSurface,
+                    hint: Text("اختر الحساب", style: TextStyle(color: context.mutedText, fontSize: 13)),
+                    items: _accounts.map((a) => DropdownMenuItem(
+                      value: a['id'] as String, 
+                      child: Text("${a['code']} ${a['name']}", style: TextStyle(fontSize: 14, color: context.textColor))
+                    )).toList(),
+                    onChanged: (v) => setDialogState(() => selectedAccountId = v),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: context.textColor),
+                  decoration: InputDecoration(
+                    labelText: "المبلغ المخصص",
+                    labelStyle: TextStyle(color: context.mutedText),
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: context.cardSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                Row(
+                  children: [
+                    _periodChip("شهري", 'monthly', period, (v) => setDialogState(() => period = v)),
+                    const SizedBox(width: 8),
+                    _periodChip("ربع سنوي", 'quarterly', period, (v) => setDialogState(() => period = v)),
+                    const SizedBox(width: 8),
+                    _periodChip("سنوي", 'yearly', period, (v) => setDialogState(() => period = v)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text("إلغاء", style: TextStyle(color: context.mutedText)),
+                      ),
+                    ),
+                    if (isEdit) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () async {
+                            final db = await _db.database;
+                            await db.delete('budgets', where: 'id = ?', whereArgs: [budget!['id']]);
+                            if (mounted) { Navigator.pop(ctx); _loadData(); }
+                          },
+                          child: const Text("حذف", style: TextStyle(color: Colors.red)),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (selectedAccountId == null || amountCtrl.text.isEmpty) return;
+                          final db = await _db.database;
+                          final data = {
+                            'account_id': selectedAccountId,
+                            'budget_amount': double.tryParse(amountCtrl.text) ?? 0,
+                            'period': period,
+                            'updated_at': DateTime.now().toIso8601String(),
+                          };
+                          if (isEdit) {
+                            await db.update('budgets', data, where: 'id = ?', whereArgs: [budget!['id']]);
+                          } else {
+                            data['id'] = 'BUD_${DateTime.now().millisecondsSinceEpoch}';
+                            data['created_at'] = DateTime.now().toIso8601String();
+                            await db.insert('budgets', data);
+                          }
+                          if (mounted) { Navigator.pop(ctx); _loadData(); }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryOrange,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(isEdit ? "تحديث" : "حفظ", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: amountCtrl, keyboardType: TextInputType.number,
-            style: TextStyle(color: context.textColor),
-            decoration: InputDecoration(hintText: "المبلغ المخصص", hintStyle: TextStyle(color: context.mutedText, fontSize: 13), filled: true, fillColor: context.cardSurface.withValues(alpha: 0.3), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
-          ),
-          const SizedBox(height: 10),
-          Row(children: [
-            _periodChip("شهري", 'monthly', period, (v) => setDialogState(() => period = v)),
-            const SizedBox(width: 6),
-            _periodChip("ربع سنوي", 'quarterly', period, (v) => setDialogState(() => period = v)),
-            const SizedBox(width: 6),
-            _periodChip("سنوي", 'yearly', period, (v) => setDialogState(() => period = v)),
-          ]),
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("إلغاء", style: TextStyle(color: context.mutedText))),
-          if (isEdit) TextButton(onPressed: () async {
-            final db = await _db.database;
-            await db.delete('budgets', where: 'id = ?', whereArgs: [budget!['id']]);
-            if (mounted) { Navigator.pop(ctx); _loadData(); }
-          }, child: const Text("حذف", style: TextStyle(color: Colors.red))),
-          ElevatedButton(
-            onPressed: () async {
-              if (selectedAccountId == null || amountCtrl.text.isEmpty) return;
-              final db = await _db.database;
-              final data = {
-                'account_id': selectedAccountId,
-                'budget_amount': double.tryParse(amountCtrl.text) ?? 0,
-                'period': period,
-                'updated_at': DateTime.now().toIso8601String(),
-              };
-              if (isEdit) {
-                await db.update('budgets', data, where: 'id = ?', whereArgs: [budget!['id']]);
-              } else {
-                data['id'] = 'BUD_${DateTime.now().millisecondsSinceEpoch}';
-                data['created_at'] = DateTime.now().toIso8601String();
-                await db.insert('budgets', data);
-              }
-              if (mounted) { Navigator.pop(ctx); _loadData(); }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryOrange, foregroundColor: Colors.black87),
-            child: Text(isEdit ? "تحديث" : "حفظ"),
-          ),
-        ],
+        ),
       ),
-    ));
+    );
   }
 
   @override

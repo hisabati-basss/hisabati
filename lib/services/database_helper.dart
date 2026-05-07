@@ -10,13 +10,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'sync_service.dart';
+import 'sync_engine.dart';
 import 'notification_service.dart';
 import '../core/accounting/coa_template.dart';
 import 'industry_provider.dart';
 import 'audit_service.dart';
 import 'package:http/http.dart' as http;
 
-class DatabaseHelper {
+// Mixin Imports
+import 'db/mixins/db_base_mixin.dart';
+import 'db/mixins/db_sales_mixin.dart';
+import 'db/mixins/db_purchase_mixin.dart';
+import 'db/mixins/db_hr_mixin.dart';
+import 'db/mixins/db_accounting_mixin.dart';
+import 'db/mixins/db_inventory_mixin.dart';
+import 'db/mixins/db_real_estate_mixin.dart';
+import 'db/mixins/db_medical_mixin.dart';
+import 'db/mixins/db_manufacturing_mixin.dart';
+import 'db/mixins/db_audit_mixin.dart';
+import 'db/mixins/db_common_mixin.dart';
+import 'db/mixins/db_specialized_mixin.dart';
+import 'db/mixins/db_fleet_mixin.dart';
+import 'db/mixins/db_approval_mixin.dart';
+import 'db/mixins/db_contracting_mixin.dart';
+import 'db/mixins/db_hospitality_mixin.dart';
+import 'db/mixins/db_ecommerce_mixin.dart';
+import 'db/mixins/db_agriculture_mixin.dart';
+import 'db/mixins/db_office_services_mixin.dart';
+
+class DatabaseHelper with 
+    DbBaseMixin, 
+    DbSalesMixin, 
+    DbPurchaseMixin, 
+    DbHrMixin, 
+    DbAccountingMixin, 
+    DbInventoryMixin, 
+    DbRealEstateMixin, 
+    DbManufacturingMixin, 
+    DbAuditMixin, 
+    DbCommonMixin,
+    DbFleetMixin,
+    DbApprovalMixin,
+    DbContractingMixin,
+    DbEcommerceMixin,
+    DbMedicalMixin,
+    DbHospitalityMixin,
+    DbAgricultureMixin,
+    DbOfficeServicesMixin,
+    DbSpecializedMixin {
+
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   static Database? _database;
@@ -35,15 +77,18 @@ class DatabaseHelper {
   }
 
   static const String _databaseName = "hisabati.db";
-  static const int _databaseVersion = 68;
+  static const int DB_VERSION = 143;
 
   Future<Database> _initDatabase() async {
+    debugPrint("📂 Initializing database: version $DB_VERSION");
+    
     // Force Web FFI
     if (kIsWeb) {
+      debugPrint("🌐 Platform: Web (using sqlite3_ffi_web)");
       databaseFactory = databaseFactoryFfiWeb;
       return await openDatabase(
         _databaseName,
-        version: _databaseVersion,
+        version: DB_VERSION,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -51,6 +96,7 @@ class DatabaseHelper {
 
     // Force FFI on desktop platforms if not already set
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      debugPrint("💻 Platform: Desktop (using sqlite3_ffi)");
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
@@ -62,17 +108,30 @@ class DatabaseHelper {
     } else {
       dbPath = join(await getDatabasesPath(), 'hisabati_offline.db');
     }
+    
+    debugPrint("📍 Database path: $dbPath");
 
-    return await openDatabase(
+    final db = await openDatabase(
       dbPath,
-      version: _databaseVersion,
+      version: DB_VERSION,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+
+    // 🚀 INITIALIZE SYNC ENGINE
+    try {
+      final fingerprint = await getDeviceFingerprint();
+      await SyncEngine().init(db, fingerprint);
+      debugPrint("🚀 SyncEngine initialized successfully.");
+    } catch (e) {
+      debugPrint("⚠️ SyncEngine initialization failed: $e");
+    }
+
+    return db;
   }
 
   // Define metadata columns once to avoid repetition
-  static const String metadata = 'sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0';
+  static const String metadata = 'sync_status INTEGER DEFAULT 0, updated_at TEXT, created_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0';
 
   /// Returns a combined string of (Device Name - Serial Number) for v34 Sync Engine
   Future<String> getDeviceFingerprint() async {
@@ -111,9 +170,1165 @@ class DatabaseHelper {
       await db.execute("CREATE TABLE IF NOT EXISTS liquidation_requests (id TEXT PRIMARY KEY, asset_id TEXT, asset_type TEXT, requested_amount REAL, reason TEXT, status TEXT, is_deleted INTEGER DEFAULT 0, created_at TEXT)");
     }
 
+    if (oldVersion < 138) {
+      // v138: Professional Fleet & Agriculture Extensions
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fleet_fuel_logs (
+          id TEXT PRIMARY KEY,
+          vehicle_id TEXT,
+          liter_count REAL DEFAULT 0,
+          cost REAL DEFAULT 0,
+          date TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fleet_maintenance_logs (
+          id TEXT PRIMARY KEY,
+          vehicle_id TEXT,
+          type TEXT,
+          cost REAL DEFAULT 0,
+          date TEXT,
+          notes TEXT,
+          status TEXT DEFAULT 'Completed',
+          $metadata
+        )
+      ''');
+      
+      // Migrate existing fleet_maintenance data if any
+      try {
+        await db.execute("INSERT INTO fleet_maintenance_logs (id, vehicle_id, type, cost, date, status) SELECT id, vehicle_id, task_name, date, cost, status FROM fleet_maintenance");
+      } catch (_) {}
+    }
+
+    if (oldVersion < 102) {
+      // v102: Multi-Branch & Bank Linking Support
+      try { await db.execute("ALTER TABLE journal_entries ADD COLUMN branch_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE journal_entry_lines ADD COLUMN branch_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE assets ADD COLUMN current_branch_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE accounts ADD COLUMN bank_name TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE accounts ADD COLUMN bank_account_number TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE accounts ADD COLUMN iban TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE accounts ADD COLUMN branch_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE salary_slips ADD COLUMN branch_id TEXT"); } catch (_) {}
+    }
+
+    if (oldVersion < 103) {
+      // Loan & Investment enhanced tracking
+      try { await db.execute("ALTER TABLE employee_loans ADD COLUMN interest_rate REAL DEFAULT 0;"); } catch(_) {}
+      try { await db.execute("ALTER TABLE employee_loans ADD COLUMN total_payable REAL DEFAULT 0;"); } catch(_) {}
+      try { await db.execute("ALTER TABLE investments ADD COLUMN interest_rate REAL DEFAULT 0;"); } catch(_) {}
+      try { await db.execute("ALTER TABLE inventory_transactions ADD COLUMN branch_id TEXT;"); } catch(_) {}
+    }
+
+    if (oldVersion < 104) {
+      // --- HR Support ---
+      await db.execute("CREATE TABLE IF NOT EXISTS departments (id TEXT PRIMARY KEY, name TEXT, manager_id TEXT, description TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS positions (id TEXT PRIMARY KEY, title TEXT, department_id TEXT, grade TEXT, salary_range TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS job_applications (id TEXT PRIMARY KEY, applicant_name TEXT, email TEXT, phone TEXT, position_id TEXT, status TEXT, applied_date TEXT, cv_path TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS employee_documents (id TEXT PRIMARY KEY, employee_id TEXT, title TEXT, type TEXT, expiry_date TEXT, file_path TEXT, is_deleted INTEGER DEFAULT 0)");
+      
+      // --- CRM Support ---
+      await db.execute("CREATE TABLE IF NOT EXISTS crm_leads (id TEXT PRIMARY KEY, name TEXT, company TEXT, email TEXT, phone TEXT, source TEXT, status TEXT, assigned_to TEXT, created_at TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS crm_interactions (id TEXT PRIMARY KEY, lead_id TEXT, type TEXT, notes TEXT, date TEXT, next_follow_up TEXT, is_deleted INTEGER DEFAULT 0)");
+
+      // --- Ops & Support ---
+      await db.execute("CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, subject TEXT, description TEXT, priority TEXT, status TEXT, category TEXT, created_by TEXT, assigned_to TEXT, created_at TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS meetings (id TEXT PRIMARY KEY, title TEXT, date TEXT, time TEXT, location TEXT, attendees TEXT, minutes TEXT, status TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS workflows (id TEXT PRIMARY KEY, name TEXT, trigger_type TEXT, actions TEXT, is_active INTEGER DEFAULT 1, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS approval_requests (id TEXT PRIMARY KEY, module TEXT, reference_id TEXT, requester_id TEXT, approver_id TEXT, status TEXT, notes TEXT, created_at TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS reminders (id TEXT PRIMARY KEY, title TEXT, date TEXT, time TEXT, status TEXT, priority TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS kpi_definitions (id TEXT PRIMARY KEY, title TEXT, target REAL, actual REAL, unit TEXT, period TEXT, department_id TEXT, is_deleted INTEGER DEFAULT 0)");
+    }
+
+    if (oldVersion < 105) {
+      // --- Manufacturing Professional ---
+      await db.execute("CREATE TABLE IF NOT EXISTS manufacturing_bom (id TEXT PRIMARY KEY, product_id TEXT, material_id TEXT, quantity REAL, cost_at_time REAL, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS manufacturing_stages (id TEXT PRIMARY KEY, order_id TEXT, stage_name TEXT, status TEXT, start_date TEXT, end_date TEXT, assigned_to TEXT, is_deleted INTEGER DEFAULT 0)");
+      
+      // --- Projects Professional ---
+      await db.execute("CREATE TABLE IF NOT EXISTS project_stages (id TEXT PRIMARY KEY, project_id TEXT, title TEXT, status TEXT, progress REAL, start_date TEXT, end_date TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS project_payments (id TEXT PRIMARY KEY, project_id TEXT, title TEXT, amount REAL, due_date TEXT, status TEXT, is_deleted INTEGER DEFAULT 0)");
+
+      // --- Real Estate Professional ---
+      await db.execute("CREATE TABLE IF NOT EXISTS real_estate_rent_logs (id TEXT PRIMARY KEY, contract_id TEXT, period TEXT, amount REAL, due_date TEXT, status TEXT, paid_date TEXT, is_deleted INTEGER DEFAULT 0)");
+
+      // --- Specialized Sectors ---
+      await db.execute("CREATE TABLE IF NOT EXISTS hotel_rooms (id TEXT PRIMARY KEY, room_number TEXT, type TEXT, status TEXT, price_per_night REAL, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS hotel_bookings (id TEXT PRIMARY KEY, room_id TEXT, guest_name TEXT, check_in TEXT, check_out TEXT, total_price REAL, status TEXT, is_deleted INTEGER DEFAULT 0)");
+      
+      await db.execute("CREATE TABLE IF NOT EXISTS medical_patients (id TEXT PRIMARY KEY, name TEXT, phone TEXT, medical_history TEXT, created_at TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS medical_appointments (id TEXT PRIMARY KEY, patient_id TEXT, doctor_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT, is_deleted INTEGER DEFAULT 0)");
+
+      await db.execute("CREATE TABLE IF NOT EXISTS fleet_vehicles (id TEXT PRIMARY KEY, plate_number TEXT, model TEXT, year INTEGER, chassis_number TEXT, status TEXT, last_service_date TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS fleet_maintenance (id TEXT PRIMARY KEY, vehicle_id TEXT, task_name TEXT, date TEXT, cost REAL, status TEXT, is_deleted INTEGER DEFAULT 0)");
+
+      // --- Logistics ---
+      await db.execute("CREATE TABLE IF NOT EXISTS shipments (id TEXT PRIMARY KEY, tracking_number TEXT, sender TEXT, receiver TEXT, origin TEXT, destination TEXT, status TEXT, estimated_delivery TEXT, is_deleted INTEGER DEFAULT 0)");
+      
+      // --- Joint Ventures ---
+      await db.execute("CREATE TABLE IF NOT EXISTS joint_ventures (id TEXT PRIMARY KEY, name TEXT, total_capital REAL, status TEXT, created_at TEXT, is_deleted INTEGER DEFAULT 0)");
+      await db.execute("CREATE TABLE IF NOT EXISTS joint_venture_partners (id TEXT PRIMARY KEY, venture_id TEXT, partner_name TEXT, share_percentage REAL, is_deleted INTEGER DEFAULT 0)");
+    }
+
+    if (oldVersion < 106) {
+      // --- Contracting & Advanced Invoicing (Mustakhalasat) ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS contracting_projects (
+          id TEXT PRIMARY KEY, 
+          name TEXT, 
+          client_id TEXT, 
+          total_value REAL, 
+          advance_payment_pct REAL DEFAULT 0, 
+          retention_pct REAL DEFAULT 0, 
+          start_date TEXT, 
+          end_date TEXT, 
+          status TEXT DEFAULT 'active',
+          current_completion_pct REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS project_invoices (
+          id TEXT PRIMARY KEY, 
+          project_id TEXT, 
+          invoice_number INTEGER, 
+          period_start TEXT, 
+          period_end TEXT, 
+          work_completed_pct REAL, 
+          total_completed_pct REAL, 
+          material_on_site REAL DEFAULT 0, 
+          advance_deduction REAL DEFAULT 0, 
+          retention_deduction REAL DEFAULT 0, 
+          net_amount REAL, 
+          status TEXT DEFAULT 'draft',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS subcontractors (
+          id TEXT PRIMARY KEY, 
+          name TEXT, 
+          trade TEXT, 
+          phone TEXT, 
+          email TEXT,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 107) {
+      // --- Ecommerce System ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ecommerce_orders (
+          id TEXT PRIMARY KEY, 
+          order_number TEXT, 
+          customer_name TEXT, 
+          customer_phone TEXT, 
+          total_amount REAL, 
+          status TEXT DEFAULT 'pending',
+          payment_status TEXT DEFAULT 'unpaid',
+          shipping_address TEXT,
+          platform TEXT DEFAULT 'Local',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ecommerce_order_items (
+          id TEXT PRIMARY KEY, 
+          order_id TEXT, 
+          product_id TEXT, 
+          product_name TEXT, 
+          quantity REAL, 
+          price REAL, 
+          total REAL,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 108) {
+      // --- Branch Management ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS branches (
+          id TEXT PRIMARY KEY, 
+          name TEXT, 
+          location TEXT, 
+          phone TEXT, 
+          manager_id TEXT, 
+          status TEXT DEFAULT 'active',
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 109) {
+      // --- Advanced Manufacturing ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS manufacturing_boms (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          product_id TEXT,
+          description TEXT,
+          total_cost REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS manufacturing_bom_lines (
+          id TEXT PRIMARY KEY,
+          bom_id TEXT,
+          item_id TEXT,
+          quantity REAL,
+          unit_cost REAL,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS manufacturing_orders (
+          id TEXT PRIMARY KEY,
+          order_no TEXT,
+          product_name TEXT,
+          bom_id TEXT,
+          qty_to_produce REAL,
+          actual_qty_produced REAL DEFAULT 0,
+          actual_material_cost REAL DEFAULT 0,
+          actual_overhead_cost REAL DEFAULT 0,
+          total_cost REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending',
+          start_date TEXT,
+          completed_at TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS manufacturing_cut_list (
+          id TEXT PRIMARY KEY,
+          order_id TEXT,
+          width REAL,
+          height REAL,
+          quantity INTEGER,
+          is_cut INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS manufacturing_specifications (
+          id TEXT PRIMARY KEY,
+          order_id TEXT,
+          type TEXT,
+          value TEXT,
+          $metadata
+        )
+      ''');
+    }
+    if (oldVersion < 110) {
+      // --- Medical & Healthcare ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_patients (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          dob TEXT,
+          gender TEXT,
+          blood_group TEXT,
+          medical_history TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_appointments (
+          id TEXT PRIMARY KEY,
+          patient_id TEXT,
+          doctor_id TEXT,
+          date TEXT,
+          time TEXT,
+          reason TEXT,
+          status TEXT DEFAULT 'scheduled',
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_invoices (
+          id TEXT PRIMARY KEY,
+          patient_id TEXT,
+          appointment_id TEXT,
+          total_amount REAL,
+          tax_amount REAL,
+          discount REAL,
+          net_amount REAL,
+          status TEXT DEFAULT 'unpaid',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_medicines (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          generic_name TEXT,
+          category TEXT,
+          stock_qty REAL,
+          unit_price REAL,
+          expiry_date TEXT,
+          $metadata
+        )
+      ''');
+    }
+    if (oldVersion < 111) {
+      // --- Hospitality & Hotel Management ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hotel_rooms (
+          id TEXT PRIMARY KEY,
+          room_number TEXT,
+          type TEXT,
+          floor TEXT,
+          price_per_night REAL,
+          status TEXT DEFAULT 'available', -- available, occupied, maintenance, dirty
+          last_cleaned TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hotel_bookings (
+          id TEXT PRIMARY KEY,
+          room_id TEXT, guest_name TEXT,
+          guest_phone TEXT,
+          check_in TEXT,
+          check_out TEXT,
+          total_price REAL,
+          status TEXT DEFAULT 'confirmed', -- confirmed, checked_in, checked_out, cancelled
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hotel_housekeeping (
+          id TEXT PRIMARY KEY,
+          room_id TEXT,
+          staff_id TEXT,
+          action TEXT, -- cleaning, laundry, repair
+          status TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+    }
+    if (oldVersion < 112) {
+      // Ensure all tables have created_at (some were missed in previous migrations)
+      final tablesToAddCreatedAt = [
+        'contracting_projects', 'project_invoices', 'subcontractors',
+        'hotel_rooms', 'hotel_bookings', 'hotel_housekeeping',
+        'medical_patients', 'medical_appointments', 'medical_invoices', 'medical_medicines',
+        'ecommerce_orders', 'ecommerce_order_items', 'branches',
+        'manufacturing_boms', 'manufacturing_bom_lines', 'manufacturing_orders',
+        'manufacturing_cut_list', 'manufacturing_specifications'
+      ];
+      
+      for (var table in tablesToAddCreatedAt) {
+        try {
+          await db.execute("ALTER TABLE $table ADD COLUMN created_at TEXT");
+        } catch (_) {
+          // Column might already exist
+        }
+      }
+      
+      // Fix fleet_vehicles missing 'name' column which is queried in DbSpecializedMixin
+      try {
+        await db.execute("ALTER TABLE fleet_vehicles ADD COLUMN name TEXT");
+        await db.execute("UPDATE fleet_vehicles SET name = model || ' ' || plate_number WHERE name IS NULL");
+      } catch (_) {}
+    }
+
+    if (oldVersion < 113) {
+      // --- Audit Alerts ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS audit_alerts (
+          id TEXT PRIMARY KEY,
+          type TEXT,
+          description TEXT,
+          severity TEXT,
+          status TEXT DEFAULT 'open',
+          $metadata
+        )
+      ''');
+
+      // --- Real Estate Fixes ---
+      try { await db.execute("ALTER TABLE real_estate_units ADD COLUMN unit_no TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE real_estate_units ADD COLUMN property_name TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE real_estate_units ADD COLUMN rent_amount REAL"); } catch (_) {}
+      
+      try { await db.execute("ALTER TABLE real_estate_contracts ADD COLUMN rent_amount REAL"); } catch (_) {}
+      try { await db.execute("ALTER TABLE real_estate_contracts ADD COLUMN last_payment_date TEXT"); } catch (_) {}
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS real_estate_payments (
+          id TEXT PRIMARY KEY,
+          contract_id TEXT,
+          amount REAL,
+          payment_date TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 114) {
+      // --- Security Audit & Audit Trail ---
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS security_audit (
+          id TEXT PRIMARY KEY,
+          action_type TEXT,
+          description TEXT,
+          is_critical INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS audit_trail (
+          id TEXT PRIMARY KEY,
+          module TEXT,
+          action TEXT,
+          reference_id TEXT,
+          user_id TEXT,
+          details TEXT,
+          timestamp TEXT,
+          device_id TEXT,
+          $metadata
+        )
+      ''');
+
+      // --- Fleet Extensions ---
+      try { await db.execute("ALTER TABLE fleet_vehicles ADD COLUMN driver_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE fleet_vehicles ADD COLUMN fuel_card TEXT"); } catch (_) {}
+      
+      // --- Support Extensions ---
+      try { await db.execute("ALTER TABLE support_tickets ADD COLUMN customer_feedback TEXT"); } catch (_) {}
+    }
+
+    if (oldVersion < 115) {
+      // --- Logistics Extensions ---
+      try { await db.execute("ALTER TABLE shipments ADD COLUMN shipping_cost REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE shipments ADD COLUMN tracking_url TEXT"); } catch (_) {}
+      
+      // Ensure metadata column exists in newer tables
+      final newerTables = ['security_audit', 'audit_trail', 'audit_alerts'];
+      for (var table in newerTables) {
+        try { await db.execute("ALTER TABLE $table ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN sync_status INTEGER DEFAULT 0"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN updated_at TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN device_id TEXT"); } catch (_) {}
+      }
+    }
+
+    if (oldVersion < 116) {
+      // --- Missing Tables Referenced by moduleTableMap (Plan 4) ---
+      
+      // 1. governance_records (used by compliance_governance module)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS governance_records (
+          id TEXT PRIMARY KEY,
+          module_id TEXT,
+          title TEXT,
+          type TEXT,
+          description TEXT,
+          status TEXT DEFAULT 'active',
+          responsible TEXT,
+          review_date TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 2. industrial_jobs (used by ai_robot_industries module)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS industrial_jobs (
+          id TEXT PRIMARY KEY,
+          module_id TEXT,
+          name TEXT,
+          job_type TEXT,
+          machine_id TEXT,
+          status TEXT DEFAULT 'pending',
+          priority TEXT DEFAULT 'medium',
+          start_date TEXT,
+          end_date TEXT,
+          output_qty REAL DEFAULT 0,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 3. meeting_records (used by meeting_mgmt module)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS meeting_records (
+          id TEXT PRIMARY KEY,
+          module_id TEXT,
+          title TEXT,
+          date TEXT,
+          time TEXT,
+          location TEXT,
+          attendees TEXT,
+          minutes TEXT,
+          status TEXT DEFAULT 'Scheduled',
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 4. feasibility_studies (used by feasibility module)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS feasibility_studies (
+          id TEXT PRIMARY KEY,
+          module_id TEXT,
+          name TEXT,
+          project_type TEXT,
+          initial_investment REAL DEFAULT 0,
+          expected_revenue REAL DEFAULT 0,
+          expected_costs REAL DEFAULT 0,
+          roi_percentage REAL DEFAULT 0,
+          payback_months INTEGER DEFAULT 0,
+          npv REAL DEFAULT 0,
+          risk_level TEXT DEFAULT 'medium',
+          status TEXT DEFAULT 'draft',
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 5. tax_filings (used by taxes & taxes_global modules)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tax_filings (
+          id TEXT PRIMARY KEY,
+          module_id TEXT,
+          period_label TEXT,
+          start_date TEXT,
+          end_date TEXT,
+          country TEXT,
+          tax_rate REAL,
+          total_sales_tax REAL DEFAULT 0,
+          total_purchase_tax REAL DEFAULT 0,
+          net_tax_due REAL DEFAULT 0,
+          status TEXT DEFAULT 'draft',
+          filed_date TEXT,
+          filed_at TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // --- Support & Logistics Tables (Plan 5) ---
+      
+      // 1. approval_requests (ApprovalSystemScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS approval_requests (
+          id TEXT PRIMARY KEY,
+          module TEXT,
+          reference_id TEXT,
+          requested_by TEXT,
+          approver_id TEXT,
+          status TEXT DEFAULT 'Pending',
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 2. workflows (WorkflowMgmtScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS workflows (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          trigger_type TEXT,
+          action_type TEXT,
+          condition_json TEXT,
+          is_active INTEGER DEFAULT 1,
+          $metadata
+        )
+      ''');
+
+      // 3. kpi_definitions (KPIManagementScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS kpi_definitions (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          target REAL DEFAULT 0,
+          actual REAL DEFAULT 0,
+          unit TEXT,
+          period TEXT DEFAULT 'Monthly',
+          department TEXT,
+          responsible_id TEXT,
+          $metadata
+        )
+      ''');
+
+      // 4. meetings (MeetingMgmtScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS meetings (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          date TEXT,
+          time TEXT,
+          location TEXT,
+          organizer_id TEXT,
+          attendees_json TEXT,
+          minutes TEXT,
+          status TEXT DEFAULT 'Scheduled',
+          $metadata
+        )
+      ''');
+
+      // 5. support_tickets (SupportTicketsScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS support_tickets (
+          id TEXT PRIMARY KEY,
+          subject TEXT,
+          description TEXT,
+          priority TEXT DEFAULT 'Medium',
+          status TEXT DEFAULT 'Open',
+          assigned_to TEXT,
+          reported_by TEXT,
+          resolution TEXT,
+          $metadata
+        )
+      ''');
+
+      // 6. shipments (ShippingLogisticsScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shipments (
+          id TEXT PRIMARY KEY,
+          tracking_number TEXT,
+          origin TEXT,
+          destination TEXT,
+          sender TEXT,
+          receiver TEXT,
+          status TEXT DEFAULT 'Processing',
+          estimated_delivery TEXT,
+          actual_delivery TEXT,
+          shipping_cost REAL DEFAULT 0,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      // 7. fleet_vehicles (FleetProfessionalScreen)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fleet_vehicles (
+          id TEXT PRIMARY KEY,
+          plate_number TEXT,
+          model TEXT,
+          year TEXT,
+          type TEXT,
+          driver_id TEXT,
+          status TEXT DEFAULT 'active',
+          last_mileage REAL DEFAULT 0,
+          insurance_expiry TEXT,
+          license_expiry TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 117) {
+      // --- Phase 7: Specialized Industries ---
+      
+      // 1. Pharmacies & Medicine
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pharmacy_drugs (
+          id TEXT PRIMARY KEY,
+          scientific_name TEXT,
+          barcode TEXT,
+          category TEXT,
+          requires_prescription INTEGER DEFAULT 0,
+          shelf_location TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS drug_batches (
+          id TEXT PRIMARY KEY,
+          drug_id TEXT,
+          lot_number TEXT,
+          production_date TEXT,
+          expiry_date TEXT,
+          quantity REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 2. Car Trading & Dealerships
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS car_inventory (
+          id TEXT PRIMARY KEY,
+          vin TEXT,
+          make TEXT,
+          model TEXT,
+          year INTEGER,
+          color TEXT,
+          mileage REAL DEFAULT 0,
+          status TEXT DEFAULT 'Available',
+          import_type TEXT,
+          notes TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS vehicle_inspections (
+          id TEXT PRIMARY KEY,
+          car_id TEXT,
+          inspection_date TEXT,
+          inspector_name TEXT,
+          damages_json TEXT,
+          passed INTEGER DEFAULT 1,
+          $metadata
+        )
+      ''');
+
+      // 3. Gas Stations
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fuel_tanks (
+          id TEXT PRIMARY KEY,
+          tank_number TEXT,
+          capacity REAL DEFAULT 0,
+          fuel_type TEXT,
+          current_level REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pump_readings (
+          id TEXT PRIMARY KEY,
+          tank_id TEXT,
+          pump_number TEXT,
+          shift_id TEXT,
+          previous_reading REAL DEFAULT 0,
+          current_reading REAL DEFAULT 0,
+          liters_sold REAL DEFAULT 0,
+          revenue_collected REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 4. Livestock & Agriculture
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS crop_cycles (
+          id TEXT PRIMARY KEY,
+          crop_type TEXT,
+          planting_date TEXT,
+          expected_harvest_date TEXT,
+          area_size REAL DEFAULT 0,
+          status TEXT DEFAULT 'Growing',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS livestock_batches (
+          id TEXT PRIMARY KEY,
+          animal_type TEXT,
+          head_count INTEGER DEFAULT 0,
+          health_status TEXT DEFAULT 'Healthy',
+          next_vaccination TEXT,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 118) {
+      // --- Phase 8: Light Industries & Services ---
+      
+      // 1. Furniture & Wood
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS wood_inventory (
+          id TEXT PRIMARY KEY,
+          wood_type TEXT,
+          thickness REAL,
+          dimensions TEXT,
+          quantity_m3 REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS furniture_assemblies (
+          id TEXT PRIMARY KEY,
+          assembly_name TEXT,
+          components_json TEXT,
+          status TEXT DEFAULT 'Pending',
+          estimated_cost REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 2. Electronics & Appliances
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS appliance_inventory (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          barcode TEXT,
+          serial_number TEXT,
+          brand TEXT,
+          warranty_period_months INTEGER,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS warranty_claims (
+          id TEXT PRIMARY KEY,
+          claim_number TEXT,
+          customer_id TEXT,
+          appliance_id TEXT,
+          fault_description TEXT,
+          repair_status TEXT DEFAULT 'Open',
+          $metadata
+        )
+      ''');
+
+      // 3. Cleaning Materials & Chemicals
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chemical_inventory (
+          id TEXT PRIMARY KEY,
+          chemical_name TEXT,
+          concentration TEXT,
+          volume REAL DEFAULT 0,
+          hazard_level TEXT,
+          expiry_date TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS mixing_batches (
+          id TEXT PRIMARY KEY,
+          batch_number TEXT,
+          ingredients_json TEXT,
+          produced_quantity REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 4. Sanitary Ware
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sanitary_inventory (
+          id TEXT PRIMARY KEY,
+          item_name TEXT,
+          model TEXT,
+          color TEXT,
+          is_set INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sanitary_sets (
+          id TEXT PRIMARY KEY,
+          set_name TEXT,
+          component_ids_json TEXT,
+          $metadata
+        )
+      ''');
+
+      // 5. Office Services & Bookings
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS office_service_catalog (
+          id TEXT PRIMARY KEY,
+          service_name TEXT,
+          pricing_type TEXT,
+          unit_price REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS service_bookings (
+          id TEXT PRIMARY KEY,
+          customer_name TEXT,
+          service_id TEXT,
+          start_time TEXT,
+          end_time TEXT,
+          total_cost REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 119) {
+      // --- Phase 9: Entities (Full CRUD) ---
+      
+      // 1. Branch Chains
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS branch_locations (
+          id TEXT PRIMARY KEY,
+          branch_name TEXT,
+          branch_code TEXT,
+          city TEXT,
+          manager_name TEXT,
+          operating_status TEXT DEFAULT 'Active',
+          target_revenue REAL DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 2. Subsidiary Companies
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS subsidiary_companies (
+          id TEXT PRIMARY KEY,
+          company_name TEXT,
+          sector TEXT,
+          ownership_percentage REAL DEFAULT 100,
+          capital REAL DEFAULT 0,
+          ceo_name TEXT,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 120) {
+      // --- Phase 10: E-Commerce & Supply Chain (Full CRUD) ---
+      
+      // 1. E-Commerce Platforms
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ecommerce_platforms (
+          id TEXT PRIMARY KEY,
+          platform_name TEXT,
+          store_url TEXT,
+          api_key TEXT,
+          last_sync TEXT,
+          total_orders INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      // 2. Shipping Shipments (Supply Chain)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shipping_shipments (
+          id TEXT PRIMARY KEY,
+          tracking_number TEXT,
+          carrier TEXT,
+          origin TEXT,
+          destination TEXT,
+          expected_arrival TEXT,
+          status TEXT DEFAULT 'In Transit',
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 121) {
+      // --- Phase 11: Operations (Trade Contracts, Stock Waste, Barcode Mgmt) ---
+
+      // 1. Trade Contracts
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS trade_contracts_records (
+          id TEXT PRIMARY KEY,
+          contract_title TEXT,
+          second_party TEXT,
+          start_date TEXT,
+          end_date TEXT,
+          contract_value REAL DEFAULT 0,
+          status TEXT DEFAULT 'Active',
+          $metadata
+        )
+      ''');
+
+      // 2. Stock Waste
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS stock_waste_records (
+          id TEXT PRIMARY KEY,
+          item_name TEXT,
+          reason TEXT,
+          quantity REAL DEFAULT 0,
+          financial_loss REAL DEFAULT 0,
+          date_reported TEXT,
+          $metadata
+        )
+      ''');
+
+      // 3. Barcode Management
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS barcode_mgmt_records (
+          id TEXT PRIMARY KEY,
+          product_name TEXT,
+          barcode_format TEXT,
+          barcode_value TEXT,
+          is_printed INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 122) {
+      // --- Phase 12: Enterprise (Recruitment, Performance, CRM, Legal) ---
+
+      // 1. HR Recruitment
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_recruitment_records (
+          id TEXT PRIMARY KEY,
+          candidate_name TEXT,
+          job_position TEXT,
+          stage TEXT DEFAULT 'Applied',
+          rating REAL DEFAULT 0,
+          interview_date TEXT,
+          $metadata
+        )
+      ''');
+
+      // 2. HR Performance
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_performance_records (
+          id TEXT PRIMARY KEY,
+          employee_name TEXT,
+          review_period TEXT,
+          score REAL DEFAULT 0,
+          manager_feedback TEXT,
+          status TEXT DEFAULT 'Draft',
+          $metadata
+        )
+      ''');
+
+      // 3. CRM Leads
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS crm_leads_records (
+          id TEXT PRIMARY KEY,
+          lead_name TEXT,
+          opportunity_value REAL DEFAULT 0,
+          stage TEXT DEFAULT 'New',
+          source TEXT,
+          contact_info TEXT,
+          $metadata
+        )
+      ''');
+
+      // 4. Legal Cases
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS legal_cases_records (
+          id TEXT PRIMARY KEY,
+          case_number TEXT,
+          court_name TEXT,
+          case_type TEXT,
+          next_session TEXT,
+          legal_status TEXT DEFAULT 'Open',
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 123) {
+      // --- Phase 13: Industrial Excellence (Quality, Maintenance) ---
+
+      // 1. Quality Management
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quality_mgmt_records (
+          id TEXT PRIMARY KEY,
+          item_name TEXT,
+          batch_number TEXT,
+          test_type TEXT,
+          result TEXT DEFAULT 'Pending',
+          inspector_name TEXT,
+          inspection_date TEXT,
+          $metadata
+        )
+      ''');
+
+      // 2. Periodic Maintenance
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS periodic_maintenance_records (
+          id TEXT PRIMARY KEY,
+          machine_name TEXT,
+          maintenance_type TEXT,
+          frequency TEXT,
+          last_service TEXT,
+          next_service TEXT,
+          status TEXT DEFAULT 'Scheduled',
+          $metadata
+        )
+      ''');
+    }
+
+    if (oldVersion < 124) {
+      // --- Phase 14: Specialized Sectors (Medical, Hotel, Labs) ---
+
+      // 1. Medical
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_patients_records (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          medical_history TEXT,
+          $metadata
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_appointments_records (
+          id TEXT PRIMARY KEY,
+          patient_id TEXT,
+          patient_name TEXT,
+          date TEXT,
+          time TEXT,
+          status TEXT DEFAULT 'scheduled',
+          $metadata
+        )
+      ''');
+
+      // 2. Hotels
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hotel_rooms_records (
+          id TEXT PRIMARY KEY,
+          room_number TEXT,
+          type TEXT,
+          price_per_night REAL DEFAULT 0,
+          status TEXT DEFAULT 'available',
+          $metadata
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hotel_bookings_records (
+          id TEXT PRIMARY KEY,
+          room_id TEXT,
+          room_number TEXT,
+          guest_name TEXT,
+          check_in TEXT,
+          check_out TEXT,
+          total_price REAL DEFAULT 0,
+          status TEXT DEFAULT 'confirmed',
+          $metadata
+        )
+      ''');
+
+      // 3. Labs
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS lab_tests_records (
+          id TEXT PRIMARY KEY,
+          patient_name TEXT,
+          test_name TEXT,
+          sample_id TEXT,
+          result_value TEXT,
+          status TEXT DEFAULT 'Pending',
+          $metadata
+        )
+      ''');
+    }
+
     if (oldVersion < 44) {
       // Fix tables that were created in v43 without the is_deleted column
-      try { await db.execute("ALTER TABLE real_estate_units ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
       try { await db.execute("ALTER TABLE real_estate_contracts ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
       try { await db.execute("ALTER TABLE investments ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
       try { await db.execute("ALTER TABLE liquidation_requests ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
@@ -647,6 +1862,7 @@ class DatabaseHelper {
           created_at TEXT,
           is_task INTEGER DEFAULT 0,
           task_id TEXT
+        )
       ''');
     }
 
@@ -1108,7 +2324,7 @@ class DatabaseHelper {
         'cost_centers', 'projects', 'budgets', 'assets', 'asset_depreciation_logs', 
         'warehouses', 'inventory_batches', 'inventory_transfers', 'bom', 
         'bom_lines', 'manufacturing_orders', 'cheques', 'financial_custodies', 
-        'asset_custody_logs', 'asset_custody_log', 'channels', 'messages', 'shifts', 'tasks',
+        'asset_custody_logs', 'asset_custody_log', 'channels', 'messages', 'shifts', 'hr_shifts', 'tasks',
         'pos_sessions', 'users', 'draft_invoices'
       ];
 
@@ -1338,6 +2554,22 @@ class DatabaseHelper {
           is_active INTEGER DEFAULT 1,
           created_at TEXT,
           $metadata
+        )
+      ''');
+
+      // 5. Compliance & Governance
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS governance_records (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          description TEXT,
+          status TEXT DEFAULT 'Active',
+          notes TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
         )
       ''');
     }
@@ -1607,7 +2839,91 @@ class DatabaseHelper {
       // v57: Comprehensive Schema Audit Fix
       // Fixes missing columns/tables discovered during production testing
       // ══════════════════════════════════════════════════════════════════
+    }
 
+    if (oldVersion < 100) {
+      // v100: Critical Finance & CRM Infrastructure
+      
+      // 1. General Contracts Table (Index 56)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS contracts (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          partner_id TEXT,
+          partner_name TEXT,
+          partner_type TEXT, -- 'client', 'supplier', 'employee', 'other'
+          start_date TEXT,
+          end_date TEXT,
+          amount REAL DEFAULT 0,
+          currency TEXT DEFAULT 'SAR',
+          status TEXT DEFAULT 'active', -- 'active', 'expired', 'terminated', 'draft'
+          attachment_path TEXT,
+          notes TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 2. Asset Transfers Table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS asset_transfers (
+          id TEXT PRIMARY KEY,
+          asset_id TEXT,
+          from_location TEXT,
+          to_location TEXT,
+          from_cost_center_id TEXT,
+          to_cost_center_id TEXT,
+          transfer_date TEXT,
+          approved_by TEXT,
+          notes TEXT,
+          sync_status INTEGER DEFAULT 0, 
+          updated_at TEXT, 
+          device_id TEXT, 
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 3. Commission Rules Table (Automated calculations)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS commission_rules (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          rule_type TEXT, -- 'flat', 'percentage', 'tiered'
+          value REAL,
+          target_amount REAL DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          sync_status INTEGER DEFAULT 0, 
+          updated_at TEXT, 
+          device_id TEXT, 
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 4. Enhance Clients & Suppliers
+      try { await db.execute("ALTER TABLE clients ADD COLUMN credit_limit REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE clients ADD COLUMN classification TEXT DEFAULT 'normal'"); } catch (_) {}
+      try { await db.execute("ALTER TABLE suppliers ADD COLUMN rating INTEGER DEFAULT 5"); } catch (_) {}
+      
+      // 5. Enhance Employee Loans (Detailed installments tracking)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS loan_installments (
+          id TEXT PRIMARY KEY,
+          loan_id TEXT,
+          due_date TEXT,
+          amount REAL,
+          paid_amount REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending', -- 'pending', 'paid', 'late'
+          payment_date TEXT,
+          sync_status INTEGER DEFAULT 0, 
+          updated_at TEXT, 
+          device_id TEXT, 
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+    
       // 1. Ensure 'documents' table exists (might be missing for users
       //    who upgraded through v48 with an already-existing DB)
       await db.execute('''
@@ -1791,6 +3107,74 @@ class DatabaseHelper {
       debugPrint("✅ Database Migrated to v61: Local schema repairs completed.");
     }
 
+    if (oldVersion < 69) {
+      // v69: Fix budgets table schema (budget_amount)
+      try {
+        await db.execute("ALTER TABLE budgets ADD COLUMN budget_amount REAL DEFAULT 0");
+        debugPrint("✅ Added 'budget_amount' column to budgets");
+      } catch (_) {}
+      
+      // Sync Engine catch-all for budgets
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN sync_status INTEGER DEFAULT 0'); } catch (_) {}
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN device_id TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN updated_at TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (_) {}
+      
+      debugPrint("✅ Database Migrated to v69: Budgets schema repaired.");
+    }
+
+    if (oldVersion < 70) {
+      // v70: Feasibility Studies Schema Update
+      final columns = [
+        'project_name TEXT', 'sector TEXT', 'country TEXT', 
+        'capital REAL DEFAULT 0', 'monthly_costs REAL DEFAULT 0', 
+        'monthly_revenue REAL DEFAULT 0', 'study_years INTEGER DEFAULT 5', 
+        'discount_rate REAL DEFAULT 0.10', 'npv REAL', 'irr REAL', 
+        'payback_months INTEGER', 'success_rate REAL', 'scenario TEXT', 'notes TEXT'
+      ];
+      for (var col in columns) {
+        try {
+          await db.execute('ALTER TABLE feasibility_studies ADD COLUMN $col');
+        } catch (_) {}
+      }
+      debugPrint("✅ Database Migrated to v70: Feasibility Studies schema synchronized.");
+    }
+
+
+    if (oldVersion < 71) {
+      // v71: Fix journal_entry_lines missing account_name and add created_at to many tables
+      try { await db.execute('ALTER TABLE journal_entry_lines ADD COLUMN account_name TEXT'); } catch (_) {}
+      
+      final tablesToAddCreatedAt = [
+        'invoices', 'invoice_lines', 'purchase_invoices', 'purchase_invoice_lines',
+        'journal_entries', 'journal_entry_lines', 'accounts', 'cost_centers',
+        'projects', 'bom_lines', 'asset_custody_logs', 'sales_targets',
+        'employees', 'suppliers', 'clients', 'items', 'budgets', 'assets', 'cheques'
+      ];
+      for (var table in tablesToAddCreatedAt) {
+        try {
+          await db.execute('ALTER TABLE $table ADD COLUMN created_at TEXT');
+        } catch (_) {}
+      }
+      debugPrint("✅ Database Migrated to v71: Global created_at columns and account_name added.");
+    }
+
+    if (oldVersion < 72) {
+      // v72: Add temporal bounds to budgets for overrun detection
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN start_date TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE budgets ADD COLUMN end_date TEXT'); } catch (_) {}
+      debugPrint("✅ Database Migrated to v72: Budget date bounds added.");
+    }
+
+    if (oldVersion < 73) {
+      // v73: Fix security_audit schema drift
+      try { await db.execute('ALTER TABLE security_audit ADD COLUMN action TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE security_audit ADD COLUMN user_id TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE security_audit ADD COLUMN details TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE security_audit ADD COLUMN ip_address TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE security_audit ADD COLUMN created_at TEXT'); } catch (_) {}
+      debugPrint("✅ Database Migrated to v73: security_audit schema unified.");
+    }
 
     if (oldVersion < 62) {
       // v62: Comprehensive User Schema Repair
@@ -2232,7 +3616,7 @@ class DatabaseHelper {
         "CREATE TABLE IF NOT EXISTS employee_loans (id TEXT PRIMARY KEY, employee_id TEXT, amount REAL, monthly_deduction REAL, remaining REAL, start_date TEXT, status TEXT DEFAULT 'active', notes TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS performance_reviews (id TEXT PRIMARY KEY, employee_id TEXT, reviewer_id TEXT, review_date TEXT, rating REAL, comments TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS employee_contracts (id TEXT PRIMARY KEY, employee_id TEXT, contract_type TEXT, start_date TEXT, end_date TEXT, basic_salary REAL, status TEXT DEFAULT 'active', created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
-        "CREATE TABLE IF NOT EXISTS tax_filings (id TEXT PRIMARY KEY, period TEXT, type TEXT, total_tax REAL, status TEXT DEFAULT 'draft', filed_date TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS tax_filings (id TEXT PRIMARY KEY, period TEXT, type TEXT, total_tax REAL, status TEXT DEFAULT 'draft', filed_date TEXT, filed_at TEXT, period_label TEXT, start_date TEXT, end_date TEXT, country TEXT, tax_rate REAL, total_sales_tax REAL, total_purchase_tax REAL, net_tax_due REAL, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS feasibility_studies (id TEXT PRIMARY KEY, title TEXT, data TEXT, result TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS asset_custody_logs (id TEXT PRIMARY KEY, asset_id TEXT, employee_id TEXT, issued_date TEXT, returned_date TEXT, status TEXT, notes TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS receipt_vouchers (id TEXT PRIMARY KEY, client_id TEXT, amount REAL, payment_method TEXT, bank_id TEXT, description TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
@@ -2247,7 +3631,7 @@ class DatabaseHelper {
         "CREATE TABLE IF NOT EXISTS credit_notes (id TEXT PRIMARY KEY, client_id TEXT, invoice_id TEXT, amount REAL, reason TEXT, date TEXT, status TEXT DEFAULT 'draft', created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS fiscal_years (id TEXT PRIMARY KEY, name TEXT, start_date TEXT, end_date TEXT, status TEXT DEFAULT 'active', closing_entry_id TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS currency_rates (id TEXT PRIMARY KEY, from_currency TEXT, to_currency TEXT, rate REAL, date TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
-        "CREATE TABLE IF NOT EXISTS budgets (id TEXT PRIMARY KEY, account_id TEXT, period TEXT, amount REAL DEFAULT 0, spent REAL DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS budgets (id TEXT PRIMARY KEY, account_id TEXT, period TEXT, budget_amount REAL DEFAULT 0, spent REAL DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS maintenance_schedules (id TEXT PRIMARY KEY, asset_id TEXT, type TEXT, scheduled_date TEXT, completed_date TEXT, status TEXT DEFAULT 'scheduled', notes TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS recurring_transactions (id TEXT PRIMARY KEY, description TEXT, amount REAL, account_id TEXT, frequency TEXT, next_run_date TEXT, is_active INTEGER DEFAULT 1, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, partner_id TEXT, partner_type TEXT, amount REAL, type TEXT, date TEXT, notes TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)",
@@ -2290,6 +3674,800 @@ class DatabaseHelper {
       try { await db.execute("ALTER TABLE maintenance_schedules ADD COLUMN payment_account_id TEXT"); } catch (_) {}
       debugPrint("✅ Database Migrated to v68: Added Fleet Management & Maintenance tracking columns.");
     }
+
+    if (oldVersion < 74) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS folders (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          parent_id TEXT,
+          created_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+      try {
+        await db.execute("ALTER TABLE documents ADD COLUMN folder_id TEXT");
+      } catch (_) {}
+      debugPrint("✅ Database Migrated to v74: Added folders support for professional file management.");
+    }
+
+    if (oldVersion < 76) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS roles (
+          id TEXT PRIMARY KEY,
+          company_id TEXT,
+          name TEXT,
+          user_count INTEGER DEFAULT 0,
+          is_preset INTEGER DEFAULT 0,
+          permissions TEXT,
+          created_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+      debugPrint("✅ Database Migrated to v76: Added roles table for Offline Advanced Permissions.");
+    }
+
+    if (oldVersion < 77) {
+      try {
+        await db.execute("ALTER TABLE roles ADD COLUMN created_at TEXT");
+      } catch (_) {}
+      debugPrint("✅ Database Migrated to v77: Added missing created_at to roles table.");
+    }
+
+    if (oldVersion < 78) {
+      try { await db.execute("ALTER TABLE companies ADD COLUMN slug TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN company_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN password_hash TEXT"); } catch (_) {}
+      debugPrint("✅ Database Migrated to v78: Added slug and company isolation columns.");
+    }
+
+    if (oldVersion < 79) {
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN phone TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN job_title TEXT"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v79: Added phone and job_title to system_users.");
+    }
+
+    if (oldVersion < 81) {
+      try { await db.execute("ALTER TABLE crm_leads ADD COLUMN module_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE support_tickets ADD COLUMN module_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE governance_records ADD COLUMN module_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE industrial_jobs ADD COLUMN module_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE specialized_records ADD COLUMN module_id TEXT"); } catch (_) {}
+    }
+
+    if (oldVersion < 80) {
+      await db.execute('CREATE TABLE IF NOT EXISTS governance_records (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, title TEXT, description TEXT, status TEXT, priority TEXT, meta_data TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      await db.execute('CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, title TEXT, priority TEXT, status TEXT, assigned_to TEXT, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      await db.execute('CREATE TABLE IF NOT EXISTS meeting_records (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, title TEXT, date TEXT, location TEXT, attendees TEXT, minutes TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      await db.execute('CREATE TABLE IF NOT EXISTS crm_leads (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, name TEXT, email TEXT, phone TEXT, source TEXT, status TEXT, value REAL, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      await db.execute('CREATE TABLE IF NOT EXISTS industrial_jobs (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, title TEXT, asset_id TEXT, status TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      await db.execute('CREATE TABLE IF NOT EXISTS specialized_records (id TEXT PRIMARY KEY, module_id TEXT, company_id TEXT, name TEXT, category TEXT, status TEXT, amount REAL, notes TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
+      debugPrint("💎 Database Migrated to v80: Global Enterprise tables initialized.");
+    }
+
+    if (oldVersion < 83) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS module_settings (
+          module_id TEXT,
+          setting_key TEXT,
+          setting_value TEXT,
+          PRIMARY KEY (module_id, setting_key)
+        )
+      ''');
+      debugPrint("🛠️ Database Migrated to v83: Added module_settings table.");
+    }
+    if (oldVersion < 84) {
+      // Phase 1: Multi-Branch & Approval Workflows
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS branches (
+          id TEXT PRIMARY KEY,
+          company_id TEXT,
+          name TEXT,
+          code TEXT,
+          address TEXT,
+          phone TEXT,
+          is_main INTEGER DEFAULT 0,
+          status TEXT DEFAULT 'active',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS approval_requests (
+          id TEXT PRIMARY KEY,
+          entity_type TEXT, -- 'invoice', 'payment', 'journal_entry'
+          entity_id TEXT,
+          requester_id TEXT,
+          approver_id TEXT,
+          status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+          request_date TEXT,
+          action_date TEXT,
+          comments TEXT,
+          $metadata
+        )
+      ''');
+
+      // Add branch_id to core tables for multi-branch isolation
+      final tablesToUpdate = [
+        'invoices', 'purchase_invoices', 'journal_entries', 'journal_entry_lines',
+        'items', 'employees', 'clients', 'suppliers', 'payments', 'warehouses',
+        'system_users', 'pos_sessions', 'shifts', 'hr_shifts', 'expenses'
+      ];
+
+      for (var table in tablesToUpdate) {
+        try {
+          await db.execute("ALTER TABLE $table ADD COLUMN branch_id TEXT");
+        } catch (_) {
+          // Column might already exist in some edge cases
+        }
+      }
+
+      try {
+        await db.execute("ALTER TABLE companies ADD COLUMN is_multi_branch INTEGER DEFAULT 0");
+      } catch (_) {}
+      
+      debugPrint("🚀 Database Migrated to v84: Multi-Branch & Approval Workflows initialized.");
+    }
+    if (oldVersion < 85) {
+      // Phase 2: Advanced Inventory & Supply Chain
+      try { await db.execute("ALTER TABLE inventory_transactions ADD COLUMN warehouse_id TEXT"); } catch (_) {}
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS item_serials (
+          id TEXT PRIMARY KEY,
+          item_id TEXT,
+          serial_number TEXT,
+          status TEXT DEFAULT 'available', 
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS landed_costs (
+          id TEXT PRIMARY KEY,
+          purchase_invoice_id TEXT,
+          journal_entry_id TEXT,
+          amount REAL,
+          description TEXT,
+          $metadata
+        )
+      ''');
+      
+      debugPrint("🚀 Database Migrated to v85: Advanced Inventory & Supply Chain initialized.");
+    }
+    if (oldVersion < 86) {
+      try { await db.execute("ALTER TABLE fiscal_years ADD COLUMN sync_status INTEGER DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE fiscal_years ADD COLUMN updated_at TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE fiscal_years ADD COLUMN device_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE fiscal_years ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v86: Fixed fiscal_years schema.");
+    }
+    if (oldVersion < 87) {
+      // Phase 3: Cost Centers & Financial Performance
+      try { await db.execute("ALTER TABLE cost_centers ADD COLUMN parent_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE cost_centers ADD COLUMN branch_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE budgets ADD COLUMN branch_id TEXT"); } catch (_) {}
+      
+      // Ensure metadata columns for these tables
+      for (var table in ['cost_centers', 'budgets']) {
+        try { await db.execute("ALTER TABLE $table ADD COLUMN sync_status INTEGER DEFAULT 0"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN updated_at TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
+      }
+      
+      debugPrint("🚀 Database Migrated to v87: Cost Centers & Budgets enhanced.");
+    }
+    if (oldVersion < 88) {
+      // Phase 4: Advanced HR & Payroll
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_shifts (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          start_time TEXT,
+          end_time TEXT,
+          grace_period INTEGER DEFAULT 15,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS loan_installments (
+          id TEXT PRIMARY KEY,
+          loan_id TEXT,
+          due_date TEXT,
+          amount REAL,
+          status TEXT DEFAULT 'pending',
+          $metadata
+        )
+      ''');
+
+      try { await db.execute("ALTER TABLE employees ADD COLUMN shift_id TEXT"); } catch (_) {}
+      
+      debugPrint("🚀 Database Migrated to v88: Advanced HR & Payroll initialized.");
+    }
+    if (oldVersion < 89) {
+      // v89: Fix HR Shifts table creation for existing users
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_shifts (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          start_time TEXT,
+          end_time TEXT,
+          grace_period INTEGER DEFAULT 15,
+          $metadata
+        )
+      ''');
+      debugPrint("🚀 Database Migrated to v89: HR Shifts table created successfully.");
+    }
+
+    if (oldVersion < 90) {
+      // v90: Manufacturing Phase 2 - WIP & Schema Unification
+      try { await db.execute("ALTER TABLE bom ADD COLUMN finished_good_item_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE bom ADD COLUMN estimated_overhead_cost REAL DEFAULT 0"); } catch (_) {}
+      
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN actual_qty_produced REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN actual_overhead_cost REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN actual_material_cost REAL DEFAULT 0"); } catch (_) {}
+      
+      // Ensure WIP account exists
+      final accRes = await db.query('accounts', where: 'id = ?', whereArgs: ['ACC_WIP']);
+      if (accRes.isEmpty) {
+        await db.insert('accounts', {
+          'id': 'ACC_WIP',
+          'code': '1205',
+          'name': 'الإنتاج تحت التشغيل (WIP)',
+          'type': 'asset',
+          'balance': 0.0,
+          'sync_status': 0,
+          'is_deleted': 0
+        });
+      }
+      
+      debugPrint("🚀 Database Migrated to v90: Manufacturing WIP & Schema Unified.");
+    }
+
+    if (oldVersion < 91) {
+      // v91: Manufacturing Phase 3 - Quality Control & Cost Centers
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN qc_status TEXT DEFAULT 'pending'"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN qc_notes TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN inspected_by TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN cost_center_id TEXT"); } catch (_) {}
+      
+      debugPrint("🚀 Database Migrated to v91: QC Tracking & Cost Centers added.");
+    }
+
+    if (oldVersion < 92) {
+      // v92: Projects Phase 2 - Progress & Cost Tracking
+      try { await db.execute("ALTER TABLE projects ADD COLUMN progress REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE projects ADD COLUMN actual_cost REAL DEFAULT 0"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v92: Projects Progress & Cost Tracking added.");
+    }
+
+    if (oldVersion < 93) {
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN filed_date TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN filed_at TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN period_label TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN start_date TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN end_date TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN country TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN tax_rate REAL"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN total_sales_tax REAL"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN total_purchase_tax REAL"); } catch (_) {}
+      try { await db.execute("ALTER TABLE tax_filings ADD COLUMN net_tax_due REAL"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v93: Tax Filings professional columns added.");
+    }
+
+    if (oldVersion < 94) {
+      // v94: Ensure employees table has all columns needed by both HR Screen and HR Professional Screen
+      try { await db.execute("ALTER TABLE employees ADD COLUMN position TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE employees ADD COLUMN hire_date TEXT"); } catch (_) {}
+      // Ensure system_users table has all needed columns (was previously queried as 'users')
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN company_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN password_hash TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN phone TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN job_title TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE system_users ADD COLUMN name TEXT"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v94: Unified HR & Users schema integrity fix.");
+    }
+
+    // v95 was previously applied — kept for compatibility
+    if (oldVersion < 95) {
+      debugPrint("🚀 Database Migrated to v95: (legacy — no-op).");
+    }
+
+    if (oldVersion < 97) {
+      // v97: Stage 1 Infrastructure - Generic Module Records & Structured HR
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS module_records (
+          id TEXT PRIMARY KEY,
+          module_id TEXT NOT NULL,
+          data TEXT NOT NULL, -- JSON formatted data
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_departments (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          manager_id TEXT,
+          parent_id TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS hr_positions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          department_id TEXT,
+          description TEXT,
+          salary_range_min REAL,
+          salary_range_max REAL,
+          created_at TEXT,
+          updated_at TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS contracts (
+          id TEXT PRIMARY KEY,
+          module_id TEXT, -- For differentiating between HR, Client, Supplier contracts
+          title TEXT,
+          party_id TEXT, -- ID of employee, client, or supplier
+          party_type TEXT, -- 'employee', 'client', 'supplier'
+          start_date TEXT,
+          end_date TEXT,
+          amount REAL,
+          status TEXT DEFAULT 'active',
+          file_path TEXT,
+          notes TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      debugPrint("🚀 Database Migrated to v97: Infrastructure Stage 1 (Module Records, HR Structure, Contracts) initialized.");
+    }
+
+    if (oldVersion < 101) {
+      // ══════════════════════════════════════════════════════════════════
+      // v101: Final Professionalization Suite
+      // ══════════════════════════════════════════════════════════════════
+      
+      // 1. Employee Loans: Interest & Remaining Balance Fix
+      try { await db.execute('ALTER TABLE employee_loans ADD COLUMN interest_rate REAL DEFAULT 0'); } catch (_) {}
+      try { await db.execute('ALTER TABLE employee_loans ADD COLUMN total_interest REAL DEFAULT 0'); } catch (_) {}
+      
+      // 2. Payroll Structure (JSON for allowances/deductions)
+      try { await db.execute('ALTER TABLE employees ADD COLUMN allowances_json TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE employees ADD COLUMN deductions_json TEXT'); } catch (_) {}
+      
+      // 3. Supplier Performance
+      try { await db.execute('ALTER TABLE suppliers ADD COLUMN lead_time_rating INTEGER DEFAULT 5'); } catch (_) {}
+      try { await db.execute('ALTER TABLE suppliers ADD COLUMN price_rating INTEGER DEFAULT 5'); } catch (_) {}
+      try { await db.execute('ALTER TABLE suppliers ADD COLUMN quality_rating INTEGER DEFAULT 5'); } catch (_) {}
+      
+      // 4. Financial Custody Settlements
+      try { await db.execute('ALTER TABLE financial_custodies ADD COLUMN settlement_status TEXT DEFAULT "pending"'); } catch (_) {}
+      try { await db.execute('ALTER TABLE financial_custodies ADD COLUMN settlement_date TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE financial_custodies ADD COLUMN settlement_entry_id TEXT'); } catch (_) {}
+
+      // 5. Asset Transfers
+      try { await db.execute('ALTER TABLE assets ADD COLUMN current_branch_id TEXT'); } catch (_) {}
+
+      debugPrint("🚀 Database Migrated to v101: Final Professionalization Suite complete.");
+    }
+
+    if (oldVersion < 125) {
+      // v125: Fix missing schema columns
+      try { await db.execute("ALTER TABLE branches ADD COLUMN location TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE branches ADD COLUMN manager_id TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE performance_reviews ADD COLUMN comments TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE performance_reviews ADD COLUMN reviewer_id TEXT"); } catch (_) {}
+      try { await db.execute("UPDATE performance_reviews SET comments = manager_feedback WHERE comments IS NULL AND manager_feedback IS NOT NULL"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v125: Missing schema columns added.");
+    }
+
+    if (oldVersion < 126) {
+      // v126: Comprehensive Data Visibility Fix
+      // 1. Missing columns in core tables
+      try { await db.execute("ALTER TABLE journal_entries ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE invoices ADD COLUMN is_return INTEGER DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE purchase_invoices ADD COLUMN is_return INTEGER DEFAULT 0"); } catch (_) {}
+      
+      // 2. Supplier performance ratings (if missed in earlier migrations)
+      try { await db.execute("ALTER TABLE suppliers ADD COLUMN lead_time_rating INTEGER DEFAULT 5"); } catch (_) {}
+      try { await db.execute("ALTER TABLE suppliers ADD COLUMN price_rating INTEGER DEFAULT 5"); } catch (_) {}
+      try { await db.execute("ALTER TABLE suppliers ADD COLUMN quality_rating INTEGER DEFAULT 5"); } catch (_) {}
+
+      // 3. New Tables for Specialized Modules
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS audit_alerts (
+          id TEXT PRIMARY KEY,
+          type TEXT, -- 'risk', 'compliance', 'unusual_activity'
+          severity TEXT, -- 'high', 'medium', 'low'
+          message TEXT,
+          date TEXT,
+          is_resolved INTEGER DEFAULT 0,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pos_receipts (
+          id TEXT PRIMARY KEY,
+          total REAL DEFAULT 0,
+          subtotal REAL DEFAULT 0,
+          tax_amount REAL DEFAULT 0,
+          discount_amount REAL DEFAULT 0,
+          date TEXT,
+          client_id TEXT,
+          shift_id TEXT,
+          payment_method TEXT DEFAULT 'cash',
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pos_receipt_lines (
+          id TEXT PRIMARY KEY,
+          receipt_id TEXT,
+          item_id TEXT,
+          name TEXT,
+          quantity REAL,
+          price REAL,
+          total REAL DEFAULT 0
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS promotions (
+          id TEXT PRIMARY KEY,
+          item_id TEXT,
+          discount_percentage REAL,
+          reason TEXT,
+          $metadata
+        )
+      ''');
+
+      // 4. Update feasibility_studies to match specialized module fields
+      try { await db.execute("DROP TABLE IF EXISTS feasibility_studies"); } catch(_) {}
+      await db.execute('''
+        CREATE TABLE feasibility_studies (
+          id TEXT PRIMARY KEY,
+          project_name TEXT,
+          sector TEXT,
+          country TEXT,
+          capital REAL,
+          monthly_costs REAL,
+          monthly_revenue REAL,
+          study_years INTEGER,
+          discount_rate REAL,
+          npv REAL,
+          irr REAL,
+          payback_months INTEGER,
+          success_rate REAL,
+          scenario TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS audit_trail (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          action TEXT,
+          table_name TEXT,
+          record_id TEXT,
+          old_data TEXT,
+          new_data TEXT,
+          $metadata
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sales_targets (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT,
+          target_amount REAL,
+          period TEXT,
+          $metadata
+        )
+      ''');
+
+      debugPrint("🚀 Database Migrated to v126: All missing tables and data visibility patches applied.");
+    }
+
+    if (oldVersion < 127) {
+      // v127: Fix 'contracts' table column inconsistency (amount vs value)
+      try { 
+        await db.execute("ALTER TABLE contracts ADD COLUMN value REAL DEFAULT 0"); 
+        debugPrint("✅ Added 'value' column to contracts table.");
+      } catch (e) {
+        debugPrint("ℹ️ contracts.value might already exist: $e");
+      }
+      debugPrint("🚀 Database Migrated to v127: Contracts schema repaired.");
+    }
+
+    if (oldVersion < 128) {
+      // v128: Ensure all sync metadata columns exist for contracts
+      final contractsColumns = {
+        'device_id': 'TEXT',
+        'updated_at': 'TEXT',
+        'sync_status': 'INTEGER DEFAULT 0',
+        'is_deleted': 'INTEGER DEFAULT 0',
+        'created_at': 'TEXT',
+      };
+      for (var col in contractsColumns.entries) {
+        try { 
+          await db.execute("ALTER TABLE contracts ADD COLUMN ${col.key} ${col.value}"); 
+          debugPrint("✅ Added '${col.key}' to contracts table.");
+        } catch (_) {}
+      }
+      debugPrint("🚀 Database Migrated to v128: Contracts metadata repaired.");
+    }
+
+    if (oldVersion < 129) {
+      try {
+        await db.execute("ALTER TABLE payments ADD COLUMN payment_method TEXT");
+        debugPrint("✅ Added 'payment_method' to payments table.");
+      } catch (e) {
+        debugPrint("ℹ️ payments.payment_method might already exist: $e");
+      }
+      debugPrint("🚀 Database Migrated to v129: Payments schema repaired.");
+    }
+    
+    if (oldVersion < 130) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS risk_incidents (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          description TEXT,
+          impact TEXT,
+          status TEXT, -- 'pending', 'investigating', 'mitigated', 'resolved'
+          date TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+      ''');
+    }
+
+    if (oldVersion < 131) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS governance_records (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          description TEXT,
+          status TEXT DEFAULT 'Active',
+          notes TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          sync_status INTEGER DEFAULT 0,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+    }
+
+    if (oldVersion < 132) {
+      // v132: Harmonize support_tickets schema (ensure 'subject' and 'description' exist)
+      final supportColumns = {
+        'subject': 'TEXT',
+        'description': 'TEXT',
+        'module_id': 'TEXT',
+        'company_id': 'TEXT',
+      };
+      for (var col in supportColumns.entries) {
+        try { 
+          await db.execute("ALTER TABLE support_tickets ADD COLUMN ${col.key} ${col.value}"); 
+        } catch (_) {}
+      }
+      debugPrint("🚀 Database Migrated to v132: Support tickets schema repaired.");
+    }
+
+    if (oldVersion < 133) {
+      // v133: Harmonize meetings schema
+      final meetingColumns = {
+        'updated_at': 'TEXT',
+        'sync_status': 'INTEGER DEFAULT 0',
+        'device_id': 'TEXT',
+        'created_at': 'TEXT',
+      };
+      for (var col in meetingColumns.entries) {
+        try { 
+          await db.execute("ALTER TABLE meetings ADD COLUMN ${col.key} ${col.value}"); 
+        } catch (_) {}
+      }
+      debugPrint("🚀 Database Migrated to v133: Meetings schema repaired.");
+    }
+
+    if (oldVersion < 134) {
+      // v134: Fix POS Receipts schema
+      try {
+        await db.execute("ALTER TABLE pos_receipts ADD COLUMN subtotal REAL DEFAULT 0");
+      } catch (_) {}
+      debugPrint("🚀 Database Migrated to v134: POS Receipts subtotal added.");
+    }
+    if (oldVersion < 135) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS risk_incidents (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          description TEXT,
+          impact TEXT DEFAULT 'medium',
+          status TEXT DEFAULT 'pending',
+          date TEXT,
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          created_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0
+        )
+      ''');
+
+      try { await db.execute("ALTER TABLE medical_patients ADD COLUMN email TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE medical_patients ADD COLUMN dob TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE medical_patients ADD COLUMN gender TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE medical_patients ADD COLUMN blood_group TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE hotel_rooms ADD COLUMN floor TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE hotel_rooms ADD COLUMN last_cleaned TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE hotel_bookings ADD COLUMN guest_phone TEXT"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v135");
+    }
+
+    if (oldVersion < 136) {
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN order_no TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN product_name TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN actual_qty_produced REAL DEFAULT 0"); } catch (_) {}
+      try { await db.execute("ALTER TABLE manufacturing_orders ADD COLUMN completed_at TEXT"); } catch (_) {}
+      debugPrint("🚀 Database Migrated to v136: Manufacturing Orders columns added.");
+    }
+
+    if (oldVersion < 137) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS real_estate_maintenance (
+          id TEXT PRIMARY KEY,
+          unit_id TEXT,
+          description TEXT,
+          request_date TEXT,
+          completion_date TEXT,
+          cost REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending',
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          created_at TEXT
+        )
+      ''');
+      debugPrint("🚀 Database Migrated to v137: Real Estate Maintenance table added.");
+    }
+
+    if (oldVersion < 138) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fleet_driver_assignments (
+          id TEXT PRIMARY KEY,
+          vehicle_id TEXT,
+          employee_id TEXT,
+          start_date TEXT,
+          end_date TEXT,
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          created_at TEXT
+        )
+      ''');
+      debugPrint("🚀 Database Migrated to v138: Fleet Driver Assignments table added.");
+    }
+
+    if (oldVersion < 139) {
+      try {
+        await db.execute("ALTER TABLE medical_medicines ADD COLUMN price REAL DEFAULT 0");
+        debugPrint("✅ Added 'price' column to medical_medicines table.");
+      } catch (e) {
+        debugPrint("ℹ️ medical_medicines.price might already exist: $e");
+      }
+      debugPrint("🚀 Database Migrated to v139: Medical medicines price column added.");
+    }
+
+    if (oldVersion < 140) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS folders (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          parent_id TEXT,
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          created_at TEXT
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          file_path TEXT,
+          file_type TEXT,
+          folder_id TEXT,
+          status TEXT DEFAULT 'active',
+          sync_status INTEGER DEFAULT 0,
+          updated_at TEXT,
+          device_id TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          created_at TEXT
+        )
+      ''');
+      debugPrint("🚀 Database Migrated to v140: File Manager tables added.");
+    }
+
+    if (oldVersion < 141) {
+      // v141: Add tenant_id to real_estate_contracts for professional client linking
+      try {
+        await db.execute("ALTER TABLE real_estate_contracts ADD COLUMN tenant_id TEXT");
+        debugPrint("✅ Added tenant_id to real_estate_contracts");
+      } catch (e) {
+        debugPrint("⚠️ Could not add tenant_id to real_estate_contracts: $e");
+      }
+    }
+
+    if (oldVersion < 142) {
+      // v142: Finalizing Industrial Schema (Mixing Batches, Sanitary Ware, Electronics)
+      try { await db.execute("ALTER TABLE mixing_batches ADD COLUMN status TEXT DEFAULT 'COMPLETED'"); } catch (_) {}
+      try { await db.execute("ALTER TABLE mixing_batches ADD COLUMN branch_id TEXT"); } catch (_) {}
+      
+      try { await db.execute("ALTER TABLE sanitary_sets ADD COLUMN description TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE sanitary_sets ADD COLUMN status TEXT DEFAULT 'ACTIVE'"); } catch (_) {}
+      try { await db.execute("ALTER TABLE sanitary_sets ADD COLUMN branch_id TEXT"); } catch (_) {}
+      
+      try { await db.execute("ALTER TABLE warranty_claims ADD COLUMN serial_number TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE warranty_claims ADD COLUMN model TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE warranty_claims ADD COLUMN issue TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE warranty_claims ADD COLUMN branch_id TEXT"); } catch (_) {}
+      
+      debugPrint("🚀 Database Migrated to v142: Industrial Schema Finalized.");
+    }
+
+    if (oldVersion < 143) {
+      // 1. Fix Furniture Professional
+      try { await db.execute("ALTER TABLE furniture_assemblies ADD COLUMN notes TEXT"); } catch (_) {}
+      try { await db.execute("ALTER TABLE furniture_assemblies ADD COLUMN created_at TEXT"); } catch (_) {}
+      
+      // 2. Fix Fleet & Specialized missing columns
+      final industryTables = [
+        'fleet_vehicles', 'wood_inventory', 'appliance_inventory', 
+        'warranty_claims', 'chemical_inventory', 'mixing_batches', 
+        'sanitary_inventory', 'sanitary_sets', 'office_service_catalog', 
+        'service_bookings', 'real_estate_units', 'real_estate_contracts'
+      ];
+      
+      for (var table in industryTables) {
+        try { await db.execute("ALTER TABLE $table ADD COLUMN created_at TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE $table ADD COLUMN updated_at TEXT"); } catch (_) {}
+      }
+      
+      debugPrint("🚀 Database Migrated to v143: Industrial Schema Stabilization Complete.");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -2299,6 +4477,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE companies (
         id TEXT PRIMARY KEY,
+        slug TEXT,
         name TEXT,
         industry_type TEXT,
         cr_number TEXT,
@@ -2324,7 +4503,21 @@ class DatabaseHelper {
         tax_id TEXT,
         address TEXT,
         balance REAL DEFAULT 0,
+        credit_limit REAL DEFAULT 0,
+        category TEXT DEFAULT 'regular', -- 'vip', 'regular', 'debtor'
         user_id TEXT,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS risk_incidents (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        description TEXT,
+        impact TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'pending',
+        date TEXT,
         $metadata
       )
     ''');
@@ -2366,6 +4559,37 @@ class DatabaseHelper {
         attachment_path TEXT,
         sales_agent_id TEXT,
         $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE user_roles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        permissions TEXT NOT NULL, -- JSON List of dot-notation perms
+        is_system INTEGER DEFAULT 0,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE contracts (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        contract_type TEXT, -- 'client', 'supplier', 'employee', 'legal'
+        party_id TEXT, -- ID of client/supplier/employee
+        start_date TEXT,
+        end_date TEXT,
+        amount REAL DEFAULT 0,
+        value REAL DEFAULT 0,
+        status TEXT DEFAULT 'active', -- 'active', 'expired', 'terminated'
+        description TEXT,
+        attachment_path TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        sync_status INTEGER DEFAULT 0,
+        device_id TEXT,
+        is_deleted INTEGER DEFAULT 0
       )
     ''');
 
@@ -2412,6 +4636,16 @@ class DatabaseHelper {
         quantity REAL,
         date TEXT,
         status TEXT,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE folders (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        parent_id TEXT,
+        created_at TEXT,
         $metadata
       )
     ''');
@@ -2512,6 +4746,30 @@ class DatabaseHelper {
         model TEXT,
         year TEXT,
         last_mileage REAL DEFAULT 0,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE fleet_fuel_logs (
+        id TEXT PRIMARY KEY,
+        vehicle_id TEXT,
+        date TEXT,
+        liter_count REAL,
+        cost REAL,
+        odometer REAL,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE fleet_maintenance_logs (
+        id TEXT PRIMARY KEY,
+        vehicle_id TEXT,
+        date TEXT,
+        description TEXT,
+        cost REAL,
+        next_maintenance_date TEXT,
         $metadata
       )
     ''');
@@ -2660,6 +4918,7 @@ class DatabaseHelper {
         amount REAL,
         type TEXT,
         date TEXT,
+        payment_method TEXT,
         attachment_path TEXT,
         $metadata
       )
@@ -2684,6 +4943,8 @@ class DatabaseHelper {
         end_date TEXT,
         status TEXT DEFAULT 'active',
         manager_id TEXT,
+        progress REAL DEFAULT 0,
+        actual_cost REAL DEFAULT 0,
         $metadata
       )
     ''');
@@ -2697,6 +4958,17 @@ class DatabaseHelper {
         returned_date TEXT,
         status TEXT,
         notes TEXT,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE hr_shifts (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        start_time TEXT,
+        end_time TEXT,
+        grace_period INTEGER DEFAULT 15,
         $metadata
       )
     ''');
@@ -2762,7 +5034,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         account_id TEXT,
         project_id TEXT,
-        allocated_amount REAL,
+        budget_amount REAL DEFAULT 0,
         period TEXT,
         created_at TEXT,
         cost_center_id TEXT,
@@ -2774,9 +5046,12 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE system_users (
         id TEXT PRIMARY KEY,
+        company_id TEXT,
         username TEXT UNIQUE,
         name TEXT,
         email TEXT,
+        phone TEXT,
+        job_title TEXT,
         password_hash TEXT,
         employee_id TEXT,
         role TEXT DEFAULT 'employee',
@@ -2788,6 +5063,19 @@ class DatabaseHelper {
         sync_status INTEGER DEFAULT 0,
         device_id TEXT,
         is_deleted INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE roles (
+        id TEXT PRIMARY KEY,
+        company_id TEXT,
+        name TEXT,
+        user_count INTEGER DEFAULT 0,
+        is_preset INTEGER DEFAULT 0,
+        permissions TEXT,
+        created_at TEXT,
+        $metadata
       )
     ''');
 
@@ -2819,6 +5107,7 @@ class DatabaseHelper {
         file_path TEXT,
         file_type TEXT,
         expiry_date TEXT,
+        folder_id TEXT,
         status TEXT DEFAULT 'active',
         created_at TEXT,
         updated_at TEXT,
@@ -3020,6 +5309,29 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE TABLE manufacturing_specifications (
+        id TEXT PRIMARY KEY,
+        order_id TEXT,
+        type TEXT, -- 'glass_type', 'thickness', 'edging', 'tempering'
+        value TEXT,
+        notes TEXT,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE manufacturing_cut_list (
+        id TEXT PRIMARY KEY,
+        order_id TEXT,
+        width REAL,
+        height REAL,
+        quantity INTEGER,
+        is_cut INTEGER DEFAULT 0,
+        $metadata
+      )
+    ''');
+
+    await db.execute('''
       CREATE TABLE cheques (
         id TEXT PRIMARY KEY,
         cheque_number TEXT,
@@ -3051,6 +5363,25 @@ class DatabaseHelper {
         journal_entry_clear TEXT,
         clearance_date TEXT,
         notes TEXT,
+        $metadata
+      )
+    ''');
+
+    // Dedicated Expenses table (petty cash, operational costs)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS expenses (
+        id TEXT PRIMARY KEY,
+        description TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0,
+        category TEXT DEFAULT 'misc',
+        expense_date TEXT,
+        payment_method TEXT DEFAULT 'cash',
+        vendor TEXT,
+        reference_no TEXT,
+        notes TEXT,
+        status TEXT DEFAULT 'approved',
+        attachment_path TEXT,
+        created_by TEXT,
         $metadata
       )
     ''');
@@ -3109,6 +5440,23 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS specialized_records (
+        id TEXT PRIMARY KEY,
+        module_id TEXT NOT NULL,
+        name TEXT,
+        category TEXT,
+        amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'active',
+        notes TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        sync_status INTEGER DEFAULT 0,
+        device_id TEXT,
+        is_deleted INTEGER DEFAULT 0
+      )
+    ''');
+
     // 🌟 THE MAGIC SPRINT FIX 🌟
     // Apply all iterative upgrades to guarantee no table is left behind!
     await _onUpgrade(db, 0, version);
@@ -3149,4436 +5497,12 @@ class DatabaseHelper {
     }
   }
 
-  /// Checks if industry can be changed (i.e., no financial transactions exist)
-  Future<bool> canChangeIndustry() async {
-    final db = await database;
-    final count = await db.rawQuery('SELECT COUNT(*) as count FROM journal_entries');
-    return (count.first['count'] as int) == 0;
-  }
-
-  /// Seeds industry-specific accounts after clearing existing ones (if safe)
-  Future<void> seedIndustryAccounts(IndustryType type) async {
-    final db = await database;
-    
-    // 1. Logic Check (Senior Level Requirement)
-    if (!await canChangeIndustry()) {
-      throw Exception('TRANSACTIONS_EXIST');
-    }
-
-    try {
-      await db.transaction((txn) async {
-        // 2. Clear existing accounts safely
-        await txn.delete('accounts');
-
-        // 3. Get specialized template
-        final templateAccounts = COATemplate.getTemplateAccounts(type);
-        
-        // 4. Batch Insert (Production Ready with Metadata)
-        final String now = DateTime.now().toIso8601String();
-        for (var account in templateAccounts) {
-          await txn.insert('accounts', {
-            'id': account['id'] ?? 'ACC_${account['code']}',
-            'code': account['code'],
-            'name': account['name'],
-            'type': account['type'],
-            'sync_status': 0,
-            'updated_at': now,
-            'device_id': 'onboarding_init',
-            'is_deleted': 0
-          }, conflictAlgorithm: ConflictAlgorithm.replace);
-        }
-      });
-    } catch (e) {
-      debugPrint('Database Seeding Error: $e');
-      rethrow;
-    }
-  }
-
-  // --- Utility for Current Company Context & Settings ---
-  
-  // --- Database Logic (CRUD) ---
-
   Future<void> _seedDefaultCostCenters(Database db) async {
     final count = await db.rawQuery('SELECT COUNT(*) as count FROM cost_centers');
     if ((count.first['count'] as int) == 0) {
       await db.insert('cost_centers', {'id': 'CC_MAIN', 'name': 'المركز الرئيسي', 'code': '100'}, conflictAlgorithm: ConflictAlgorithm.replace);
       await db.insert('cost_centers', {'id': 'CC_SALES', 'name': 'قسم المبيعات', 'code': '200'}, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-  }
-
-  static const String _companyIdKey = 'current_company_id';
-  static const String _companyNameKey = 'current_company_name';
-  static const String _industryTypeKey = 'current_industry_type';
-  static const String _taxRateKey = 'current_tax_rate';
-  static const String _currencyKey = 'current_currency';
-  static const String _countryKey = 'current_country';
-  static const String _logoPathKey = 'current_company_logo';
-  static const String _vatNumberKey = 'current_vat_number'; 
-  static const String _addressKey = 'current_address'; 
-  static const String _phoneKey = 'current_phone';
-  static const String _emailKey = 'current_email';
-  static const String _crNumberKey = 'current_cr_number';
-  static const String _closingDateKey = 'current_closing_date';
-  static const String _lastSyncKey = 'last_sync_timestamp';
-
-  Future<String> getLastSyncTimestamp() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_lastSyncKey) ?? '1970-01-01T00:00:00Z';
-  }
-
-  Future<void> setLastSyncTimestamp(String timestamp) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastSyncKey, timestamp);
-  }
-
-  Future<void> setCurrentCompany(String companyId, String industryType) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_companyIdKey, companyId);
-    await prefs.setString(_industryTypeKey, industryType);
-  }
-
-  Future<void> setCompanySettings({
-    required double taxRate,
-    required String currency,
-    required String country,
-    String? vatNumber,
-    String? address,
-    String? logoPath,
-    String? phone,
-    String? email,
-    String? crNumber,
-    String? companyName,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_taxRateKey, taxRate);
-    await prefs.setString(_currencyKey, currency);
-    await prefs.setString(_countryKey, country);
-    if (vatNumber != null) await prefs.setString(_vatNumberKey, vatNumber);
-    if (address != null) await prefs.setString(_addressKey, address);
-    if (logoPath != null) await prefs.setString(_logoPathKey, logoPath);
-    if (phone != null) await prefs.setString(_phoneKey, phone);
-    if (email != null) await prefs.setString(_emailKey, email);
-    if (crNumber != null) await prefs.setString(_crNumberKey, crNumber);
-    if (companyName != null) await prefs.setString(_companyNameKey, companyName);
-  }
-
-  Future<void> setClosingDate(String? date) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (date == null) {
-      await prefs.remove(_closingDateKey);
-    } else {
-      await prefs.setString(_closingDateKey, date);
-    }
-  }
-
-  Future<String?> getClosingDate() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_closingDateKey);
-  }
-
-  Future<bool> isDateLocked(String dateStr) async {
-    final closingDateStr = await getClosingDate();
-    if (closingDateStr == null) return false;
-    
-    try {
-      final date = DateTime.parse(dateStr);
-      final closingDate = DateTime.parse(closingDateStr);
-      // Locked if the target date is on or before the closing date
-      return date.isBefore(closingDate) || date.isAtSameMomentAs(closingDate);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  String _sanitizeCountry(String? country) {
-    if (country == null) return 'Saudi Arabia';
-    final map = {
-      'السعودية': 'Saudi Arabia',
-      'مصر': 'Egypt',
-      'الكويت': 'Kuwait',
-      'الامارات': 'UAE',
-      'الاردن': 'Jordan',
-    };
-    return map[country] ?? country;
-  }
-
-  String _sanitizeCurrency(String? currency) {
-    if (currency == null) return 'sar';
-    final map = {
-      'ر.س': 'sar',
-      'ج.م': 'egp',
-      'د.ك': 'kwd',
-    };
-    return map[currency] ?? currency;
-  }
-
-  Future<Map<String, dynamic>> getCurrentCompanyContext() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawCurrency = prefs.getString(_currencyKey);
-    final rawCountry = prefs.getString(_countryKey);
-    final companyId = prefs.getString(_companyIdKey);
-    
-    return {
-      'company_id': companyId,
-      'name': prefs.getString(_companyNameKey) ?? companyId,
-      'industry_type': prefs.getString(_industryTypeKey),
-      'tax_rate': prefs.getDouble(_taxRateKey) ?? 15.0,
-      'currency': _sanitizeCurrency(rawCurrency),
-      'country': _sanitizeCountry(rawCountry),
-      'vat_number': prefs.getString(_vatNumberKey),
-      'cr_number': prefs.getString(_crNumberKey),
-      'phone': prefs.getString(_phoneKey),
-      'email': prefs.getString(_emailKey),
-      'address': prefs.getString(_addressKey),
-      'logo_path': prefs.getString(_logoPathKey),
-    };
-  }
-
-  Future<void> saveInvoiceWithLines({
-    required Map<String, dynamic> invoice,
-    required List<Map<String, dynamic>> lines,
-    String? paymentAccountId,
-  }) async {
-    // 🛡️ QuickBooks Rule: Check if the period is closed
-    if (await isDateLocked(invoice['issue_date'] ?? '')) {
-      throw Exception("لا يمكن إضافة فاتورة في فترة محاسبية مغلقة (حتى تاريخ الإغلاق).");
-    }
-    final db = await database;
-    await db.transaction((txn) async {
-      // Use provided account or default to Cash
-      final String finalAccount = paymentAccountId ?? (invoice['payment_type'] == 'credit' ? 'ACC_RECEIVABLE' : 'ACC_CASH');
-
-      final nowStr = DateTime.now().toIso8601String();
-      final deviceId = await getDeviceFingerprint();
-
-      // 1. Insert Invoice Header with Sync Metadata
-      await txn.insert('invoices', {
-        ...invoice,
-        'sync_status': 0,
-        'updated_at': nowStr,
-        'device_id': deviceId,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-      
-      // 2. Insert Invoice Lines and deduct inventory
-      double totalCogs = 0.0;
-      for (var line in lines) {
-        await txn.insert('invoice_lines', line, conflictAlgorithm: ConflictAlgorithm.replace);
-        
-        // Fetch cost_price from items table to calculate COGS
-        final itemRes = await txn.query('items', columns: ['cost_price'], where: 'name = ?', whereArgs: [line['name']]);
-        if (itemRes.isNotEmpty) {
-           final double unitCost = (itemRes.first['cost_price'] as num?)?.toDouble() ?? 0.0;
-           totalCogs += unitCost * (line['quantity'] as num).toDouble();
-        }
-
-        // 3. Inventory Sync
-        
-        // 3. Inventory Sync & Logging (Phase 7.2)
-        await txn.rawUpdate(
-          'UPDATE items SET quantity = quantity - ? WHERE name = ?',
-          [line['quantity'], line['name']]
-        );
-
-        await txn.insert('inventory_transactions', {
-          'id': 'ITX_${DateTime.now().microsecondsSinceEpoch}',
-          'item_id': line['item_id'] ?? line['name'],
-          'item_name': line['name'],
-          'type': 'sale',
-          'quantity': -(line['quantity'] as num).toDouble(),
-          'reference_id': invoice['id'],
-          'date': invoice['issue_date'] ?? nowStr,
-          'created_at': nowStr,
-          'updated_at': nowStr,
-        });
-
-      }
-
-      // 4. GENERATE JOURNAL ENTRY
-      final String entryId = "JE_${DateTime.now().millisecondsSinceEpoch}";
-      final String invoiceId = invoice['id'];
-      
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': invoice['issue_date']?.split('T')?[0] ?? nowStr.split('T')[0],
-        'description': "تسجيل مبيعات الفاتورة رقم $invoiceId",
-        'reference_id': invoiceId,
-        'attachment_path': invoice['attachment_path'],
-        'sync_status': 0,
-        'updated_at': nowStr,
-        'device_id': deviceId,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-      final double total = invoice['total'] ?? 0.0;
-      final double subtotal = invoice['subtotal'] ?? 0.0;
-      final double taxAmount = invoice['tax_amount'] ?? 0.0;
-
-      // Line 1: Debit Selected Account (Asset)
-      await txn.insert('journal_entry_lines', {
-        'id': "${entryId}_L1",
-        'entry_id': entryId,
-        'account_id': finalAccount,
-        'debit': total,
-        'credit': 0.0,
-        'project_id': invoice['project_id'],
-        'cost_center_id': invoice['cost_center_id'],
-      });
-
-      // Line 2: Credit Sales Revenue
-      await txn.insert('journal_entry_lines', {
-        'id': "${entryId}_L2",
-        'project_id': invoice['project_id'],
-        'cost_center_id': invoice['cost_center_id'],
-        'entry_id': entryId,
-        'account_id': 'ACC_SALES',
-        'debit': 0.0,
-        'credit': subtotal,
-      });
-
-      // Line 3: Credit VAT
-      if (taxAmount > 0) {
-        await txn.insert('journal_entry_lines', {
-          'id': "${entryId}_L3",
-        'project_id': invoice['project_id'],
-        'cost_center_id': invoice['cost_center_id'],
-          'entry_id': entryId,
-          'account_id': 'ACC_VAT',
-          'debit': 0.0,
-          'credit': taxAmount,
-        });
-      }
-
-      // COGS Entry
-      if (totalCogs > 0) {
-         await txn.insert('journal_entry_lines', { 'id': "${entryId}_L4",
-        'project_id': invoice['project_id'],
-        'cost_center_id': invoice['cost_center_id'], 'entry_id': entryId, 'account_id': 'ACC_COGS', 'debit': totalCogs, 'credit': 0.0 });
-         await txn.insert('journal_entry_lines', { 'id': "${entryId}_L5",
-        'project_id': invoice['project_id'],
-        'cost_center_id': invoice['cost_center_id'], 'entry_id': entryId, 'account_id': 'ACC_INVENTORY', 'debit': 0.0, 'credit': totalCogs });
-         await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [totalCogs, 'ACC_COGS']);
-         await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [totalCogs, 'ACC_INVENTORY']);
-      }
-
-      // Update balances
-      await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [total, finalAccount]);
-      await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [subtotal, 'ACC_SALES']);
-      if (taxAmount > 0) await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [taxAmount, 'ACC_VAT']);
-
-      // 🛡️ CRITICAL: Update Client Balance in 'clients' table for Credit Sales
-      if (invoice['payment_type'] == 'credit') {
-        await txn.rawUpdate('UPDATE clients SET balance = balance + ? WHERE id = ?', [total, invoice['client_id']]);
-      }
-    });
-  }
-
-  // --- Process Payment (Pay to Supplier / Receive from Client) ---
-  Future<void> processPayment({
-    required String partnerId,
-    required String partnerType, // 'client' or 'supplier'
-    required double amount,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      
-      final paymentId = "PMT_${DateTime.now().millisecondsSinceEpoch}";
-      final String dateIso = DateTime.now().toIso8601String();
-      
-      final nowStr = DateTime.now().toIso8601String();
-      final deviceId = await getDeviceFingerprint();
-
-      await txn.insert('payments', {
-        'id': paymentId,
-        'partner_id': partnerId,
-        'partner_type': partnerType,
-        'amount': amount,
-        'type': partnerType == 'supplier' ? 'pay' : 'receive',
-        'date': dateIso,
-        'sync_status': 0,
-        'updated_at': nowStr,
-        'device_id': deviceId,
-      });
-
-      // التحقق من المعاملات الكبيرة للتنبيه (Phase 4)
-      if (amount >= 5000) {
-        NotificationService().notifySensitiveAction("معاملة مالية كبيرة", "تم تسجيل $partnerType بقيمة $amount للطرف $partnerId");
-      }
-
-      final entryId = "JE_PMT_$paymentId";
-      
-      if (partnerType == 'supplier') { // Payment TO Supplier
-        final nowStr = DateTime.now().toIso8601String();
-        final deviceId = await getDeviceFingerprint();
-
-        await txn.insert('journal_entries', {
-          'id': entryId,
-          'date': dateIso,
-          'description': "سداد دفعة نقدية لمورد ($partnerId)",
-          'reference_id': paymentId,
-          'sync_status': 0,
-          'updated_at': nowStr,
-          'device_id': deviceId,
-        });
-        
-        // Debit Payable (Liability goes down)
-        await txn.insert('journal_entry_lines', { 'id': "${entryId}_L1", 'entry_id': entryId, 'account_id': 'ACC_PAYABLE', 'debit': amount, 'credit': 0.0 });
-        // Credit Cash (Asset goes down)
-        await txn.insert('journal_entry_lines', { 'id': "${entryId}_L2", 'entry_id': entryId, 'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': amount });
-        
-        // Update Balances
-        await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, 'ACC_PAYABLE']);
-        await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, 'ACC_CASH']);
-        await txn.rawUpdate('UPDATE suppliers SET balance = balance - ? WHERE id = ?', [amount, partnerId]);
-        
-      } else { // Receive FROM Client
-        final nowStr = DateTime.now().toIso8601String();
-        final deviceId = await getDeviceFingerprint();
-
-        await txn.insert('journal_entries', {
-          'id': entryId,
-          'date': dateIso,
-          'description': "تحصيل دفعة نقدية من عميل ($partnerId)",
-          'reference_id': paymentId,
-          'sync_status': 0,
-          'updated_at': nowStr,
-          'device_id': deviceId,
-        });
-        
-        // Debit Cash (Asset goes up)
-        await txn.insert('journal_entry_lines', { 'id': "${entryId}_L1", 'entry_id': entryId, 'account_id': 'ACC_CASH', 'debit': amount, 'credit': 0.0 });
-        // Credit Receivable (Asset goes down)
-        await txn.insert('journal_entry_lines', { 'id': "${entryId}_L2", 'entry_id': entryId, 'account_id': 'ACC_RECEIVABLE', 'debit': 0.0, 'credit': amount });
-        
-        // Update Balances
-        await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amount, 'ACC_CASH']);
-        await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, 'ACC_RECEIVABLE']);
-      }
-    });
-
-    // Sync on Save
-    SyncService().performFullSync();
-  }
-
-  Future<void> seedDemoProducts() async {
-    final db = await database;
-    final count = await db.rawQuery('SELECT COUNT(*) as count FROM items');
-    if ((count.first['count'] as int) == 0) {
-      await db.execute("INSERT INTO items (id, name, base_price, cost_price, quantity, tax_type, min_stock_level, lead_time) VALUES ('ITM1', 'ورق طباعة A4', 120.0, 80.0, 15.0, '15%', 10.0, 3)");
-      await db.execute("INSERT INTO items (id, name, base_price, cost_price, quantity, tax_type, min_stock_level, lead_time) VALUES ('ITM2', 'أحبار HP 652', 450.0, 320.0, 2.0, '15%', 5.0, 5)");
-      await db.execute("INSERT INTO items (id, name, base_price, cost_price, quantity, tax_type, min_stock_level, lead_time) VALUES ('ITM3', 'ماوس احترافي', 85.0, 45.0, 40.0, '15%', 5.0, 2)");
-      
-      // Seed Demo Clients/Suppliers for Lifecycle Testing
-      await db.execute("INSERT INTO clients (id, name, cr_number) VALUES ('CLI_001', 'مؤسسة الحلول الذكية', '1010000123')");
-      await db.execute("INSERT INTO suppliers (id, name, balance) VALUES ('SUP_001', 'شركة توريدات الحاسب', 5000.0)");
-      await db.execute("INSERT INTO cost_centers (id, name, code) VALUES ('CC_001', 'المقر الرئيسي', 'HQ')");
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getProducts({String? query}) async {
-    final db = await database;
-    if (query == null || query.isEmpty) {
-      return await db.query('items');
-    }
-    return await db.query('items', where: 'name LIKE ?', whereArgs: ['%$query%']);
-  }
-
-
-  // Alias for getProducts
-  Future<List<Map<String, dynamic>>> getItems() => getProducts();
-
-  Future<int> insertProduct(Map<String, dynamic> product) async {
-    final db = await database;
-    return await db.insert('items', product, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<int> updateProduct(Map<String, dynamic> product) async {
-    final db = await database;
-    return await db.update(
-      'items',
-      product,
-      where: 'id = ?',
-      whereArgs: [product['id']],
-    );
-  }
-
-  Future<void> deleteProduct(String id) async {
-    final db = await database;
-    await db.delete('items', where: 'id = ?', whereArgs: [id]);
-    await AuditService.log(action: 'delete', entityType: 'product', entityId: id);
-  }
-
-  Future<String> insertLocalInvoice(Map<String, dynamic> invoiceData) async {
-    final db = await database;
-    final id = invoiceData['id'] ?? DateTime.now().millisecondsSinceEpoch.toString();
-    invoiceData['id'] = id;
-    invoiceData['sync_status'] = 'pending_sync';
-    await db.insert('invoices', invoiceData, conflictAlgorithm: ConflictAlgorithm.replace);
-    return id;
-  }
-
-  Future<int> insertLocalInvoiceLine(Map<String, dynamic> lineData) async {
-    final db = await database;
-    final id = lineData['id'] ?? DateTime.now().millisecondsSinceEpoch.toString();
-    lineData['id'] = id;
-    return await db.insert('invoice_lines', lineData, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getPendingInvoices() async {
-    final db = await database;
-    return await db.query('invoices', where: 'sync_status = ?', whereArgs: ['pending_sync']);
-  }
-
-  Future<void> markInvoiceSynced(String id) async {
-    final db = await database;
-    await db.update('invoices', {'sync_status': 'synced'}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // --- الرقابة الأمنية وبصمة الجهاز (Phase 4) ---
-
-  Future<List<Map<String, dynamic>>> getSecurityAuditLogs() async {
-    final db = await database;
-    // جلب آخر 50 حركة حساسة + التنبيهات الأمنية الفورية مع بصمة الجهاز
-    return await db.rawQuery('''
-      SELECT 'تنبيه أمني' as action_type, description, updated_at, device_id FROM security_audit
-      UNION ALL
-      SELECT 'فاتورة مبيعات' as action_type, 'رقم: ' || id || ' - بقيمة: ' || total as description, updated_at, device_id FROM invoices
-      UNION ALL
-      SELECT 'فاتورة مشتريات' as action_type, 'رقم: ' || id || ' - بقيمة: ' || total as description, updated_at, device_id FROM purchase_invoices
-      UNION ALL
-      SELECT 'حركة شيك' as action_type, 'شيك رقم: ' || cheque_number || ' - ' || status as description, updated_at, device_id FROM cheques
-      UNION ALL
-      SELECT 'صرف عهدة' as action_type, 'للموظف: ' || employee_name || ' - مبلغ: ' || amount as description, updated_at, device_id FROM financial_custodies
-      UNION ALL
-      SELECT 'عملية دفع' as action_type, 'مبلغ: ' || amount || ' - نوع: ' || type as description, updated_at, device_id FROM payments
-      UNION ALL
-      SELECT 'شؤون موظفين' as action_type, 'تعديل بيانات الموظف: ' || name as description, updated_at, device_id FROM employees
-      ORDER BY updated_at DESC
-      LIMIT 50
-    ''');
-  }
-
-  // --- Statistics for Dashboard ---
-
-  // --- Statistics for Dashboard (v14) ---
-  
-  Future<Map<String, double>> getCEOStats(String startDate, String endDate) async {
-    final db = await database;
-
-    // 1. Profit (Revenue - COGS - Expenses)
-    final pnl = await getPNLSummary(startDate, endDate);
-    double profit = pnl['net_profit'] ?? 0.0;
-
-    // 2. Liquidity (Bank + Cash)
-    final accounts = await db.query('accounts', 
-      where: 'id LIKE ? OR id LIKE ? OR id = ?', 
-      whereArgs: ['%BANK%', '%CASH%', 'ACC_CASH']);
-    double liquidity = accounts.fold(0.0, (sum, acc) => sum + ((acc['balance'] as num?) ?? 0.0).toDouble());
-
-    // 3. Inventory Value (Quantity * Cost)
-    double inventoryVal = await getInventoryValue();
-
-    // 4. Expenses (Sum of specific expense types in period)
-    double expenses = (pnl['general_expenses'] ?? 0.0) + (pnl['salaries'] ?? 0.0);
-
-    return {
-      'profit': profit,
-      'liquidity': liquidity,
-      'inventory': inventoryVal,
-      'expenses': expenses,
-      'revenue': pnl['revenue'] ?? 0.0,
-    };
-  }
-
-  Future<double> getInventoryValue() async {
-    final db = await database;
-    final res = await db.rawQuery('SELECT SUM(quantity * cost_price) as total FROM items');
-    return (res.first['total'] as num?)?.toDouble() ?? 0.0;
-  }
-
-  Future<List<Map<String, dynamic>>> getMonthlyAnalytics(String startDate, String endDate) async {
-    final db = await database;
-    
-    // Grouping by DATE to aggregate multiple invoices in the same day
-    final sales = await db.rawQuery('''
-      SELECT DATE(issue_date) as date, SUM(total) as amount FROM invoices 
-      WHERE issue_date BETWEEN ? AND ? 
-      GROUP BY DATE(issue_date) ORDER BY DATE(issue_date) ASC
-    ''', [startDate, endDate]);
-
-    final purchases = await db.rawQuery('''
-      SELECT DATE(issue_date) as date, SUM(total) as amount FROM purchase_invoices 
-      WHERE issue_date BETWEEN ? AND ? 
-      GROUP BY DATE(issue_date) ORDER BY DATE(issue_date) ASC
-    ''', [startDate, endDate]);
-
-    return [
-      {'label': 'Sales', 'data': sales},
-      {'label': 'Purchases', 'data': purchases},
-    ];
-  }
-  
-  Future<double> getTodaySalesTotal() async {
-    final db = await database;
-    final today = DateTime.now().toIso8601String().split('T')[0];
-    final res = await db.rawQuery('SELECT SUM(total) as total FROM invoices WHERE DATE(issue_date) = ?', [today]);
-    return (res.first['total'] as num?)?.toDouble() ?? 0.0;
-  }
-
-  Future<double> getAccountBalance(String id) async {
-    final db = await database;
-    final res = await db.query('accounts', columns: ['balance'], where: 'id = ?', whereArgs: [id]);
-    if (res.isEmpty) return 0.0;
-    return (res.first['balance'] as num?)?.toDouble() ?? 0.0;
-  }
-
-  Future<Map<String, double>> getDashboardStats() async {
-    // Keep for backward compatibility or refactor to use getCEOStats
-    return getCEOStats(
-      DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0],
-      DateTime.now().toIso8601String().split('T')[0]
-    );
-  }
-
-  /// ⚠️ DANGER ZONE: Clears all transactional data to start fresh for "Real Data" phase.
-  /// Preserves Master Data like Accounts, but resets their balances.
-  Future<void> factoryReset() async {
-    final db = await database;
-    await db.transaction((txn) async {
-      final tablesToClear = [
-        'invoices', 'invoice_lines', 'purchase_invoices', 'purchase_invoice_lines',
-        'journal_entries', 'journal_entry_lines', 'inventory_transactions',
-        'attendance_logs', 'salary_payments', 'salary_slips', 'payments',
-        'cheques', 'financial_custodies', 'damage_reports', 'maintenance_schedules',
-        'money_transfers', 'draft_invoices', 'quotations', 'quotation_lines',
-        'receipt_vouchers', 'payment_vouchers', 'credit_notes', 'recurring_transactions',
-        'audit_trail', 'security_audit', 'leave_requests', 'employee_loans',
-        'investment_transactions', 'investments', 'liquidation_requests',
-        'sales_targets', 'commissions', 'job_applications', 'tasks', 'documents',
-        'shifts', 'pos_sessions', 'companies' // Clearing companies triggers onboarding
-      ];
-
-      for (var table in tablesToClear) {
-        try {
-          await txn.delete(table);
-        } catch (e) {
-          debugPrint("Safe skip clearing table $table: $e");
-        }
-      }
-
-      // Reset Items quantity and cost mapping
-      await txn.update('items', {'quantity': 0, 'cost_price': 0});
-      
-      // Reset Accounts balances to zero
-      await txn.update('accounts', {'balance': 0});
-      
-      // Clear specific master data that might be demo-only
-      await txn.delete('suppliers');
-      await txn.delete('clients');
-    });
-    
-    // Clear sync metadata and other cached states if necessary
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Reset onboarding modules and other flags
-  }
-
-  Future<double> getClientBalance(String clientId) async {
-    final db = await database;
-    final invoicesRes = await db.query('invoices', where: 'client_id = ? AND payment_type = ?', whereArgs: [clientId, 'credit']);
-    final paymentsRes = await db.query('payments', where: 'partner_id = ? AND type = ?', whereArgs: [clientId, 'receive']);
-    
-    double totalCredit = invoicesRes.fold(0.0, (sum, item) => sum + ((item['total'] as num?) ?? 0.0));
-    double totalPaid = paymentsRes.fold(0.0, (sum, item) => sum + ((item['amount'] as num?) ?? 0.0));
-    return totalCredit - totalPaid;
-  }
-
-  Future<List<Map<String, dynamic>>> getSalesByDay() async {
-    final db = await database;
-    // Simple grouping by date
-    return await db.rawQuery('''
-      SELECT substr(issue_date, 1, 10) as date, SUM(total) as total 
-      FROM invoices 
-      GROUP BY date 
-      ORDER BY date ASC 
-      LIMIT 7
-    ''');
-  }
-
-  // --- HR & Payroll Methods ---
-
-  Future<List<Map<String, dynamic>>> getEmployees() async {
-    final db = await database;
-    return await db.query('employees', where: 'is_deleted = 0', orderBy: 'name ASC');
-  }
-
-  Future<void> addEmployee(Map<String, dynamic> employee) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    final nowStr = DateTime.now().toIso8601String();
-    
-    final Map<String, dynamic> data = Map<String, dynamic>.from(employee);
-    // Generate a unique id if not provided (TEXT PRIMARY KEY doesn't auto-increment)
-    data['id'] ??= 'EMP_${DateTime.now().millisecondsSinceEpoch}';
-    data['sync_status'] = 0;
-    data['updated_at'] = nowStr;
-    data['device_id'] = deviceId;
-    data['is_deleted'] = 0;
-
-    debugPrint('📝 addEmployee data keys: ${data.keys.toList()}');
-    await db.insert('employees', data, conflictAlgorithm: ConflictAlgorithm.replace);
-    debugPrint('✅ Employee inserted into SQLite successfully');
-
-    // Sync on Save
-    SyncService().performFullSync();
-  }
-
-  Future<void> updateEmployee(Map<String, dynamic> employee) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    final nowStr = DateTime.now().toIso8601String();
-
-    final Map<String, dynamic> data = Map<String, dynamic>.from(employee);
-    data['sync_status'] = 0;
-    data['updated_at'] = nowStr;
-    data['device_id'] = deviceId;
-
-    await db.update(
-      'employees',
-      data,
-      where: 'id = ?',
-      whereArgs: [employee['id']],
-    );
-
-    // Sync on Save
-    SyncService().performFullSync();
-  }
-
-  Future<void> deleteEmployee(String id) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    final nowStr = DateTime.now().toIso8601String();
-
-    await db.update(
-      'employees', 
-      {
-        'is_deleted': 1,
-        'sync_status': 0,
-        'updated_at': nowStr,
-        'device_id': deviceId,
-      }, 
-      where: 'id = ?', 
-      whereArgs: [id]
-    );
-
-    // تريجر التنبيه الذكي للمدير
-    NotificationService().notifySensitiveAction("حذف موظف", "تم حذف الموظف رقم $id نهائياً من النظام.");
-
-    // Sync on Save
-    await AuditService.log(action: 'delete', entityType: 'employee', entityId: id);
-    SyncService().performFullSync();
-  }
-
-  Future<bool> payEmployeeSalary(String employeeId, double amount, String payPeriod, String employeeName, [String? projectId]) async {
-    final db = await database;
-    
-    // Check if already paid for this period
-    final existing = await db.query('salary_payments', 
-      where: 'employee_id = ? AND pay_period = ?', 
-      whereArgs: [employeeId, payPeriod]);
-      
-    if (existing.isNotEmpty) {
-      return false; // Already paid
-    }
-
-    await db.transaction((txn) async {
-      // 1. Log Payment
-      final paymentId = "PAY_${DateTime.now().millisecondsSinceEpoch}";
-      final dateIso = DateTime.now().toIso8601String();
-      await txn.insert('salary_payments', {
-        'id': paymentId,
-        'employee_id': employeeId,
-        'pay_period': payPeriod,
-        'amount': amount,
-        'payment_date': dateIso,
-        'project_id': projectId,
-      });
-
-      await AuditService.log(
-        action: 'payroll_payment', 
-        entityType: 'salary', 
-        entityId: paymentId,
-        description: "دفع راتب للموظف $employeeName بقيمة $amount لفترة $payPeriod",
-        isCritical: true,
-      );
-
-      // 2. Generate Journal Entry
-      final entryId = "JE_PAY_$paymentId";
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': dateIso,
-        'description': "صرف راتب الموظف $employeeName لشهر $payPeriod",
-        'reference_id': paymentId,
-      });
-
-      // Debit Expense (increase)
-      await txn.insert('journal_entry_lines', {
-        'id': "${entryId}_L1",
-        'entry_id': entryId,
-        'account_id': 'ACC_EXPENSES_SALARY', // مدين
-        'debit': amount,
-        'credit': 0.0,
-        'project_id': projectId,
-      });
-
-      // Credit Cash (decrease asset)
-      await txn.insert('journal_entry_lines', {
-        'id': "${entryId}_L2",
-        'entry_id': entryId,
-        'account_id': 'ACC_CASH', // دائن
-        'debit': 0.0,
-        'credit': amount,
-        'project_id': projectId,
-      });
-
-      // 3. Update Balances
-      await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, 'ACC_CASH']);
-      await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amount, 'ACC_EXPENSES_SALARY']);
-    });
-    
-    return true;
-  }
-
-  // --- Purchase Module Integration ---
-  
-  Future<bool> savePurchaseInvoice({
-    required String supplierId,
-    required double total,
-    required String paymentType,
-    required List<Map<String, dynamic>> lines,
-    String? paymentAccountId,
-    String? attachmentPath,
-    String? projectId,
-    String? costCenterId,
-    String? assetId,
-    bool isMaintenance = false,
-  }) async {
-    // 🛡️ QuickBooks Rule: Check if the period is closed
-    final issueDate = DateTime.now().toIso8601String().split('T')[0];
-    if (await isDateLocked(issueDate)) {
-      throw Exception("لا يمكن إضافة مشتريات في فترة محاسبية مغلقة.");
-    }
-    final db = await database;
-    final invoiceId = 'PINV_${DateTime.now().millisecondsSinceEpoch}';
-    
-    // Default account logic
-    final String finalAccount = paymentAccountId ?? (paymentType == 'cash' ? 'ACC_CASH' : 'ACC_PAYABLE');
-
-    // Calculate Tax
-    double taxRate = 0.15; 
-    double subtotal = total / (1 + taxRate);
-    double taxAmount = total - subtotal;
-
-    try {
-      await db.transaction((txn) async {
-        await txn.insert('purchase_invoices', {
-          'id': invoiceId,
-          'issue_date': issueDate,
-          'supplier_id': supplierId,
-          'subtotal': subtotal,
-          'tax_amount': taxAmount,
-          'total': total,
-          'payment_type': paymentType,
-          'attachment_path': attachmentPath,
-          'project_id': projectId,
-          'cost_center_id': costCenterId,
-        });
-
-        int lineCounter = 0;
-        for (var line in lines) {
-          lineCounter++;
-          await txn.insert('purchase_invoice_lines', {
-            'id': 'PIL_${DateTime.now().microsecondsSinceEpoch}_$lineCounter',
-            'invoice_id': invoiceId,
-            'item_id': line['item_id'],
-            'name': line['name'],
-            'quantity': line['quantity'],
-            'price_at_purchase': line['price'],
-            'total': (line['quantity'] as num).toDouble() * (line['price'] as num).toDouble(),
-            'sync_status': 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          });
-          
-          if (line['item_id'] != null) {
-              await txn.rawUpdate('UPDATE items SET quantity = quantity + ?, cost_price = ? WHERE id = ?', [line['quantity'], line['price'], line['item_id']]);
-              
-              await txn.insert('inventory_transactions', {
-                'id': 'PUR_ITX_${DateTime.now().microsecondsSinceEpoch}',
-                'item_id': line['item_id'],
-                'item_name': line['name'],
-                'type': 'purchase',
-                'quantity': (line['quantity'] as num).toDouble(),
-                'reference_id': invoiceId,
-                'date': issueDate,
-                'created_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-              });
-          }
-        }
-
-        final entryId = 'JRN_${DateTime.now().millisecondsSinceEpoch}';
-        await txn.insert('journal_entries', {
-          'id': entryId,
-          'date': issueDate,
-          'description': isMaintenance ? 'فاتورة صيانة أصل ($assetId)' : 'فاتورة مشتريات رقم $invoiceId',
-          'reference_id': invoiceId,
-          'attachment_path': attachmentPath,
-        });
-
-        // Debit: Inventory & VAT (Or Maintenance Expense if isMaintenance)
-        String debitAccount = isMaintenance ? 'ACC_EXPENSES_GENERAL' : 'ACC_INVENTORY';
-        await txn.insert('journal_entry_lines', { 'id': 'JEL1_${DateTime.now().microsecondsSinceEpoch}', 'entry_id': entryId, 'account_id': debitAccount, 'debit': subtotal, 'credit': 0, 'project_id': projectId, 'cost_center_id': costCenterId });
-        await txn.insert('journal_entry_lines', { 'id': 'JEL_VAT_${DateTime.now().microsecondsSinceEpoch}', 'entry_id': entryId, 'account_id': 'ACC_VAT', 'debit': taxAmount, 'credit': 0, 'project_id': projectId, 'cost_center_id': costCenterId });
-
-        // Credit: Selected Account
-        await txn.insert('journal_entry_lines', { 'id': 'JEL2_${DateTime.now().microsecondsSinceEpoch}', 'entry_id': entryId, 'account_id': finalAccount, 'debit': 0, 'credit': total, 'project_id': projectId, 'cost_center_id': costCenterId });
-
-        // Update Balances
-        if (!isMaintenance) {
-          await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [subtotal, 'ACC_INVENTORY']);
-        } else {
-          await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [subtotal, 'ACC_EXPENSES_GENERAL']);
-        }
-        await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [taxAmount, 'ACC_VAT']); 
-        
-        if (finalAccount == 'ACC_PAYABLE') {
-          await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [total, 'ACC_PAYABLE']);
-          await txn.rawUpdate('UPDATE suppliers SET balance = balance + ? WHERE id = ?', [total, supplierId]);
-        } else {
-          await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [total, finalAccount]);
-        }
-
-        // If it's a maintenance invoice, link it to the asset's maintenance schedule
-        if (isMaintenance && assetId != null) {
-          await txn.insert('maintenance_schedules', {
-            'id': 'MAINT_INV_${DateTime.now().millisecondsSinceEpoch}',
-            'asset_id': assetId,
-            'scheduled_date': issueDate,
-            'reason': 'صيانة عبر فاتورة مشتريات $invoiceId',
-            'status': 'completed',
-            'total_cost': total,
-            'linked_invoice_id': invoiceId,
-          });
-        }
-
-        // If it's the initial purchase of an asset, link the asset to this invoice
-        if (!isMaintenance && assetId != null) {
-          await txn.update('assets', 
-            {'purchase_invoice_id': invoiceId},
-            where: 'id = ?',
-            whereArgs: [assetId]
-          );
-        }
-      });
-      return true;
-    } catch (e) {
-      if (e.toString().contains("has no column named") || e.toString().contains("no such table")) {
-        debugPrint("🛠️ Self-healing: Recreating purchase tables due to schema mismatch...");
-        await db.execute("DROP TABLE IF EXISTS purchase_invoices");
-        await db.execute("DROP TABLE IF EXISTS purchase_invoice_lines");
-        
-        // Recreate using the latest schema
-        await db.execute('''
-          CREATE TABLE purchase_invoices (
-            id TEXT PRIMARY KEY,
-            issue_date TEXT,
-            supplier_id TEXT,
-            subtotal REAL,
-            tax_amount REAL,
-            total REAL,
-            payment_type TEXT DEFAULT 'credit',
-            attachment_path TEXT,
-            project_id TEXT,
-            cost_center_id TEXT
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE purchase_invoice_lines (
-            id TEXT PRIMARY KEY,
-            invoice_id TEXT,
-            item_id TEXT,
-            name TEXT,
-            quantity REAL,
-            price_at_purchase REAL,
-            total REAL,
-            sync_status INTEGER DEFAULT 0,
-            updated_at TEXT
-          )
-        ''');
-        
-        // Retry the save operation once
-        return await savePurchaseInvoice(
-          supplierId: supplierId,
-          total: total,
-          paymentType: paymentType,
-          lines: lines,
-          paymentAccountId: paymentAccountId,
-          attachmentPath: attachmentPath,
-          projectId: projectId,
-          costCenterId: costCenterId,
-          assetId: assetId,
-          isMaintenance: isMaintenance,
-        );
-      }
-      rethrow;
-    }
-  }
-
-  // --- Wallet & Bank Logic (v13) ---
-
-  Future<void> transferFunds({
-    required String fromAccountId,
-    required String toAccountId,
-    required double amount,
-    double fee = 0,
-    String? attachmentPath,
-    String? notes,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-       final transferId = 'XFER_${DateTime.now().millisecondsSinceEpoch}';
-       final dateStr = DateTime.now().toIso8601String().split('T')[0];
-
-       await txn.insert('money_transfers', {
-         'id': transferId,
-         'from_account_id': fromAccountId,
-         'to_account_id': toAccountId,
-         'amount': amount,
-         'fee': fee,
-         'date': dateStr,
-         'attachment_path': attachmentPath,
-         'notes': notes,
-       });
-
-       final entryId = 'JE_XFER_$transferId';
-       await txn.insert('journal_entries', {
-         'id': entryId,
-         'date': dateStr,
-         'description': "تحويل مالي: ${notes ?? ''}",
-         'reference_id': transferId,
-         'attachment_path': attachmentPath,
-       });
-
-       // 1. Credit From Account (Decrease Asset)
-       await txn.insert('journal_entry_lines', { 'id': "${entryId}_L1", 'entry_id': entryId, 'account_id': fromAccountId, 'debit': 0, 'credit': amount + fee });
-       // 2. Debit To Account (Increase Asset)
-       await txn.insert('journal_entry_lines', { 'id': "${entryId}_L2", 'entry_id': entryId, 'account_id': toAccountId, 'debit': amount, 'credit': 0 });
-       // 3. Debit Bank Expense (Increase Expense)
-       if (fee > 0) {
-         await txn.insert('journal_entry_lines', { 'id': "${entryId}_L3", 'entry_id': entryId, 'account_id': 'ACC_EXPENSES_BANK', 'debit': fee, 'credit': 0 });
-       }
-
-       // Update Balances
-       await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount + fee, fromAccountId]);
-       await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amount, toAccountId]);
-       if (fee > 0) {
-         await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [fee, 'ACC_EXPENSES_BANK']);
-       }
-    });
-  }
-
-  Future<void> setReconciliationStatus(String id, bool status) async {
-    final db = await database;
-    await db.update('money_transfers', {'reconciled': status ? 1 : 0}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<List<Map<String, dynamic>>> getCostCenters() async {
-    final db = await database;
-    try {
-      return await db.query('cost_centers', where: 'is_deleted = 0');
-    } catch (_) {
-      return await db.query('cost_centers');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getWalletAccounts() async {
-    final db = await database;
-    // We only want Cash and Bank accounts for the wallet UI
-    return await db.query('accounts', 
-      where: 'id LIKE ? OR id LIKE ? OR id = ?', 
-      whereArgs: ['%BANK%', '%CASH%', 'ACC_CASH'],
-      orderBy: 'code ASC'
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getTransferHistory() async {
-    final db = await database;
-    try {
-      await db.execute('CREATE TABLE IF NOT EXISTS money_transfers (id TEXT PRIMARY KEY, from_account_id TEXT, to_account_id TEXT, amount REAL, fee REAL DEFAULT 0, date TEXT, notes TEXT, attachment_path TEXT, reconciled INTEGER DEFAULT 0, created_at TEXT, sync_status INTEGER DEFAULT 0, updated_at TEXT, device_id TEXT, is_deleted INTEGER DEFAULT 0)');
-      return await db.rawQuery('''
-        SELECT mt.*, fa.name as from_name, ta.name as to_name
-        FROM money_transfers mt
-        JOIN accounts fa ON mt.from_account_id = fa.id
-        JOIN accounts ta ON mt.to_account_id = ta.id
-        ORDER BY mt.date DESC
-      ''');
-    } catch (e) {
-      debugPrint('⚠️ getTransferHistory: $e');
-      return [];
-    }
-  }
-
-  // --- Financial Intelligence & Reports Data ---
-
-  Future<Map<String, double>> getPNLSummary(String startDate, String endDate) async {
-    final db = await database;
-    
-    // Revenue (Sum of Credit in ACC_SALES for period)
-    final revenueRes = await db.rawQuery('''
-      SELECT SUM(credit - debit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_SALES' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-    
-    // COGS (Sum of Debit in ACC_COGS)
-    final cogsRes = await db.rawQuery('''
-      SELECT SUM(debit - credit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_COGS' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-    
-    // Salaries (Sum of Debit in ACC_EXPENSES_SALARY)
-    final salariesRes = await db.rawQuery('''
-      SELECT SUM(debit - credit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_EXPENSES_SALARY' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-
-    // General Expenses (Sum of Debit in ACC_EXPENSES_GENERAL)
-    final generalRes = await db.rawQuery('''
-      SELECT SUM(debit - credit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_EXPENSES_GENERAL' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-
-    // Total Purchases (Information only, for checking)
-    final purchasesRes = await db.rawQuery('''
-      SELECT SUM(total) as total FROM purchase_invoices 
-      WHERE issue_date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-
-    double revenue = (revenueRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double cogs = (cogsRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double salaries = (salariesRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double general = (generalRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double totalPurchases = (purchasesRes.first['total'] as num?)?.toDouble() ?? 0.0;
-
-    return {
-      'revenue': revenue,
-      'cogs': cogs,
-      'gross_profit': revenue - cogs,
-      'salaries': salaries,
-      'general_expenses': general,
-      'net_profit': revenue - cogs - salaries - general,
-      'total_purchases': totalPurchases,
-    };
-  }
-
-  Future<Map<String, double>> getVATSummary(String startDate, String endDate) async {
-    final db = await database;
-    
-    // VAT Collected (Sales Output - Credit)
-    final outputRes = await db.rawQuery('''
-      SELECT SUM(jel.credit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_VAT' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-    
-    // VAT Paid (Purchase Input - Debit)
-    final inputRes = await db.rawQuery('''
-      SELECT SUM(jel.debit) as total FROM journal_entry_lines jel 
-      JOIN journal_entries je ON jel.entry_id = je.id 
-      WHERE jel.account_id = 'ACC_VAT' AND je.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-
-    double outputVat = (outputRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double inputVat = (inputRes.first['total'] as num?)?.toDouble() ?? 0.0;
-
-    return {
-      'output_vat': outputVat,
-      'input_vat': inputVat,
-      'net_payable': outputVat - inputVat,
-    };
-  }
-
-  Future<Map<String, double>> getBalanceSheet(String endDate) async {
-    final db = await database;
-    
-    // Assets (Type: asset) - Debit Balance
-    final assetsRes = await db.rawQuery('''
-      SELECT SUM(jel.debit - jel.credit) as balance FROM journal_entry_lines jel
-      JOIN journal_entries je ON jel.entry_id = je.id
-      JOIN accounts a ON jel.account_id = a.id
-      WHERE a.type = 'asset' AND je.date <= ?
-    ''', [endDate]);
-
-    // Liabilities (Type: liability) - Credit Balance
-    final liabilitiesRes = await db.rawQuery('''
-      SELECT SUM(jel.credit - jel.debit) as balance FROM journal_entry_lines jel
-      JOIN journal_entries je ON jel.entry_id = je.id
-      JOIN accounts a ON jel.account_id = a.id
-      WHERE a.type = 'liability' AND je.date <= ?
-    ''', [endDate]);
-
-    // Equity (Type: equity) - Credit Balance
-    final equityRes = await db.rawQuery('''
-      SELECT SUM(jel.credit - jel.debit) as balance FROM journal_entry_lines jel
-      JOIN journal_entries je ON jel.entry_id = je.id
-      JOIN accounts a ON jel.account_id = a.id
-      WHERE a.type = 'equity' AND je.date <= ?
-    ''', [endDate]);
-
-    // All-time profit (Revenue - Expenses) up to date
-    final profitRes = await db.rawQuery('''
-      SELECT SUM(jel.credit - jel.debit) as profit FROM journal_entry_lines jel
-      JOIN journal_entries je ON jel.entry_id = je.id
-      JOIN accounts a ON jel.account_id = a.id
-      WHERE (a.type = 'income' OR a.type = 'expense') AND je.date <= ?
-    ''', [endDate]);
-
-    double assets = (assetsRes.first['balance'] as num?)?.toDouble() ?? 0.0;
-    double liabilities = (liabilitiesRes.first['balance'] as num?)?.toDouble() ?? 0.0;
-    double equity = (equityRes.first['balance'] as num?)?.toDouble() ?? 0.0;
-    double cumulativeProfit = (profitRes.first['profit'] as num?)?.toDouble() ?? 0.0;
-
-    return {
-      'total_assets': assets,
-      'total_liabilities': liabilities,
-      'total_equity': equity,
-      'retained_earnings': cumulativeProfit,
-      'total_liabilities_equity': liabilities + equity + cumulativeProfit,
-    };
-  }
-
-  Future<Map<String, dynamic>> getFinancialIQ(String startDate, String endDate) async {
-    final currentPnl = await getPNLSummary(startDate, endDate);
-    
-    // Calculate previous period of same duration
-    DateTime start = DateTime.parse(startDate);
-    DateTime end = DateTime.parse(endDate);
-    Duration duration = end.difference(start);
-    String prevEnd = start.subtract(const Duration(days: 1)).toIso8601String().split('T')[0];
-    String prevStart = DateTime.parse(prevEnd).subtract(duration).toIso8601String().split('T')[0];
-
-    final prevPnl = await getPNLSummary(prevStart, prevEnd);
-
-    double currentRev = currentPnl['revenue'] ?? 0;
-    double prevRev = prevPnl['revenue'] ?? 0;
-    double currentExp = (currentPnl['salaries'] ?? 0) + (currentPnl['general_expenses'] ?? 0);
-    double prevExp = (prevPnl['salaries'] ?? 0) + (prevPnl['general_expenses'] ?? 0);
-
-    double revGrowth = prevRev > 0 ? ((currentRev - prevRev) / prevRev) : 0;
-    double expGrowth = prevExp > 0 ? ((currentExp - prevExp) / prevExp) : 0;
-    
-    double expenseRatio = currentRev > 0 ? (currentExp / currentRev) : 0;
-
-    return {
-      'current': currentPnl,
-      'previous': prevPnl,
-      'revenue_growth': revGrowth,
-      'expense_growth': expGrowth,
-      'expense_ratio': expenseRatio,
-      'is_healthy': revGrowth >= expGrowth && expenseRatio < 0.7,
-    };
-  }
-
-  // --- Smart Inventory & Stock Analytics (v15) ---
-
-  Future<void> updateWeightedAverageCost(String itemId, double newQty, double newUnitPrice) async {
-    final db = await database;
-    final item = await db.query('items', where: 'id = ?', whereArgs: [itemId]);
-    if (item.isEmpty) return;
-
-    double currentQty = (item.first['quantity'] as num?)?.toDouble() ?? 0.0;
-    double currentCost = (item.first['cost_price'] as num?)?.toDouble() ?? 0.0;
-
-    // Formula: (Current Total Cost + New Purchase Cost) / Total Quantity
-    double totalOldValue = currentQty * currentCost;
-    double totalNewValue = newQty * newUnitPrice;
-    double totalNewQty = currentQty + newQty;
-
-    double newWAC = totalNewQty > 0 ? (totalOldValue + totalNewValue) / totalNewQty : newUnitPrice;
-
-    await db.update('items', {
-      'cost_price': newWAC,
-      'quantity': totalNewQty,
-    }, where: 'id = ?', whereArgs: [itemId]);
-  }
-
-  Future<Map<String, dynamic>> getItemPredictiveAnalytics(String itemId) async {
-    final db = await database;
-    final item = await db.query('items', where: 'id = ?', whereArgs: [itemId]);
-    if (item.isEmpty) return {};
-
-    double currentQty = (item.first['quantity'] as num?)?.toDouble() ?? 0.0;
-    double safetyStock = (item.first['min_stock_level'] as num?)?.toDouble() ?? 0.0;
-
-    // Calculate Average Daily Sales (ADS) for last 30 days
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
-    
-    // We search in invoice_lines for matches to our item ID
-    // Note: since itemId is a string ID, we use LIKE for robust matching if needed
-    final salesRes = await db.rawQuery('''
-      SELECT SUM(il.quantity) as total_sold FROM invoice_lines il
-      JOIN invoices i ON il.invoice_id = i.id
-      WHERE il.name LIKE ? AND i.issue_date >= ?
-    ''', ["%${item.first['name']}%", thirtyDaysAgo]);
-
-    double totalSold = (salesRes.first['total_sold'] as num?)?.toDouble() ?? 0.0;
-    double ads = totalSold / 30.0;
-
-    // Days Until Stockout: Current Qty / ADS
-    double daysRemaining = ads > 0 ? currentQty / ads : double.infinity;
-
-    return {
-      'current_qty': currentQty,
-      'safety_stock': safetyStock,
-      'ads': ads,
-      'days_remaining': daysRemaining,
-      'is_critical': currentQty <= safetyStock || daysRemaining <= 7,
-    };
-  }
-
-  Future<List<Map<String, dynamic>>> getDraftInvoices() async {
-    final db = await database;
-    return await db.query('draft_invoices', orderBy: 'date DESC');
-  }
-
-  Future<void> saveDraftInvoice(Map<String, dynamic> draft) async {
-    final db = await database;
-    await db.insert('draft_invoices', draft, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // --- Assets Custody & Maintenance (v16) ---
-
-  Future<void> assignAssetCustody(String assetId, String employeeId, String notes) async {
-    final db = await database;
-    final logId = 'CST_${DateTime.now().millisecondsSinceEpoch}';
-    final dateIso = DateTime.now().toIso8601String();
-    
-    await db.transaction((txn) async {
-      await txn.update('assets', {
-        'status': 'in_use',
-        'assigned_to': employeeId
-      }, where: 'id = ?', whereArgs: [assetId]);
-
-      await txn.insert('asset_custody_log', {
-        'id': logId,
-        'asset_id': assetId,
-        'employee_id': employeeId,
-        'issued_date': dateIso,
-        'status': 'active',
-        'notes': notes
-      });
-    });
-  }
-
-  Future<void> returnAssetCustody(String assetId) async {
-    final db = await database;
-    final dateIso = DateTime.now().toIso8601String();
-    
-    await db.transaction((txn) async {
-      await txn.update('assets', {
-        'status': 'available',
-        'assigned_to': null
-      }, where: 'id = ?', whereArgs: [assetId]);
-
-      await txn.rawUpdate('''
-        UPDATE asset_custody_log 
-        SET status = 'returned', returned_date = ? 
-        WHERE asset_id = ? AND status = 'active'
-      ''', [dateIso, assetId]);
-    });
-  }
-
-  Future<void> reportAssetDamage(String assetId, String employeeId, String reason, bool deductFromEmployee) async {
-    final db = await database;
-    final dateIso = DateTime.now().toIso8601String();
-    
-    // Fetch asset cost to record the loss
-    final assetRes = await db.query('assets', columns: ['cost_price', 'name'], where: 'id = ?', whereArgs: [assetId]);
-    if (assetRes.isEmpty) return;
-    
-    final double valueLoss = (assetRes.first['cost_price'] as num?)?.toDouble() ?? 0.0;
-    final String assetName = assetRes.first['name'] as String? ?? 'Asset';
-    
-    final entryId = "JE_DMG_${DateTime.now().millisecondsSinceEpoch}";
-    final reportId = "DMG_${DateTime.now().millisecondsSinceEpoch}";
-
-    await db.transaction((txn) async {
-      // 1. Update Asset Status to scrap
-      await txn.update('assets', {
-        'status': 'scrap'
-      }, where: 'id = ?', whereArgs: [assetId]);
-      
-      // 2. Return custody if active
-      await txn.rawUpdate('''
-        UPDATE asset_custody_log 
-        SET status = 'returned', returned_date = ? 
-        WHERE asset_id = ? AND status = 'active'
-      ''', [dateIso, assetId]);
-
-      // 3. Record Damage Report
-      await txn.insert('damage_reports', {
-        'id': reportId,
-        'asset_id': assetId,
-        'employee_id': employeeId,
-        'date': dateIso,
-        'damage_reason': reason,
-        'value_loss': valueLoss,
-        'entry_id': entryId
-      });
-
-      // 4. Accounting Journal Entry for Loss
-      if (valueLoss > 0) {
-        await txn.insert('journal_entries', {
-          'id': entryId,
-          'date': dateIso.split('T')[0],
-          'description': "إهلاك أصل تالف: $assetName ($reason)",
-          'reference_id': reportId,
-        });
-
-        if (deductFromEmployee) {
-          // Debit Employee Receivable
-          await txn.insert('journal_entry_lines', { 'id': "${entryId}_L1", 'entry_id': entryId, 'account_id': 'ACC_EMP_RECEIVABLE', 'debit': valueLoss, 'credit': 0.0 });
-          // Update Account Balance
-          await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [valueLoss, 'ACC_EMP_RECEIVABLE']);
-        } else {
-          // Debit Loss / Expense
-          await txn.insert('journal_entry_lines', { 'id': "${entryId}_L1", 'entry_id': entryId, 'account_id': 'ACC_LOSS_ASSETS', 'debit': valueLoss, 'credit': 0.0 });
-          // Update Account Balance
-          await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [valueLoss, 'ACC_LOSS_ASSETS']);
-        }
-      }
-    });
-  }
-
-  Future<void> scheduleMaintenance(String assetId, String date, String reason) async {
-    final db = await database;
-    final scheduleId = 'MNT_${DateTime.now().millisecondsSinceEpoch}';
-    
-    await db.insert('maintenance_schedules', {
-      'id': scheduleId,
-      'asset_id': assetId,
-      'scheduled_date': date,
-      'reason': reason,
-      'status': 'pending'
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getMaintenanceCalendar() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT m.*, a.name as asset_name, a.location 
-      FROM maintenance_schedules m
-      JOIN assets a ON m.asset_id = a.id
-      ORDER BY m.scheduled_date ASC
-    ''');
-  }
-
-  // --- Projects & Contracting (v17) ---
-
-  Future<void> createProject(Map<String, dynamic> projectData) async {
-    final db = await database;
-    await db.insert('projects', projectData, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getProjects() async {
-    final db = await database;
-    return await db.query('projects', orderBy: 'start_date DESC');
-  }
-
-  Future<Map<String, dynamic>> getProjectFinancials(String projectId) async {
-    final db = await database;
-    
-    // Calculate total costs assigned to this project via Journal Entry Lines
-    // Any debit against an expense account (starting with '5' or explicitly expense) with this project_id
-    final result = await db.rawQuery('''
-      SELECT SUM(jel.debit) as total_cost 
-      FROM journal_entry_lines jel
-      JOIN accounts a ON jel.account_id = a.id
-      WHERE jel.project_id = ? AND a.type = 'expense'
-    ''', [projectId]);
-
-    double actualCost = (result.first['total_cost'] as num?)?.toDouble() ?? 0.0;
-    
-    // Fetch budget
-    final projRes = await db.query('projects', columns: ['budget_amount'], where: 'id = ?', whereArgs: [projectId]);
-    double budget = 0.0;
-    if (projRes.isNotEmpty) {
-      budget = (projRes.first['budget_amount'] as num?)?.toDouble() ?? 0.0;
-    }
-
-    double spentPercentage = budget > 0 ? (actualCost / budget) : 0.0;
-
-    return {
-      'actual_cost': actualCost,
-      'budget': budget,
-      'spent_percentage': spentPercentage,
-      'is_critical': spentPercentage >= 0.8  // Alert threshold 80%
-    };
-  }
-
-  // --- POS Cashier System (v18) ---
-
-  Future<Map<String, dynamic>?> getActiveShift(String cashierId) async {
-    final db = await database;
-    final res = await db.query('shifts', where: 'cashier_id = ? AND status = ?', whereArgs: [cashierId, 'open']);
-    if (res.isNotEmpty) return res.first;
-    return null;
-  }
-
-  Future<String> openShift(String cashierId, double openingBalance) async {
-    final db = await database;
-    final shiftId = 'SHIFT_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('shifts', {
-      'id': shiftId,
-      'cashier_id': cashierId,
-      'start_time': DateTime.now().toIso8601String(),
-      'opening_balance': openingBalance,
-      'status': 'open'
-    });
-    return shiftId;
-  }
-
-  Future<void> closeShift(String shiftId, double closingBalance) async {
-    final db = await database;
-    await db.update('shifts', {
-      'end_time': DateTime.now().toIso8601String(),
-      'closing_balance': closingBalance,
-      'status': 'closed'
-    }, where: 'id = ?', whereArgs: [shiftId]);
-  }
-
-  Future<void> savePosReceipt({
-    required List<Map<String, dynamic>> lines,
-    required double total,
-    required double taxAmount,
-    required double subtotal,
-    required String shiftId,
-  }) async {
-    // 🛡️ QuickBooks Rule: Check if the period is closed
-    final issueDate = DateTime.now().toIso8601String().split('T')[0];
-    if (await isDateLocked(issueDate)) {
-      throw Exception("لا يمكن إضافة مبيعات في فترة محاسبية مغلقة.");
-    }
-    final db = await database;
-    final invoiceId = 'POS_${DateTime.now().millisecondsSinceEpoch}';
-
-    await db.transaction((txn) async {
-      // 1. Insert Invoice connected to Shift
-      await txn.insert('invoices', {
-        'id': invoiceId,
-        'issue_date': issueDate,
-        'client_id': 'WALK_IN_CUSTOMER',
-        'subtotal': subtotal,
-        'tax_amount': taxAmount,
-        'total': total,
-        'status': 'paid',
-        'payment_type': 'cash',
-        'shift_id': shiftId,
-      });
-
-      // 2. Insert Invoice Lines and Update Inventory
-      for (var line in lines) {
-        String itemId = line['item_id'];
-        double qty = line['quantity'];
-        double price = line['price'];
-
-        await txn.insert('invoice_lines', {
-          'id': 'POSL_${DateTime.now().microsecondsSinceEpoch}',
-          'invoice_id': invoiceId,
-          'name': line['name'],
-          'quantity': qty,
-          'price_at_sale': price,
-        });
-
-        // Drain Inventory
-        
-        // 3. Inventory & COGS Logging (Phase 7.1)
-        final itemDetails = await txn.query('items', where: 'id = ?', whereArgs: [itemId], columns: ['name', 'quantity', 'min_stock_level']);
-        if (itemDetails.isNotEmpty) {
-           double newQty = ((itemDetails.first['quantity'] as num?) ?? 0) - qty;
-           double minQty = (itemDetails.first['min_stock_level'] as num?)?.toDouble() ?? 0;
-           String itemName = itemDetails.first['name'] as String;
-
-           // Alert if below min level (Handled via logging or app could check this ITX)
-           if (newQty < minQty) {
-              debugPrint("⚠️ LOW STOCK ALERT: $itemName is below min level ($newQty < $minQty)");
-           }
-        }
-
-        await txn.rawUpdate('UPDATE items SET quantity = quantity - ? WHERE id = ?', [qty, itemId]);
-        
-        await txn.insert('inventory_transactions', {
-          'id': 'POS_ITX_${DateTime.now().microsecondsSinceEpoch}',
-          'item_id': itemId,
-          'item_name': line['name'],
-          'type': 'sale',
-          'quantity': -qty,
-          'reference_id': invoiceId,
-          'date': issueDate,
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-
-      }
-
-      // 3. Accounting Entries
-      final entryId = 'JRN_$invoiceId';
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': issueDate,
-        'description': 'مبيعات نقاط البيع (POS) $invoiceId',
-        'reference_id': invoiceId,
-      });
-
-      // Debit Cash (Asset Up)
-      await txn.insert('journal_entry_lines', { 'id': '${entryId}_L1', 'entry_id': entryId, 'account_id': 'ACC_CASH', 'debit': total, 'credit': 0 });
-      // Credit Revenue
-      await txn.insert('journal_entry_lines', { 'id': '${entryId}_L2', 'entry_id': entryId, 'account_id': 'ACC_REVENUE', 'debit': 0, 'credit': subtotal });
-      // Credit VAT
-      if (taxAmount > 0) {
-        await txn.insert('journal_entry_lines', { 'id': '${entryId}_L3', 'entry_id': entryId, 'account_id': 'ACC_VAT', 'debit': 0, 'credit': taxAmount });
-        await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [taxAmount, 'ACC_VAT']);
-      }
-
-      // We approximate COGS using COGS logic based on item cost (Simplified for POS context right now)
-      double totalCogs = 0.0;
-      for (var line in lines) {
-         final res = await txn.query('items', columns: ['cost_price'], where: 'id = ?', whereArgs: [line['item_id']]);
-         if (res.isNotEmpty) {
-           double cost = (res.first['cost_price'] as num?)?.toDouble() ?? 0.0;
-           totalCogs += cost * (line['quantity'] as num).toDouble();
-         }
-      }
-
-      if (totalCogs > 0) {
-        // Debit COGS
-        await txn.insert('journal_entry_lines', { 'id': '${entryId}_COGS_D', 'entry_id': entryId, 'account_id': 'ACC_COGS', 'debit': totalCogs, 'credit': 0 });
-        // Credit Inventory
-        await txn.insert('journal_entry_lines', { 'id': '${entryId}_INV_C', 'entry_id': entryId, 'account_id': 'ACC_INVENTORY', 'debit': 0, 'credit': totalCogs });
-        
-        await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [totalCogs, 'ACC_COGS']);
-        await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [totalCogs, 'ACC_INVENTORY']);
-      }
-
-      // Update Balances
-      await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [total, 'ACC_CASH']);
-      await txn.rawUpdate('UPDATE accounts SET balance = balance + ? WHERE id = ?', [subtotal, 'ACC_REVENUE']);
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getUnifiedFinancialRecords(String searchQuery) async {
-    final db = await database;
-    String q = '%$searchQuery%';
-    
-    String sql = '''
-      SELECT 
-        id, 
-        issue_date as date, 
-        'sales' as type, 
-        id as title, 
-        total as amount, 
-        status 
-      FROM invoices
-      WHERE id LIKE ? OR (client_id IS NOT NULL AND client_id LIKE ?)
-      
-      UNION ALL
-      
-      SELECT 
-        id, 
-        issue_date as date, 
-        'purchase' as type, 
-        id as title, 
-        total as amount, 
-        'paid' as status 
-      FROM purchase_invoices
-      WHERE id LIKE ? OR (supplier_id IS NOT NULL AND supplier_id LIKE ?)
-      
-      UNION ALL
-      
-      SELECT 
-        je.id, 
-        je.date, 
-        'entry' as type, 
-        je.description as title, 
-        (SELECT COALESCE(SUM(debit), 0) FROM journal_entry_lines WHERE entry_id = je.id) as amount, 
-        'posted' as status
-      FROM journal_entries je
-      WHERE je.id LIKE ? OR (je.description IS NOT NULL AND je.description LIKE ?)
-      
-      ORDER BY date DESC
-    ''';
-    
-    return await db.rawQuery(sql, [q, q, q, q, q, q]);
-  }
-
-  Future<void> saveManualJournalEntry({
-    required String date,
-    required String description,
-    required List<Map<String, dynamic>> lines,
-  }) async {
-    // 🛡️ QuickBooks Rule: Check if the period is closed
-    if (await isDateLocked(date)) {
-      throw Exception("لا يمكن إضافة قيد في فترة محاسبية مغلقة.");
-    }
-    final db = await database;
-    final entryId = 'MANUAL_${DateTime.now().millisecondsSinceEpoch}';
-
-    await db.transaction((txn) async {
-      // 1. Insert Header
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': date,
-        'description': description,
-        'reference_id': 'MANUAL',
-      });
-
-      // 2. Insert Lines & Update Account Balances
-      int lineCounter = 0;
-      for (var line in lines) {
-        lineCounter++;
-        String accountId = line['account_id'];
-        double debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
-        double credit = (line['credit'] as num?)?.toDouble() ?? 0.0;
-        String? projectId = line['project_id'];
-        String? costCenterId = line['cost_center_id'];
-
-        await txn.insert('journal_entry_lines', {
-          'id': 'JEL_${DateTime.now().microsecondsSinceEpoch}_$lineCounter',
-          'entry_id': entryId,
-          'account_id': accountId,
-          'debit': debit,
-          'credit': credit,
-          'project_id': projectId,
-          'cost_center_id': costCenterId,
-        });
-
-        // Update Account Balance
-        // Logic: Add Debit, Subtract Credit (Normal for Assets/Expenses)
-        // Note: For Liabilities/Equity/Revenue, we should be careful, but here we'll use simple +/-
-        // and let the Financial Reports handle the meaning of the signed balance.
-        await txn.rawUpdate(
-          'UPDATE accounts SET balance = balance + ? - ? WHERE id = ?',
-          [debit, credit, accountId]
-        );
-      }
-    });
-  }
-
-  Future<Map<String, dynamic>> getSupplierSummary(String supplierId) async {
-    final db = await database;
-    
-    // 1. Current Balance from suppliers table (cached/synced)
-    final supplierRes = await db.query('suppliers', where: 'id = ?', whereArgs: [supplierId]);
-    final double balance = (supplierRes.first['balance'] as num?)?.toDouble() ?? 0.0;
-
-    // 2. Overdue Amount (where due_date < now and unpaid)
-    // For simplicity, we assume if it's in purchase_invoices, it's a debt unless payment is separate.
-    // In this system, payments are tracked in 'payments' table.
-    final now = DateTime.now().toIso8601String().split('T')[0];
-    final overdueRes = await db.rawQuery('''
-      SELECT SUM(total) as overdue 
-      FROM purchase_invoices 
-      WHERE supplier_id = ? AND due_date < ?
-    ''', [supplierId, now]);
-    
-    // 3. Prepayments (Payments where type is 'advance' or just sum of all payments vs sum of all invoices)
-    final paymentsRes = await db.rawQuery('SELECT SUM(amount) as total_paid FROM payments WHERE partner_id = ? AND partner_type = "supplier"', [supplierId]);
-    final double totalPaid = (paymentsRes.first['total_paid'] as num?)?.toDouble() ?? 0.0;
-    
-    return {
-      'balance': balance,
-      'overdue': (overdueRes.first['overdue'] as num?)?.toDouble() ?? 0.0,
-      'total_paid': totalPaid,
-    };
-  }
-
-  Future<List<double>> getSupplierAging(String supplierId) async {
-    final db = await database;
-    final now = DateTime.now();
-    
-    // Categories: [0-30, 31-60, 60+]
-    List<double> aging = [0.0, 0.0, 0.0];
-    
-    final invoices = await db.query('purchase_invoices', where: 'supplier_id = ?', whereArgs: [supplierId]);
-    
-    for (var inv in invoices) {
-      final dueDateStr = inv['due_date'] as String?;
-      if (dueDateStr == null) continue;
-      
-      final dueDate = DateTime.parse(dueDateStr);
-      final diff = now.difference(dueDate).inDays;
-      final amount = (inv['total'] as num?)?.toDouble() ?? 0.0;
-      
-      if (diff <= 30) {
-        aging[0] += amount;
-      } else if (diff <= 60) {
-        aging[1] += amount;
-      } else {
-        aging[2] += amount;
-      }
-    }
-    
-    return aging;
-  }
-
-  Future<List<Map<String, dynamic>>> getSupplierTransactions(String supplierId) async {
-    final db = await database;
-    
-    // Combined Statement: Invoices + Payments
-    final sql = '''
-      SELECT id, issue_date as date, 'فاتورة مشتريات' as type, total as amount, 'out' as direction
-      FROM purchase_invoices
-      WHERE supplier_id = ?
-      
-      UNION ALL
-      
-      SELECT id, date, 'دفعة نقدية' as type, amount, 'in' as direction
-      FROM payments
-      WHERE partner_id = ? AND partner_type = 'supplier'
-      
-      ORDER BY date DESC
-    ''';
-    
-    return await db.rawQuery(sql, [supplierId, supplierId]);
-  }
-
-  // --- Budgeting Logic (v22) ---
-
-  Future<List<Map<String, dynamic>>> getBudgets(String period) async {
-    final db = await database;
-    
-    // Join with accounts and projects names for the UI
-    final sql = '''
-      SELECT 
-        b.*, 
-        a.name as account_name,
-        COALESCE(p.name, 'بدون مشروع') as project_name,
-        (
-          SELECT COALESCE(SUM(jel.debit - jel.credit), 0)
-          FROM journal_entry_lines jel
-          JOIN journal_entries je ON jel.entry_id = je.id
-          WHERE jel.account_id = b.account_id 
-          AND (b.project_id IS NULL OR jel.project_id = b.project_id)
-          AND je.date LIKE ?
-        ) as spent_amount
-      FROM budgets b
-      JOIN accounts a ON b.account_id = a.id
-      LEFT JOIN projects p ON b.project_id = p.id
-      WHERE b.period = ?
-    ''';
-    
-    return await db.rawQuery(sql, ['$period%', period]);
-  }
-
-  Future<void> upsertBudget({
-    required String accountId,
-    String? projectId,
-    required double amount,
-    required String period,
-  }) async {
-    final db = await database;
-    final id = 'BGT_${accountId}_${projectId ?? "ALL"}_$period';
-    
-    await db.insert('budgets', {
-      'id': id,
-      'account_id': accountId,
-      'project_id': projectId,
-      'allocated_amount': amount,
-      'period': period,
-      'created_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  /// Returns a map with {is_exceeded: bool, message: String, variance: percentage}
-  Future<Map<String, dynamic>> checkBudgetExceedance(String accountId, double newAmount, {String? projectId}) async {
-    final db = await database;
-    final period = DateTime.now().toIso8601String().substring(0, 7); // YYYY-MM
-    
-    final budgets = await db.query('budgets', 
-      where: 'account_id = ? AND period = ? AND (project_id = ? OR project_id IS NULL)',
-      whereArgs: [accountId, period, projectId],
-      orderBy: 'project_id DESC' // Specific project budget takes priority if both exist
-    );
-    
-    if (budgets.isEmpty) return {'is_exceeded': false};
-
-    final budget = budgets.first;
-    final double allocated = (budget['allocated_amount'] as num).toDouble();
-    
-    // Calculate current spent
-    final spentRes = await db.rawQuery('''
-      SELECT SUM(jel.debit - jel.credit) as total
-      FROM journal_entry_lines jel
-      JOIN journal_entries je ON jel.entry_id = je.id
-      WHERE jel.account_id = ? AND je.date LIKE ? AND (jel.project_id = ? OR ? IS NULL)
-    ''', [accountId, '$period%', projectId, projectId]);
-    
-    final double currentSpent = (spentRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    final double totalWithNew = currentSpent + newAmount;
-    
-    if (totalWithNew > allocated) {
-      final double exceedPercent = ((totalWithNew / allocated) - 1) * 100;
-      return {
-        'is_exceeded': true,
-        'message': '⚠️ تجاوزت الميزانية! إجمالي المصروف لهذا البند سيصل لـ ${totalWithNew.toStringAsFixed(0)} من أصل $allocated.',
-        'variance': exceedPercent,
-        'allocated': allocated,
-        'new_total': totalWithNew,
-      };
-    }
-    
-    return {'is_exceeded': false};
-  }
-
-  /// Validates multiple lines at once, returning a list of warnings
-  Future<List<Map<String, dynamic>>> validateEntryBudgets(List<Map<String, dynamic>> lines) async {
-    List<Map<String, dynamic>> warnings = [];
-    
-    for (var line in lines) {
-      final double debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
-      final String accountId = line['account_id'];
-      final String? projectId = line['project_id'];
-
-      if (debit > 0) {
-        final check = await checkBudgetExceedance(accountId, debit, projectId: projectId);
-        if (check['is_exceeded'] == true) {
-          warnings.add(check);
-        }
-      }
-    }
-    return warnings;
-  }
-
-  // --- Security Audit Logging (v35) ---
-
-  Future<void> logSecurityAlert(String type, String description, {bool isCritical = false}) async {
-    final db = await database;
-    final id = 'SEC_${DateTime.now().millisecondsSinceEpoch}';
-    final deviceId = await getDeviceFingerprint();
-    final now = DateTime.now().toIso8601String();
-
-    await db.insert('security_audit', {
-      'id': id,
-      'action_type': type,
-      'description': description,
-      'is_critical': isCritical ? 1 : 0,
-      'updated_at': now,
-      'device_id': deviceId,
-      'sync_status': 0, // Pending Sync
-    });
-    
-    // Notify Listeners (if any through a Stream or Provider, handled in main.dart)
-    NotificationService().notifySensitiveAction(type, description);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  LEAVE REQUESTS (HR Module - QuickBooks Time-Off)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getLeaveRequests({String? employeeId, String? status}) async {
-    final db = await database;
-    String whereClause = 'is_deleted = 0';
-    List<dynamic> args = [];
-    if (employeeId != null) {
-      whereClause += ' AND employee_id = ?';
-      args.add(employeeId);
-    }
-    if (status != null) {
-      whereClause += ' AND status = ?';
-      args.add(status);
-    }
-    return await db.query('leave_requests', where: whereClause, whereArgs: args, orderBy: 'start_date DESC');
-  }
-
-  Future<void> addLeaveRequest(Map<String, dynamic> request) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    final nowStr = DateTime.now().toIso8601String();
-    request['id'] ??= 'LR_${DateTime.now().millisecondsSinceEpoch}';
-    request['sync_status'] = 0;
-    request['updated_at'] = nowStr;
-    request['device_id'] = deviceId;
-    request['is_deleted'] = 0;
-    await db.insert('leave_requests', request, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateLeaveRequestStatus(String id, String status) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    await db.update('leave_requests', {
-      'status': status,
-      'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-      'device_id': deviceId,
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> deleteLeaveRequest(String id) async {
-    final db = await database;
-    await db.update('leave_requests', {
-      'is_deleted': 1,
-      'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  EMPLOYEE LOANS (HR Module)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getEmployeeLoans({String? employeeId}) async {
-    final db = await database;
-    if (employeeId != null) {
-      return await db.query('employee_loans',
-        where: 'employee_id = ? AND is_deleted = 0',
-        whereArgs: [employeeId],
-        orderBy: 'start_date DESC');
-    }
-    return await db.query('employee_loans',
-      where: 'is_deleted = 0',
-      orderBy: 'start_date DESC');
-  }
-
-  Future<void> addEmployeeLoan(Map<String, dynamic> loan) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    final nowStr = DateTime.now().toIso8601String();
-    loan['id'] ??= 'LOAN_${DateTime.now().millisecondsSinceEpoch}';
-    loan['sync_status'] = 0;
-    loan['updated_at'] = nowStr;
-    loan['device_id'] = deviceId;
-    loan['is_deleted'] = 0;
-
-    await db.insert('employee_loans', loan, conflictAlgorithm: ConflictAlgorithm.replace);
-
-    // Create journal entry for loan disbursement
-    if (loan['status'] == 'ACTIVE') {
-      final double amount = (loan['amount'] as num).toDouble();
-      await saveManualJournalEntry(
-        date: nowStr.split('T')[0],
-        description: 'صرف سلفة للموظف ${loan['employee_id']}',
-        lines: [
-          {'account_id': 'ACC_EMP_RECEIVABLE', 'debit': amount, 'credit': 0.0},
-          {'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': amount},
-        ],
-      );
-    }
-  }
-
-  Future<void> deductLoanInstallment(String loanId, double installment) async {
-    final db = await database;
-    await db.rawUpdate(
-      'UPDATE employee_loans SET balance = balance - ?, sync_status = 0, updated_at = ? WHERE id = ?',
-      [installment, DateTime.now().toIso8601String(), loanId],
-    );
-    // Mark as PAID if balance <= 0
-    await db.rawUpdate(
-      "UPDATE employee_loans SET status = 'PAID' WHERE id = ? AND balance <= 0",
-      [loanId],
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  ATTENDANCE (HR Module - Check-in/Check-out)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getAttendanceLogs({String? employeeId, String? date}) async {
-    final db = await database;
-    String where = 'is_deleted = 0';
-    List<dynamic> args = [];
-    if (employeeId != null) {
-      where += ' AND employee_id = ?';
-      args.add(employeeId);
-    }
-    if (date != null) {
-      where += ' AND date = ?';
-      args.add(date);
-    }
-    return await db.query('attendance_logs', where: where, whereArgs: args, orderBy: 'date DESC');
-  }
-
-  Future<void> recordCheckIn(String employeeId) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-    final dateStr = nowStr.split('T')[0];
-    final timeStr = nowStr.split('T')[1].substring(0, 5);
-    final deviceId = await getDeviceFingerprint();
-
-    await db.insert('attendance_logs', {
-      'id': 'ATT_${DateTime.now().millisecondsSinceEpoch}',
-      'employee_id': employeeId,
-      'date': dateStr,
-      'check_in': timeStr,
-      'status': 'present',
-      'sync_status': 0,
-      'updated_at': nowStr,
-      'device_id': deviceId,
-      'is_deleted': 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> recordCheckOut(String attendanceId) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-    final timeStr = nowStr.split('T')[1].substring(0, 5);
-    await db.update('attendance_logs', {
-      'check_out': timeStr,
-      'sync_status': 0,
-      'updated_at': nowStr,
-    }, where: 'id = ?', whereArgs: [attendanceId]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  REAL ESTATE (Units + Contracts)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getRealEstateUnits() async {
-    final db = await database;
-    return await db.query('real_estate_units', where: 'is_deleted = 0', orderBy: 'name ASC');
-  }
-
-  Future<void> addRealEstateUnit(Map<String, dynamic> unit) async {
-    final db = await database;
-    unit['id'] ??= 'REU_${DateTime.now().millisecondsSinceEpoch}';
-    unit['sync_status'] = 0;
-    unit['updated_at'] = DateTime.now().toIso8601String();
-    unit['device_id'] = await getDeviceFingerprint();
-    unit['is_deleted'] = 0;
-    await db.insert('real_estate_units', unit, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateRealEstateUnit(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    data['sync_status'] = 0;
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await db.update('real_estate_units', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> deleteRealEstateUnit(String id) async {
-    final db = await database;
-    await db.update('real_estate_units', {
-      'is_deleted': 1, 'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<List<Map<String, dynamic>>> getRealEstateContracts({String? unitId}) async {
-    final db = await database;
-    if (unitId != null) {
-      return await db.query('real_estate_contracts',
-        where: 'unit_id = ? AND is_deleted = 0', whereArgs: [unitId],
-        orderBy: 'start_date DESC');
-    }
-    return await db.query('real_estate_contracts', where: 'is_deleted = 0', orderBy: 'start_date DESC');
-  }
-
-  Future<void> addRealEstateContract(Map<String, dynamic> contract) async {
-    final db = await database;
-    contract['id'] ??= 'REC_${DateTime.now().millisecondsSinceEpoch}';
-    contract['sync_status'] = 0;
-    contract['updated_at'] = DateTime.now().toIso8601String();
-    contract['device_id'] = await getDeviceFingerprint();
-    contract['is_deleted'] = 0;
-    await db.insert('real_estate_contracts', contract, conflictAlgorithm: ConflictAlgorithm.replace);
-
-    // Update unit status to RENTED
-    if (contract['unit_id'] != null) {
-      await db.update('real_estate_units', {'status': 'RENTED'}, where: 'id = ?', whereArgs: [contract['unit_id']]);
-    }
-  }
-
-  Future<void> collectRent(String contractId, double amount) async {
-    final nowStr = DateTime.now().toIso8601String();
-    await saveManualJournalEntry(
-      date: nowStr.split('T')[0],
-      description: 'تحصيل إيجار عقد رقم $contractId',
-      lines: [
-        {'account_id': 'ACC_CASH', 'debit': amount, 'credit': 0.0},
-        {'account_id': 'ACC_SALES', 'debit': 0.0, 'credit': amount},
-      ],
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  INVESTMENTS (Portfolio Management)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getInvestments() async {
-    final db = await database;
-    return await db.query('investments', where: 'is_deleted = 0', orderBy: 'name ASC');
-  }
-
-  Future<void> addInvestment(Map<String, dynamic> investment) async {
-    final db = await database;
-    investment['id'] ??= 'INV_${DateTime.now().millisecondsSinceEpoch}';
-    investment['sync_status'] = 0;
-    investment['updated_at'] = DateTime.now().toIso8601String();
-    investment['device_id'] = await getDeviceFingerprint();
-    investment['is_deleted'] = 0;
-    
-    try {
-      await db.insert('investments', investment, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e) {
-      if (e.toString().contains("has no column named initial_amount")) {
-        debugPrint("🛠️ Self-healing: Adding missing 'initial_amount' column to investments table...");
-        try {
-          await db.execute("ALTER TABLE investments ADD COLUMN initial_amount REAL DEFAULT 0");
-          await db.insert('investments', investment, conflictAlgorithm: ConflictAlgorithm.replace);
-        } catch (innerE) {
-          debugPrint("❌ Self-healing failed: $innerE");
-          rethrow;
-        }
-      } else {
-        rethrow;
-      }
-    }
-  }
-
-  Future<void> updateInvestmentValue(String id, double newValue) async {
-    final db = await database;
-    await db.update('investments', {
-      'current_value': newValue,
-      'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> addInvestmentTransaction(Map<String, dynamic> txn) async {
-    final db = await database;
-    txn['id'] ??= 'ITXN_${DateTime.now().millisecondsSinceEpoch}';
-    txn['sync_status'] = 0;
-    txn['updated_at'] = DateTime.now().toIso8601String();
-    txn['device_id'] = await getDeviceFingerprint();
-    txn['is_deleted'] = 0;
-    await db.insert('investment_transactions', txn, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getInvestmentTransactions(String investmentId) async {
-    final db = await database;
-    return await db.query('investment_transactions',
-      where: 'investment_id = ?', whereArgs: [investmentId],
-      orderBy: 'date DESC');
-  }
-
-  Future<void> liquidateInvestment(String id, String reason, double amount) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-    await db.update('investments', {
-      'status': 'LIQUIDATED',
-      'sync_status': 0,
-      'updated_at': nowStr,
-    }, where: 'id = ?', whereArgs: [id]);
-
-    await db.insert('liquidation_requests', {
-      'id': 'LIQ_${DateTime.now().millisecondsSinceEpoch}',
-      'asset_type': 'INVESTMENT',
-      'asset_id': id,
-      'reason': reason,
-      'requested_amount': amount,
-      'status': 'APPROVED',
-      'sync_status': 0,
-      'updated_at': nowStr,
-      'device_id': await getDeviceFingerprint(),
-      'is_deleted': 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  MANUFACTURING & BOM (Production Module)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getBOMs() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT b.*, i.name as finished_good_name
-      FROM bom b
-      LEFT JOIN items i ON b.finished_good_item_id = i.id
-      ORDER BY b.name ASC
-    ''');
-  }
-
-  Future<void> addBOM(Map<String, dynamic> bom) async {
-    final db = await database;
-    bom['id'] ??= 'BOM_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('bom', bom, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> addBOMLine(Map<String, dynamic> line) async {
-    final db = await database;
-    line['id'] ??= 'BL_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('bom_lines', line, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getBOMLines(String bomId) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT bl.*, i.name as material_name, i.cost_price, i.quantity as available_qty
-      FROM bom_lines bl
-      LEFT JOIN items i ON bl.raw_material_item_id = i.id
-      WHERE bl.bom_id = ?
-    ''', [bomId]);
-  }
-
-  Future<void> executeManufacturingOrder({
-    required String bomId,
-    required double qtyToProduce,
-  }) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-    final orderId = 'MO_${DateTime.now().millisecondsSinceEpoch}';
-
-    await db.transaction((txn) async {
-      // Get BOM and its lines
-      final bomRes = await txn.query('bom', where: 'id = ?', whereArgs: [bomId]);
-      if (bomRes.isEmpty) return;
-      final bom = bomRes.first;
-      final String? finishedItemId = bom['finished_good_item_id'] as String?;
-      final double overhead = (bom['estimated_overhead_cost'] as num?)?.toDouble() ?? 0;
-
-      final bomLines = await txn.query('bom_lines', where: 'bom_id = ?', whereArgs: [bomId]);
-      double totalMaterialCost = 0;
-
-      // 1. Deduct raw materials
-      for (var line in bomLines) {
-        final String rawItemId = line['raw_material_item_id'] as String;
-        final double qtyRequired = (line['quantity_required'] as num).toDouble();
-        final double waste = (line['waste_percentage'] as num?)?.toDouble() ?? 0;
-        final double totalQty = qtyRequired * qtyToProduce * (1 + waste / 100);
-
-        // Get current cost
-        final itemRes = await txn.query('items', where: 'id = ?', whereArgs: [rawItemId]);
-        if (itemRes.isNotEmpty) {
-          final double unitCost = (itemRes.first['cost_price'] as num?)?.toDouble() ?? 0;
-          totalMaterialCost += unitCost * totalQty;
-        }
-
-        // Deduct stock
-        await txn.rawUpdate(
-          'UPDATE items SET quantity = quantity - ? WHERE id = ?',
-          [totalQty, rawItemId],
-        );
-      }
-
-      // 2. Add finished goods to inventory
-      final double totalCost = totalMaterialCost + (overhead * qtyToProduce);
-      final double unitCost = qtyToProduce > 0 ? totalCost / qtyToProduce : 0;
-
-      if (finishedItemId != null) {
-        await txn.rawUpdate(
-          'UPDATE items SET quantity = quantity + ?, cost_price = ? WHERE id = ?',
-          [qtyToProduce, unitCost, finishedItemId],
-        );
-      }
-
-      // 3. Create manufacturing order record
-      await txn.insert('manufacturing_orders', {
-        'id': orderId,
-        'bom_id': bomId,
-        'status': 'completed',
-        'qty_to_produce': qtyToProduce,
-        'start_date': nowStr,
-        'end_date': nowStr,
-        'actual_material_cost': totalMaterialCost,
-        'actual_overhead_cost': overhead * qtyToProduce,
-        'total_cost': totalCost,
-      });
-
-      // 4. Journal entry
-      final entryId = 'JE_MO_$orderId';
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': nowStr.split('T')[0],
-        'description': 'أمر تصنيع $orderId - إنتاج $qtyToProduce وحدة',
-        'reference_id': orderId,
-      });
-      await txn.insert('journal_entry_lines', {
-        'id': '${entryId}_D', 'entry_id': entryId,
-        'account_id': 'ACC_INVENTORY', 'debit': totalCost, 'credit': 0,
-      });
-      await txn.insert('journal_entry_lines', {
-        'id': '${entryId}_C',
-        'entry_id': entryId,
-        'account_id': 'ACC_INVENTORY', 'debit': 0, 'credit': totalMaterialCost,
-      });
-      if (overhead > 0) {
-        await txn.insert('journal_entry_lines', {
-          'id': '${entryId}_OH', 'entry_id': entryId,
-          'account_id': 'ACC_EXPENSES_GENERAL', 'debit': 0, 'credit': overhead * qtyToProduce,
-        });
-      }
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getManufacturingOrders() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT mo.*, b.name as bom_name
-      FROM manufacturing_orders mo
-      LEFT JOIN bom b ON mo.bom_id = b.id
-      ORDER BY mo.start_date DESC
-    ''');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  WAREHOUSE & INVENTORY OPERATIONS
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getWarehouses() async {
-    final db = await database;
-    return await db.query('warehouses', orderBy: 'name ASC');
-  }
-
-  Future<void> addWarehouse(Map<String, dynamic> warehouse) async {
-    final db = await database;
-    warehouse['id'] ??= 'WH_${DateTime.now().millisecondsSinceEpoch}';
-    warehouse['sync_status'] = 0;
-    warehouse['updated_at'] = DateTime.now().toIso8601String();
-    warehouse['device_id'] = await getDeviceFingerprint();
-    warehouse['is_deleted'] = 0;
-    await db.insert('warehouses', warehouse, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getInventoryBatches({String? warehouseId, String? itemId}) async {
-    final db = await database;
-    String where = '1=1';
-    List<dynamic> args = [];
-    if (warehouseId != null) { where += ' AND warehouse_id = ?'; args.add(warehouseId); }
-    if (itemId != null) { where += ' AND item_id = ?'; args.add(itemId); }
-    return await db.query('inventory_batches', where: where, whereArgs: args, orderBy: 'expiry_date ASC');
-  }
-
-  Future<void> addInventoryBatch(Map<String, dynamic> batch) async {
-    final db = await database;
-    batch['id'] ??= 'BATCH_${DateTime.now().millisecondsSinceEpoch}';
-    batch['sync_status'] = 0;
-    batch['updated_at'] = DateTime.now().toIso8601String();
-    batch['device_id'] = await getDeviceFingerprint();
-    batch['is_deleted'] = 0;
-    await db.insert('inventory_batches', batch, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> transferInventory({
-    required String itemId,
-    required String fromWarehouseId,
-    required String toWarehouseId,
-    required double quantity,
-  }) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-    await db.insert('inventory_transfers', {
-      'id': 'XFER_${DateTime.now().millisecondsSinceEpoch}',
-      'item_id': itemId,
-      'from_warehouse_id': fromWarehouseId,
-      'to_warehouse_id': toWarehouseId,
-      'quantity': quantity,
-      'date': nowStr,
-      'status': 'completed',
-      'sync_status': 0,
-      'updated_at': nowStr,
-      'device_id': await getDeviceFingerprint(),
-      'is_deleted': 0,
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getInventoryTransfers() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT it.*, i.name as item_name, fw.name as from_name, tw.name as to_name
-      FROM inventory_transfers it
-      LEFT JOIN items i ON it.item_id = i.id
-      LEFT JOIN warehouses fw ON it.from_warehouse_id = fw.id
-      LEFT JOIN warehouses tw ON it.to_warehouse_id = tw.id
-      ORDER BY it.date DESC
-    ''');
-  }
-
-  Future<List<Map<String, dynamic>>> getExpiringItems({int daysThreshold = 30}) async {
-    final db = await database;
-    final threshold = DateTime.now().add(Duration(days: daysThreshold)).toIso8601String().split('T')[0];
-    return await db.rawQuery('''
-      SELECT ib.*, i.name as item_name, w.name as warehouse_name
-      FROM inventory_batches ib
-      LEFT JOIN items i ON ib.item_id = i.id
-      LEFT JOIN warehouses w ON ib.warehouse_id = w.id
-      WHERE ib.expiry_date IS NOT NULL AND ib.expiry_date <= ? AND ib.quantity > 0
-      ORDER BY ib.expiry_date ASC
-    ''', [threshold]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  SYSTEM USERS & PERMISSIONS (Auth Module)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getSystemUsers() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT su.*, e.name as employee_name
-      FROM system_users su
-      LEFT JOIN employees e ON su.employee_id = e.id
-      WHERE su.is_deleted = 0
-      ORDER BY su.username ASC
-    ''');
-  }
-
-  Future<void> addSystemUser(Map<String, dynamic> user) async {
-    await saveSystemUser(user);
-  }
-
-  Future<void> updateSystemUser(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    await db.update('system_users', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> deactivateSystemUser(String id) async {
-    final db = await database;
-    await db.update('system_users', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<Map<String, dynamic>?> authenticateSystemUser(String username, String passwordHash) async {
-    final db = await database;
-    final res = await db.query('system_users',
-      where: 'username = ? AND password_hash = ? AND is_active = 1',
-      whereArgs: [username, passwordHash]);
-    return res.isNotEmpty ? res.first : null;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  SALES AGENTS & COMMISSIONS
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getSalesAgents() async {
-    final db = await database;
-    return await db.query('sales_agents', where: "status = 'active'", orderBy: 'name ASC');
-  }
-
-  Future<void> addSalesAgent(Map<String, dynamic> agent) async {
-    final db = await database;
-    agent['id'] ??= 'SA_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('sales_agents', agent, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getSalesTargets({String? agentId}) async {
-    final db = await database;
-    if (agentId != null) {
-      return await db.query('sales_targets', where: 'agent_id = ?', whereArgs: [agentId], orderBy: 'month DESC');
-    }
-    return await db.query('sales_targets', orderBy: 'start_date DESC');
-  }
-
-  Future<void> addSalesTarget(Map<String, dynamic> target) async {
-    final db = await database;
-    target['id'] ??= 'ST_${DateTime.now().millisecondsSinceEpoch}';
-    target['created_at'] = DateTime.now().toIso8601String();
-    await db.insert('sales_targets', target, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getCommissions({String? employeeId}) async {
-    final db = await database;
-    if (employeeId != null) {
-      return await db.query('commissions', where: 'employee_id = ?', whereArgs: [employeeId], orderBy: 'created_at DESC');
-    }
-    return await db.query('commissions', orderBy: 'created_at DESC');
-  }
-
-  Future<void> addCommission(Map<String, dynamic> commission) async {
-    final db = await database;
-    commission['id'] ??= 'COM_${DateTime.now().millisecondsSinceEpoch}';
-    commission['created_at'] = DateTime.now().toIso8601String();
-    await db.insert('commissions', commission, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> calculateSalesCommission(String invoiceId, String employeeId, double percentage) async {
-    final db = await database;
-    final inv = await db.query('invoices', where: 'id = ?', whereArgs: [invoiceId]);
-    if (inv.isEmpty) return;
-
-    final double total = (inv.first['total'] as num?)?.toDouble() ?? 0;
-    final double commissionAmount = total * (percentage / 100);
-
-    await addCommission({
-      'employee_id': employeeId,
-      'invoice_id': invoiceId,
-      'amount': commissionAmount,
-      'percentage': percentage,
-      'status': 'PENDING',
-    });
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  JOB APPLICATIONS (Recruitment Module)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getJobApplications({String? status}) async {
-    final db = await database;
-    if (status != null) {
-      return await db.query('job_applications', where: 'status = ?', whereArgs: [status], orderBy: 'created_at DESC');
-    }
-    return await db.query('job_applications', orderBy: 'created_at DESC');
-  }
-
-  Future<void> addJobApplication(Map<String, dynamic> app) async {
-    final db = await database;
-    app['id'] ??= 'JA_${DateTime.now().millisecondsSinceEpoch}';
-    app['created_at'] = DateTime.now().toIso8601String();
-    app['status'] ??= 'NEW';
-    await db.insert('job_applications', app, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateJobApplicationStatus(String id, String status, {String? interviewDate}) async {
-    final db = await database;
-    final data = <String, dynamic>{'status': status};
-    if (interviewDate != null) data['interview_date'] = interviewDate;
-    await db.update('job_applications', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  PROMOTIONAL CAMPAIGNS (Marketing Module)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getPromotionalCampaigns({bool activeOnly = true}) async {
-    final db = await database;
-    if (activeOnly) {
-      return await db.query('promotional_campaigns', where: 'is_active = 1', orderBy: 'start_date DESC');
-    }
-    return await db.query('promotional_campaigns', orderBy: 'start_date DESC');
-  }
-
-  Future<void> addPromotionalCampaign(Map<String, dynamic> campaign) async {
-    final db = await database;
-    campaign['id'] ??= 'PROMO_${DateTime.now().millisecondsSinceEpoch}';
-    campaign['created_at'] = DateTime.now().toIso8601String();
-    campaign['is_active'] = 1;
-    await db.insert('promotional_campaigns', campaign, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  ACCOUNTS (Chart of Accounts - Full CRUD)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getAccounts({String? type}) async {
-    final db = await database;
-    if (type != null) {
-      return await db.query('accounts', where: 'type = ?', whereArgs: [type], orderBy: 'code ASC');
-    }
-    return await db.query('accounts', orderBy: 'code ASC');
-  }
-
-  Future<void> addAccount(Map<String, dynamic> account) async {
-    final db = await database;
-    await db.insert('accounts', account, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  TRIAL BALANCE & FINANCIAL STATEMENTS
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getTrialBalance(String endDate) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT
-        a.id, a.code, a.name, a.type,
-        COALESCE(SUM(jel.debit), 0) as total_debit,
-        COALESCE(SUM(jel.credit), 0) as total_credit,
-        COALESCE(SUM(jel.debit) - SUM(jel.credit), 0) as balance
-      FROM accounts a
-      LEFT JOIN journal_entry_lines jel ON a.id = jel.account_id
-      LEFT JOIN journal_entries je ON jel.entry_id = je.id AND je.date <= ?
-      GROUP BY a.id, a.code, a.name, a.type
-      HAVING total_debit > 0 OR total_credit > 0
-      ORDER BY a.code ASC
-    ''', [endDate]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  CLIENTS CRUD (Full Management)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> addClient(Map<String, dynamic> client) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    client['id'] ??= 'CLI_${DateTime.now().millisecondsSinceEpoch}';
-    client['sync_status'] = 0;
-    client['updated_at'] = DateTime.now().toIso8601String();
-    client['device_id'] = deviceId;
-    client['is_deleted'] = 0;
-    await db.insert('clients', client, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateClient(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    data['sync_status'] = 0;
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await db.update('clients', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> deleteClient(String id) async {
-    final db = await database;
-    await db.update('clients', {
-      'is_deleted': 1, 'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-    await AuditService.log(action: 'delete', entityType: 'client', entityId: id);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  SUPPLIERS CRUD (Full Management)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> addSupplier(Map<String, dynamic> supplier) async {
-    final db = await database;
-    supplier['id'] ??= 'SUP_${DateTime.now().millisecondsSinceEpoch}';
-    supplier['sync_status'] = 0;
-    supplier['updated_at'] = DateTime.now().toIso8601String();
-    supplier['device_id'] = await getDeviceFingerprint();
-    supplier['is_deleted'] = 0;
-    await db.insert('suppliers', supplier, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateSupplier(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    data['sync_status'] = 0;
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await db.update('suppliers', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  INVOICES (Full Query Methods)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getInvoices({String? clientId, String? status, int limit = 50}) async {
-    final db = await database;
-    String where = '1=1';
-    List<dynamic> args = [];
-    if (clientId != null) { where += ' AND client_id = ?'; args.add(clientId); }
-    if (status != null) { where += ' AND status = ?'; args.add(status); }
-    return await db.query('invoices', where: where, whereArgs: args, orderBy: 'issue_date DESC', limit: limit);
-  }
-
-  Future<List<Map<String, dynamic>>> getInvoiceLines(String invoiceId) async {
-    final db = await database;
-    return await db.query('invoice_lines', where: 'invoice_id = ?', whereArgs: [invoiceId]);
-  }
-
-  Future<List<Map<String, dynamic>>> getPurchaseInvoices({String? supplierId, int limit = 50}) async {
-    final db = await database;
-    if (supplierId != null) {
-      return await db.query('purchase_invoices', where: 'supplier_id = ?', whereArgs: [supplierId], orderBy: 'issue_date DESC', limit: limit);
-    }
-    return await db.query('purchase_invoices', orderBy: 'issue_date DESC', limit: limit);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  ASSETS (Full CRUD + Depreciation)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getAssets({String? status}) async {
-    final db = await database;
-    if (status != null) {
-      return await db.query('assets', where: 'status = ?', whereArgs: [status], orderBy: 'name ASC');
-    }
-    return await db.query('assets', orderBy: 'name ASC');
-  }
-
-  Future<void> addAsset(Map<String, dynamic> asset) async {
-    final db = await database;
-    final deviceId = await getDeviceFingerprint();
-    asset['id'] ??= 'ASSET_${DateTime.now().millisecondsSinceEpoch}';
-    asset['sync_status'] = 0;
-    asset['updated_at'] = DateTime.now().toIso8601String();
-    asset['device_id'] = deviceId;
-    asset['is_deleted'] = 0;
-    await db.insert('assets', asset, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateAsset(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    data['sync_status'] = 0;
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await db.update('assets', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  JOURNAL ENTRIES (Full Query)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getJournalEntries({int limit = 50}) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT je.*, COALESCE(SUM(jel.debit), 0) as total_debit
-      FROM journal_entries je
-      LEFT JOIN journal_entry_lines jel ON je.id = jel.entry_id
-      GROUP BY je.id
-      ORDER BY je.date DESC
-      LIMIT ?
-    ''', [limit]);
-  }
-
-  Future<List<Map<String, dynamic>>> getJournalEntryLines(String entryId) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT jel.*, a.name as account_name, a.code as account_code
-      FROM journal_entry_lines jel
-      LEFT JOIN accounts a ON jel.account_id = a.id
-      WHERE jel.entry_id = ?
-    ''', [entryId]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  SALARY SLIPS (Payroll)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getSalarySlips({String? employeeId, String? month}) async {
-    final db = await database;
-    String where = '1=1';
-    List<dynamic> args = [];
-    if (employeeId != null) { where += ' AND employee_id = ?'; args.add(employeeId); }
-    if (month != null) { where += ' AND month = ?'; args.add(month); }
-    return await db.query('salary_slips', where: where, whereArgs: args, orderBy: 'month DESC');
-  }
-
-  Future<void> generateSalarySlip(Map<String, dynamic> slip) async {
-    final db = await database;
-    slip['id'] ??= 'SS_${DateTime.now().millisecondsSinceEpoch}';
-    slip['status'] = 'paid';
-    slip['payment_date'] = DateTime.now().toIso8601String();
-    await db.insert('salary_slips', slip, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  COST CENTERS (Full CRUD)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> addCostCenter(Map<String, dynamic> cc) async {
-    final db = await database;
-    cc['id'] ??= 'CC_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('cost_centers', cc, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateCostCenter(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    await db.update('cost_centers', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  PROJECTS (Full CRUD)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> updateProject(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    data['sync_status'] = 0;
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await db.update('projects', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> deleteProject(String id) async {
-    final db = await database;
-    await db.update('projects', {
-      'status': 'archived', 'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-    await AuditService.log(action: 'delete', entityType: 'project', entityId: id);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  LOW STOCK ALERTS (QuickBooks Inventory Alerts)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getLowStockItems() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT * FROM items
-      WHERE quantity <= min_stock_level AND quantity >= 0
-      ORDER BY quantity ASC
-    ''');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  CHEQUES (Full CRUD)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<List<Map<String, dynamic>>> getCheques({String? status, String? type}) async {
-    final db = await database;
-    String where = '1=1';
-    List<dynamic> args = [];
-    if (status != null) { where += ' AND status = ?'; args.add(status); }
-    if (type != null) { where += ' AND type = ?'; args.add(type); }
-    return await db.query('cheques', where: where, whereArgs: args, orderBy: 'due_date ASC');
-  }
-
-  Future<void> addCheque(Map<String, dynamic> cheque) async {
-    final db = await database;
-    cheque['id'] ??= 'CHQ_${DateTime.now().millisecondsSinceEpoch}';
-    cheque['sync_status'] = 0;
-    cheque['updated_at'] = DateTime.now().toIso8601String();
-    cheque['device_id'] = await getDeviceFingerprint();
-    cheque['is_deleted'] = 0;
-    await db.insert('cheques', cheque, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> updateChequeStatus(String id, String status) async {
-    final db = await database;
-    await db.update('cheques', {
-      'status': status,
-      'sync_status': 0,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ============================================================
-  // Phase 2: Core Feature Gap Methods
-  // ============================================================
-
-  /// Register a payment to a supplier (reduces supplier balance + journal entry)
-  Future<void> registerSupplierPayment({
-    required String supplierId,
-    required double amount,
-    required String paymentAccountId,
-    String? notes,
-  }) async {
-    final db = await database;
-    final paymentId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
-    final dateIso = DateTime.now().toIso8601String().split('T')[0];
-
-    await db.transaction((txn) async {
-      // 1. Record Payment
-      await txn.insert('payments', {
-        'id': paymentId,
-        'partner_id': supplierId,
-        'partner_type': 'supplier',
-        'amount': amount,
-        'type': 'payment',
-        'date': dateIso,
-      });
-
-      // 2. Reduce Supplier Balance
-      await txn.rawUpdate(
-        'UPDATE suppliers SET balance = balance - ? WHERE id = ?',
-        [amount, supplierId],
-      );
-
-      // 3. Journal Entry: Debit Payable, Credit Bank/Cash
-      final entryId = 'JRN_PAY_${DateTime.now().millisecondsSinceEpoch}';
-      await txn.insert('journal_entries', {
-        'id': entryId,
-        'date': dateIso,
-        'description': 'سداد مورد - $paymentId${notes != null ? " ($notes)" : ""}',
-        'reference_id': paymentId,
-      });
-      await txn.insert('journal_entry_lines', {
-        'id': 'JEL_D_${DateTime.now().microsecondsSinceEpoch}',
-        'entry_id': entryId,
-        'account_id': 'ACC_PAYABLE',
-        'debit': amount,
-        'credit': 0,
-      });
-      await txn.insert('journal_entry_lines', {
-        'id': 'JEL_C_${DateTime.now().microsecondsSinceEpoch}',
-        'entry_id': entryId,
-        'account_id': paymentAccountId,
-        'debit': 0,
-        'credit': amount,
-      });
-
-      // 4. Update Account Balances
-      await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, 'ACC_PAYABLE']);
-      await txn.rawUpdate('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, paymentAccountId]);
-    });
-  }
-
-  /// Recalculate commissions for all agents in a given month (YYYY-MM)
-  Future<void> recalculateAgentCommissions(String month) async {
-    final db = await database;
-
-    // 1. Get all sales from invoices grouped by agent
-    final sales = await db.rawQuery('''
-      SELECT sales_agent_id, SUM(total) as total_sales
-      FROM invoices
-      WHERE sales_agent_id IS NOT NULL
-        AND issue_date LIKE ?
-        AND is_return = 0
-      GROUP BY sales_agent_id
-    ''', ['$month%']);
-
-    for (var row in sales) {
-      final agentId = row['sales_agent_id'] as String;
-      final totalSales = (row['total_sales'] as num?)?.toDouble() ?? 0.0;
-
-      // 2. Get agent commission rate
-      final agentRes = await db.query('sales_agents', where: 'id = ?', whereArgs: [agentId]);
-      if (agentRes.isEmpty) continue;
-      final rate = (agentRes.first['commission_rate'] as num?)?.toDouble() ?? 0.0;
-      final commissionEarned = totalSales * rate / 100;
-
-      // 3. Update or create sales target for this month
-      final targetId = 'TGT_${agentId}_$month';
-      final existingTarget = await db.query('sales_targets', where: 'id = ?', whereArgs: [targetId]);
-
-      if (existingTarget.isNotEmpty) {
-        await db.update('sales_targets', {
-          'achieved_amount': totalSales,
-          'commission_earned': commissionEarned,
-          'status': totalSales >= (existingTarget.first['target_amount'] as num? ?? 0) ? 'achieved' : 'pending',
-        }, where: 'id = ?', whereArgs: [targetId]);
-      } else {
-        await db.insert('sales_targets', {
-          'id': targetId,
-          'agent_id': agentId,
-          'month': month,
-          'target_amount': 0,
-          'achieved_amount': totalSales,
-          'commission_earned': commissionEarned,
-          'status': 'pending',
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    }
-  }
-
-  /// Get invoices linked to a specific sales agent in a given month
-  Future<List<Map<String, dynamic>>> getAgentInvoices(String agentId, String month) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT i.*, c.name as client_name
-      FROM invoices i
-      LEFT JOIN clients c ON i.client_id = c.id
-      WHERE i.sales_agent_id = ?
-        AND i.issue_date LIKE ?
-        AND i.is_return = 0
-      ORDER BY i.issue_date DESC
-    ''', [agentId, '$month%']);
-  }
-
-
-  /// Create a promotional campaign for an expiring product
-  Future<void> createExpiryPromotion({
-    required String itemId,
-    required double discountPercent,
-    required int campaignDays,
-  }) async {
-    final db = await database;
-    final now = DateTime.now();
-    await db.insert('promotional_campaigns', {
-      'id': 'PROMO_${now.millisecondsSinceEpoch}',
-      'item_id': itemId,
-      'discount_type': 'percentage',
-      'discount_value': discountPercent,
-      'start_date': now.toIso8601String().split('T')[0],
-      'end_date': now.add(Duration(days: campaignDays)).toIso8601String().split('T')[0],
-      'is_active': 1,
-      'created_at': now.toIso8601String(),
-    });
-  }
-
-  /// Transfer an inventory batch to another warehouse
-  Future<void> transferBatch({
-    required String batchId,
-    required String toWarehouseId,
-  }) async {
-    final db = await database;
-    final dateIso = DateTime.now().toIso8601String().split('T')[0];
-
-    await db.transaction((txn) async {
-      // 1. Get batch info
-      final batch = await txn.query('inventory_batches', where: 'id = ?', whereArgs: [batchId]);
-      if (batch.isEmpty) return;
-      final fromWarehouseId = batch.first['warehouse_id'] as String;
-      final itemId = batch.first['item_id'] as String;
-      final quantity = (batch.first['quantity'] as num?)?.toDouble() ?? 0;
-
-      // 2. Update batch warehouse
-      await txn.update('inventory_batches', {
-        'warehouse_id': toWarehouseId,
-      }, where: 'id = ?', whereArgs: [batchId]);
-
-      // 3. Record transfer
-      await txn.insert('inventory_transfers', {
-        'id': 'TRF_${DateTime.now().millisecondsSinceEpoch}',
-        'item_id': itemId,
-        'from_warehouse_id': fromWarehouseId,
-        'to_warehouse_id': toWarehouseId,
-        'quantity': quantity,
-        'date': dateIso,
-        'status': 'completed',
-      });
-    });
-  }
-
-  /// Approve a draft invoice — create real purchase invoice from draft data
-  Future<bool> approveDraftInvoice(String draftId) async {
-    final db = await database;
-
-    final drafts = await db.query('draft_invoices', where: 'id = ?', whereArgs: [draftId]);
-    if (drafts.isEmpty) return false;
-    final draft = drafts.first;
-
-    final total = (draft['total_amount'] as num?)?.toDouble() ?? 0;
-    final supplierName = draft['supplier_name'] as String? ?? 'مورد غير معروف';
-
-    // 1. Find or create supplier
-    var suppliers = await db.query('suppliers', where: 'name = ?', whereArgs: [supplierName]);
-    String supplierId;
-    if (suppliers.isEmpty) {
-      supplierId = 'SUP_${DateTime.now().millisecondsSinceEpoch}';
-      await db.insert('suppliers', {
-        'id': supplierId,
-        'name': supplierName,
-        'balance': 0,
-      });
-    } else {
-      supplierId = suppliers.first['id'] as String;
-    }
-
-    // 2. Create purchase invoice (QuickBooks style: total only, items added later)
-    await savePurchaseInvoice(
-      supplierId: supplierId,
-      total: total,
-      paymentType: 'credit',
-      lines: [],
-    );
-
-    // 3. Mark draft as approved
-    await db.update('draft_invoices', {
-      'status': 'approved',
-    }, where: 'id = ?', whereArgs: [draftId]);
-
-    return true;
-  }
-
-  /// Reject/archive a draft invoice
-  Future<void> rejectDraftInvoice(String draftId) async {
-    final db = await database;
-    await db.update('draft_invoices', {
-      'status': 'rejected',
-    }, where: 'id = ?', whereArgs: [draftId]);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // 🔒 الأنظمة الأربعة الأساسية — قاعدة بيانات شاملة
-  // ══════════════════════════════════════════════════════════════════
-
-  /// Ensure core tables exist for the 4 systems
-  Future<void> _ensureCoreTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS feasibility_studies (
-        id TEXT PRIMARY KEY,
-        project_name TEXT NOT NULL,
-        sector TEXT,
-        country TEXT,
-        capital REAL DEFAULT 0,
-        monthly_costs REAL DEFAULT 0,
-        monthly_revenue REAL DEFAULT 0,
-        study_years INTEGER DEFAULT 5,
-        discount_rate REAL DEFAULT 0.10,
-        npv REAL,
-        irr REAL,
-        payback_months INTEGER,
-        success_rate REAL,
-        scenario TEXT DEFAULT 'moderate',
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS tax_filings (
-        id TEXT PRIMARY KEY,
-        period_label TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
-        country TEXT DEFAULT 'السعودية',
-        tax_rate REAL DEFAULT 0.15,
-        total_sales_tax REAL DEFAULT 0,
-        total_purchase_tax REAL DEFAULT 0,
-        net_tax_due REAL DEFAULT 0,
-        status TEXT DEFAULT 'draft',
-        filed_at TEXT,
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    ''');
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📊 1. نظام الحسابات الشامل
-  // ─────────────────────────────────────────────────
-
-  /// Get the full Chart of Accounts
-  Future<List<Map<String, dynamic>>> getChartOfAccounts() async {
-    final db = await database;
-    return await db.query('accounts', orderBy: 'code ASC');
-  }
-
-  /// Update an existing account
-  Future<void> updateAccount(String id, Map<String, dynamic> data) async {
-    final db = await database;
-    await db.update('accounts', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  /// Delete an account (only if no journal lines reference it)
-  Future<bool> deleteAccount(String id) async {
-    final db = await database;
-    final refs = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM journal_entry_lines WHERE account_id = ?', [id]
-    );
-    if ((refs.first['c'] as int) > 0) return false;
-    await db.delete('accounts', where: 'id = ?', whereArgs: [id]);
-    return true;
-  }
-
-  /// Get ledger (all movements) for a specific account
-  Future<List<Map<String, dynamic>>> getAccountLedger(String accountId, {String? fromDate, String? toDate}) async {
-    final db = await database;
-    String where = 'jl.account_id = ?';
-    List<dynamic> args = [accountId];
-    if (fromDate != null) { where += ' AND je.date >= ?'; args.add(fromDate); }
-    if (toDate != null) { where += ' AND je.date <= ?'; args.add(toDate); }
-    
-    return await db.rawQuery('''
-      SELECT jl.*, je.date, je.description,
-        COALESCE(a.name, jl.account_name, 'غير محدد') as display_name
-      FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.journal_entry_id = je.id
-      LEFT JOIN accounts a ON jl.account_id = a.id
-      WHERE $where
-      ORDER BY je.date DESC
-    ''', args);
-  }
-
-  /// Get financial position (Balance Sheet) 
-  Future<Map<String, dynamic>> getFinancialPosition() async {
-    final db = await database;
-    
-    // Assets
-    final assets = await db.rawQuery('''
-      SELECT COALESCE(SUM(balance), 0) as total FROM accounts WHERE type = 'asset'
-    ''');
-    // Liabilities
-    final liabilities = await db.rawQuery('''
-      SELECT COALESCE(SUM(balance), 0) as total FROM accounts WHERE type = 'liability'
-    ''');
-    // Revenue
-    final revenue = await db.rawQuery('''
-      SELECT COALESCE(SUM(balance), 0) as total FROM accounts WHERE type = 'revenue'
-    ''');
-    // Expenses
-    final expenses = await db.rawQuery('''
-      SELECT COALESCE(SUM(balance), 0) as total FROM accounts WHERE type = 'expense'
-    ''');
-    
-    final totalAssets = (assets.first['total'] as num?)?.toDouble() ?? 0;
-    final totalLiabilities = (liabilities.first['total'] as num?)?.toDouble() ?? 0;
-    final totalRevenue = (revenue.first['total'] as num?)?.toDouble() ?? 0;
-    final totalExpenses = (expenses.first['total'] as num?)?.toDouble() ?? 0;
-    final netProfit = totalRevenue - totalExpenses;
-    final equity = totalAssets - totalLiabilities;
-    
-    // Get individual accounts by type
-    final assetAccounts = await db.query('accounts', where: 'type = ?', whereArgs: ['asset'], orderBy: 'code ASC');
-    final liabilityAccounts = await db.query('accounts', where: 'type = ?', whereArgs: ['liability'], orderBy: 'code ASC');
-    final revenueAccounts = await db.query('accounts', where: 'type = ?', whereArgs: ['revenue'], orderBy: 'code ASC');
-    final expenseAccounts = await db.query('accounts', where: 'type = ?', whereArgs: ['expense'], orderBy: 'code ASC');
-    
-    return {
-      'total_assets': totalAssets,
-      'total_liabilities': totalLiabilities,
-      'total_revenue': totalRevenue,
-      'total_expenses': totalExpenses,
-      'net_profit': netProfit,
-      'equity': equity,
-      'asset_accounts': assetAccounts,
-      'liability_accounts': liabilityAccounts,
-      'revenue_accounts': revenueAccounts,
-      'expense_accounts': expenseAccounts,
-    };
-  }
-
-  /// Get Income Statement (P&L) for a period
-  Future<Map<String, dynamic>> getIncomeStatement({String? fromDate, String? toDate}) async {
-    final db = await database;
-    String dateFilter = '';
-    List<dynamic> args = [];
-    if (fromDate != null && toDate != null) {
-      dateFilter = 'AND je.date BETWEEN ? AND ?';
-      args = [fromDate, toDate];
-    }
-
-    final revenue = await db.rawQuery('''
-      SELECT a.id, a.code, a.name, COALESCE(SUM(jl.credit - jl.debit), 0) as net_amount
-      FROM accounts a
-      LEFT JOIN journal_entry_lines jl ON a.id = jl.account_id
-      LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-      WHERE a.type = 'revenue' $dateFilter
-      GROUP BY a.id
-      ORDER BY a.code
-    ''', args);
-
-    final expenses = await db.rawQuery('''
-      SELECT a.id, a.code, a.name, COALESCE(SUM(jl.debit - jl.credit), 0) as net_amount
-      FROM accounts a
-      LEFT JOIN journal_entry_lines jl ON a.id = jl.account_id
-      LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-      WHERE a.type = 'expense' $dateFilter
-      GROUP BY a.id
-      ORDER BY a.code
-    ''', args);
-
-    final totalRevenue = revenue.fold<double>(0, (s, r) => s + ((r['net_amount'] as num?)?.toDouble() ?? 0));
-    final totalExpenses = expenses.fold<double>(0, (s, r) => s + ((r['net_amount'] as num?)?.toDouble() ?? 0));
-
-    return {
-      'revenue_items': revenue,
-      'expense_items': expenses,
-      'total_revenue': totalRevenue,
-      'total_expenses': totalExpenses,
-      'net_profit': totalRevenue - totalExpenses,
-    };
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🧾 2. نظام الضرائب الشامل
-  // ─────────────────────────────────────────────────
-
-  /// Get tax summary: sales VAT vs purchase VAT from real invoices
-  Future<Map<String, dynamic>> getTaxSummary({String? fromDate, String? toDate}) async {
-    final db = await database;
-    String dateFilter = '';
-    List<dynamic> args = [];
-    if (fromDate != null && toDate != null) {
-      dateFilter = "WHERE issue_date BETWEEN ? AND ?";
-      args = [fromDate, toDate];
-    }
-
-    // Sales VAT (collected)
-    final salesVat = await db.rawQuery('''
-      SELECT COALESCE(SUM(tax_amount), 0) as total,
-             COUNT(*) as invoice_count,
-             COALESCE(SUM(total), 0) as total_sales
-      FROM invoices $dateFilter
-    ''', args);
-    
-    // Purchase VAT (paid) 
-    final purchaseVat = await db.rawQuery('''
-      SELECT COALESCE(SUM(tax_amount), 0) as total,
-             COUNT(*) as invoice_count,
-             COALESCE(SUM(total), 0) as total_purchases
-      FROM purchase_invoices ${dateFilter.isNotEmpty ? dateFilter : ''}
-    ''', dateFilter.isNotEmpty ? args : []);
-
-    final salesTax = (salesVat.first['total'] as num?)?.toDouble() ?? 0;
-    final purchaseTax = (purchaseVat.first['total'] as num?)?.toDouble() ?? 0;
-    
-    return {
-      'sales_tax': salesTax,
-      'purchase_tax': purchaseTax,
-      'net_tax_due': salesTax - purchaseTax,
-      'sales_count': salesVat.first['invoice_count'] ?? 0,
-      'purchase_count': purchaseVat.first['invoice_count'] ?? 0,
-      'total_sales': (salesVat.first['total_sales'] as num?)?.toDouble() ?? 0,
-      'total_purchases': (purchaseVat.first['total_purchases'] as num?)?.toDouble() ?? 0,
-    };
-  }
-
-  /// Get all taxable invoices for a period
-  Future<List<Map<String, dynamic>>> getTaxableInvoices({String? fromDate, String? toDate, String type = 'all'}) async {
-    final db = await database;
-    List<Map<String, dynamic>> result = [];
-    
-    if (type == 'all' || type == 'sales') {
-      String where = 'tax_amount > 0';
-      List<dynamic> args = [];
-      if (fromDate != null) { where += ' AND issue_date >= ?'; args.add(fromDate); }
-      if (toDate != null) { where += ' AND issue_date <= ?'; args.add(toDate); }
-      final sales = await db.query('invoices', where: where, whereArgs: args, orderBy: 'issue_date DESC');
-      for (var s in sales) { result.add({...s, 'inv_type': 'sales'}); }
-    }
-    
-    if (type == 'all' || type == 'purchase') {
-      String where = 'tax_amount > 0';
-      List<dynamic> args = [];
-      if (fromDate != null) { where += ' AND issue_date >= ?'; args.add(fromDate); }
-      if (toDate != null) { where += ' AND issue_date <= ?'; args.add(toDate); }
-      final purchases = await db.query('purchase_invoices', where: where, whereArgs: args, orderBy: 'issue_date DESC');
-      for (var p in purchases) { result.add({...p, 'inv_type': 'purchase'}); }
-    }
-    
-    result.sort((a, b) => (b['issue_date'] ?? '').compareTo(a['issue_date'] ?? ''));
-    return result;
-  }
-
-  /// Save a tax filing record
-  Future<void> saveTaxFiling(Map<String, dynamic> filing) async {
-    final db = await database;
-    await _ensureCoreTables(db);
-    
-    try {
-      await db.insert('tax_filings', filing, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e) {
-      if (e.toString().contains("has no column named period_label") || e.toString().contains("no such table")) {
-        debugPrint("🛠️ Self-healing: Recreating tax_filings table due to schema mismatch...");
-        await db.execute("DROP TABLE IF EXISTS tax_filings");
-        await _ensureCoreTables(db);
-        await db.insert('tax_filings', filing, conflictAlgorithm: ConflictAlgorithm.replace);
-      } else {
-        rethrow;
-      }
-    }
-  }
-
-  /// Get all tax filings
-  Future<List<Map<String, dynamic>>> getTaxFilings() async {
-    final db = await database;
-    await _ensureCoreTables(db);
-    return await db.query('tax_filings', orderBy: 'start_date DESC');
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🔍 3. نظام التدقيق الشامل
-  // ─────────────────────────────────────────────────
-
-  /// Find unbalanced journal entries (debit != credit)
-  Future<List<Map<String, dynamic>>> getUnbalancedEntries() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT je.id, je.description, je.date,
-        SUM(jl.debit) as total_debit, 
-        SUM(jl.credit) as total_credit,
-        ABS(SUM(jl.debit) - SUM(jl.credit)) as imbalance
-      FROM journal_entries je
-      JOIN journal_entry_lines jl ON je.id = jl.journal_entry_id
-      GROUP BY je.id
-      HAVING ABS(SUM(jl.debit) - SUM(jl.credit)) > 0.01
-      ORDER BY je.date DESC
-    ''');
-  }
-
-  /// Find potential duplicate payments (same amount + same date + same supplier)
-  Future<List<Map<String, dynamic>>> getDuplicatePayments() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT supplier_name, total, issue_date, COUNT(*) as occurrence_count,
-        GROUP_CONCAT(id) as invoice_ids
-      FROM purchase_invoices
-      WHERE total > 0
-      GROUP BY supplier_name, total, issue_date
-      HAVING COUNT(*) > 1
-      ORDER BY issue_date DESC
-    ''');
-  }
-
-  /// Find budget overruns (actual > budget for any account)
-  Future<List<Map<String, dynamic>>> getBudgetOverruns() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT b.account_id, a.name as account_name, a.code,
-        b.budget_amount,
-        COALESCE(SUM(jl.debit), 0) as actual_amount,
-        COALESCE(SUM(jl.debit), 0) - b.budget_amount as overrun
-      FROM budgets b
-      JOIN accounts a ON b.account_id = a.id
-      LEFT JOIN journal_entry_lines jl ON b.account_id = jl.account_id
-      LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-        AND je.date BETWEEN b.start_date AND b.end_date
-      GROUP BY b.account_id
-      HAVING COALESCE(SUM(jl.debit), 0) > b.budget_amount
-    ''');
-  }
-
-  /// Get audit trail — recent changes and suspicious activity
-  Future<Map<String, dynamic>> getAuditSummary() async {
-    final db = await database;
-    
-    final unbalanced = await getUnbalancedEntries();
-    final duplicates = await getDuplicatePayments();
-    final overruns = await getBudgetOverruns();
-    final risks = await getAuditRisks();
-    
-    // Large individual transactions (top 10)
-    final largeTransactions = await db.rawQuery('''
-      SELECT je.id, je.description, je.date, jl.debit, jl.credit, 
-        COALESCE(a.name, jl.account_name) as account_name
-      FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.entry_id = je.id
-      LEFT JOIN accounts a ON jl.account_id = a.id
-      WHERE jl.debit > 10000 OR jl.credit > 10000
-      ORDER BY COALESCE(jl.debit, 0) + COALESCE(jl.credit, 0) DESC
-      LIMIT 10
-    ''');
-    
-    // Total entries and recent entries count
-    final totalEntries = await db.rawQuery('SELECT COUNT(*) as c FROM journal_entries');
-    final recentEntries = await db.rawQuery('''
-      SELECT COUNT(*) as c FROM journal_entries 
-      WHERE date >= date('now', '-30 days')
-    ''');
-    
-    final totalIssues = unbalanced.length + duplicates.length + overruns.length + risks.length;
-    final safetyScore = totalIssues == 0 ? 100.0 : 
-      (100.0 - (totalIssues * 5)).clamp(0.0, 100.0);
-    
-    return {
-      'unbalanced_entries': unbalanced,
-      'duplicate_payments': duplicates,
-      'budget_overruns': overruns,
-      'audit_risks': risks,
-      'large_transactions': largeTransactions,
-      'total_entries': (totalEntries.first['c'] as int?) ?? 0,
-      'recent_entries': (recentEntries.first['c'] as int?) ?? 0,
-      'total_issues': totalIssues,
-      'safety_score': safetyScore,
-    };
-  }
-
-  // ─────────────────────────────────────────────────
-  // 👥 3. إدارة العملاء والموردين (Partners)
-  // ─────────────────────────────────────────────────
-
-  Future<void> saveClient(Map<String, dynamic> client) async {
-    final db = await database;
-    client['id'] ??= 'CL_${DateTime.now().millisecondsSinceEpoch}';
-    client['updated_at'] = DateTime.now().toIso8601String();
-    client['sync_status'] ??= 0;
-    client['is_deleted'] ??= 0;
-    await db.insert('clients', client, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getClients() async {
-    final db = await database;
-    return await db.query('clients', where: 'is_deleted = 0', orderBy: 'name ASC');
-  }
-
-  Future<void> saveSupplier(Map<String, dynamic> supplier) async {
-    final db = await database;
-    supplier['id'] ??= 'SUP_${DateTime.now().millisecondsSinceEpoch}';
-    supplier['updated_at'] = DateTime.now().toIso8601String();
-    supplier['sync_status'] ??= 0;
-    supplier['is_deleted'] ??= 0;
-    await db.insert('suppliers', supplier, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getSuppliers() async {
-    final db = await database;
-    return await db.query('suppliers', where: 'is_deleted = 0', orderBy: 'name ASC');
-  }
-
-
-
-  Future<void> deleteCostCenter(String id) async {
-    final db = await database;
-    await db.update('cost_centers', {
-      'is_deleted': 1,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📈 4. نظام دراسات الجدوى
-  // ─────────────────────────────────────────────────
-
-  /// Save a feasibility study
-  Future<void> saveFeasibilityStudy(Map<String, dynamic> study) async {
-    final db = await database;
-    await _ensureCoreTables(db);
-    await db.insert('feasibility_studies', study, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  /// Get all saved feasibility studies
-  Future<List<Map<String, dynamic>>> getFeasibilityStudies() async {
-    final db = await database;
-    await _ensureCoreTables(db);
-    return await db.query('feasibility_studies', orderBy: 'created_at DESC');
-  }
-
-  /// Delete a feasibility study
-  // ─────────────────────────────────────────────────
-  // 📄 5. نظام عروض الأسعار (Quotations)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addQuotation(Map<String, dynamic> quotation, List<Map<String, dynamic>> lines) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.insert('quotations', quotation, conflictAlgorithm: ConflictAlgorithm.replace);
-      for (var line in lines) {
-        await txn.insert('quotation_lines', line, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getQuotations() async {
-    final db = await database;
-    return await db.query('quotations', where: 'is_deleted = 0', orderBy: 'issue_date DESC');
-  }
-
-  Future<void> convertQuotationToInvoice(String quotationId, String invoiceId) async {
-    final db = await database;
-    await db.update('quotations', {
-      'status': 'converted',
-      'converted_invoice_id': invoiceId,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [quotationId]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 💸 6. سندات القبض والدفع (Vouchers)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addReceiptVoucher(Map<String, dynamic> voucher) async {
-    if (await isDateLocked(voucher['date'] ?? '')) {
-      throw Exception("لا يمكن إضافة سند قبض في فترة محاسبية مغلقة.");
-    }
-    final db = await database;
-    await db.insert('receipt_vouchers', voucher, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getReceiptVouchers() async {
-    final db = await database;
-    return await db.query('receipt_vouchers', where: 'is_deleted = 0', orderBy: 'date DESC');
-  }
-
-  Future<void> addPaymentVoucher(Map<String, dynamic> voucher) async {
-    if (await isDateLocked(voucher['date'] ?? '')) {
-      throw Exception("لا يمكن إضافة سند صرف في فترة محاسبية مغلقة.");
-    }
-    final db = await database;
-    await db.insert('payment_vouchers', voucher, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getPaymentVouchers() async {
-    final db = await database;
-    return await db.query('payment_vouchers', where: 'is_deleted = 0', orderBy: 'date DESC');
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🔄 7. الإشعارات الدائنة والمدينة (Credit Notes)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addCreditNote(Map<String, dynamic> note) async {
-    final db = await database;
-    await db.insert('credit_notes', note, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getCreditNotes() async {
-    final db = await database;
-    return await db.query('credit_notes', where: 'is_deleted = 0', orderBy: 'date DESC');
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📝 8. إدارة المهام (Tasks)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addTask(Map<String, dynamic> task) async {
-    final db = await database;
-    await db.insert('tasks', task, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getTasks({String? assignedTo}) async {
-    final db = await database;
-    if (assignedTo != null) {
-      return await db.query('tasks', where: 'assigned_to = ? AND is_deleted = 0', whereArgs: [assignedTo]);
-    }
-    return await db.query('tasks', where: 'is_deleted = 0');
-  }
-
-  Future<void> updateTaskStatus(String taskId, String status) async {
-    final db = await database;
-    await db.update('tasks', {
-      'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [taskId]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📂 9. إدارة المستندات (Documents)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addDocument(Map<String, dynamic> doc) async {
-    final db = await database;
-    await db.insert('documents', doc, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getDocuments(String ownerId, String ownerType) async {
-    final db = await database;
-    return await db.query('documents', 
-      where: 'owner_id = ? AND owner_type = ? AND is_deleted = 0', 
-      whereArgs: [ownerId, ownerType]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🛡️ 10. سجل تتبع النظام (Audit Trail)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addAuditTrailEntry(Map<String, dynamic> entry) async {
-    final db = await database;
-    await db.insert('audit_trail', entry);
-  }
-
-  Future<List<Map<String, dynamic>>> getAuditTrail({int limit = 100}) async {
-    final db = await database;
-    return await db.query('audit_trail', orderBy: 'timestamp DESC', limit: limit);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🌍 11. العملات والسنة المالية
-  // ─────────────────────────────────────────────────
-
-  Future<void> addCurrencyRate(Map<String, dynamic> rate) async {
-    final db = await database;
-    rate['id'] ??= '${rate['from_currency']}_${rate['to_currency']}_${DateTime.now().millisecondsSinceEpoch}';
-    rate['date'] ??= DateTime.now().toIso8601String();
-    await db.insert('currency_rates', rate, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getCurrencyRates() async {
-    final db = await database;
-    return await db.query('currency_rates', orderBy: 'date DESC');
-  }
-
-  Future<void> deleteCurrencyRate(String id) async {
-    final db = await database;
-    await db.delete('currency_rates', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<double> convertCurrency(String from, String to, double amount) async {
-    final db = await database;
-    final res = await db.query('currency_rates', 
-      where: 'from_currency = ? AND to_currency = ?', 
-      whereArgs: [from, to],
-      orderBy: 'date DESC',
-      limit: 1);
-    
-    if (res.isEmpty) return amount; // Default to 1:1 if no rate found
-    final rate = (res.first['rate'] as num).toDouble();
-    return amount * rate;
-  }
-
-  Future<void> addFiscalYear(Map<String, dynamic> fy) async {
-    final db = await database;
-    await db.insert('fiscal_years', fy, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> closeFiscalYear(String id, String journalEntryId) async {
-    final db = await database;
-    await db.update('fiscal_years', {
-      'is_closed': 1,
-      'closing_entry_id': journalEntryId,
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  /// Delete a feasibility study
-  Future<void> deleteFeasibilityStudy(String id) async {
-    final db = await database;
-    await db.delete('feasibility_studies', where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🏦 12. نظام التسوية البنكية (Bank Reconciliation)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getAccountTransactions(String accountId, {String? fromDate, String? toDate}) async {
-    final db = await database;
-    String where = 'jl.account_id = ?';
-    List<dynamic> args = [accountId];
-    
-    if (fromDate != null) {
-      where += ' AND je.date >= ?';
-      args.add(fromDate);
-    }
-    if (toDate != null) {
-      where += ' AND je.date <= ?';
-      args.add(toDate);
-    }
-
-    return await db.rawQuery('''
-      SELECT jl.id as line_id, je.id as entry_id, je.date, je.description, 
-             jl.debit, jl.credit, jl.reconciled
-      FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.entry_id = je.id
-      WHERE $where
-      ORDER BY je.date DESC, je.id DESC
-    ''', args);
-  }
-
-  Future<void> markAsReconciled(String lineId, int reconciled) async {
-    final db = await database;
-    await db.update('journal_entry_lines', {'reconciled': reconciled}, where: 'id = ?', whereArgs: [lineId]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🤖 13. AI Assistant Helper Methods
-  // ─────────────────────────────────────────────────
-
-  /// Fuzzy match account balance by name (e.g., 'خزينة' matches 'الخزينة العامة')
-  Future<Map<String, dynamic>?> getAccountBalanceByName(String name) async {
-    final db = await database;
-    final res = await db.rawQuery(
-      "SELECT name, balance FROM accounts WHERE name LIKE ? OR name LIKE ? OR name LIKE ? LIMIT 1",
-      ['%$name%', '$name%', '%$name']
-    );
-    return res.isNotEmpty ? res.first : null;
-  }
-
-  /// Get pending (unpaid) invoices statistic
-  Future<Map<String, dynamic>> getPendingInvoicesStats() async {
-    final db = await database;
-    final res = await db.rawQuery(
-      "SELECT COUNT(*) as count, SUM(total) as total FROM invoices WHERE status != 'paid' AND is_deleted = 0"
-    );
-    return {
-      'count': res.first['count'] ?? 0,
-      'total': (res.first['total'] as num?)?.toDouble() ?? 0.0
-    };
-  }
-
-  /// Check stock level for a product by name
-  Future<Map<String, dynamic>?> checkProductStock(String productName) async {
-    final db = await database;
-    final res = await db.rawQuery(
-      "SELECT name, quantity, unit FROM items WHERE name LIKE ? AND is_deleted = 0 LIMIT 1",
-      ['%$productName%']
-    );
-    return res.isNotEmpty ? res.first : null;
-  }
-
-  // ─────────────────────────────────────────────────
-  // 👥 14. نظام إدارة المستخدمين والفروع
-  // ─────────────────────────────────────────────────
-
-
-
-  Future<void> saveSystemUser(Map<String, dynamic> user) async {
-    final db = await database;
-    user['id'] ??= 'USR_${DateTime.now().millisecondsSinceEpoch}';
-    user['created_at'] ??= DateTime.now().toIso8601String();
-    user['updated_at'] = DateTime.now().toIso8601String();
-    user['is_active'] ??= 1;
-    user['is_deleted'] ??= 0;
-    user['sync_status'] ??= 0;
-    await db.insert('system_users', user, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> deleteSystemUser(String id) async {
-    final db = await database;
-    await db.update('system_users', {
-      'is_deleted': 1,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-
-
-  Future<void> saveCostCenter(Map<String, dynamic> center) async {
-    final db = await database;
-    final now = DateTime.now().toIso8601String();
-    center['id'] ??= 'CC_${DateTime.now().millisecondsSinceEpoch}';
-    center['created_at'] ??= now;
-    center['updated_at'] = now;
-    center['sync_status'] ??= 0;
-    center['is_deleted'] ??= 0;
-    await db.insert('cost_centers', center, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  HR MODULE (Advanced: Performance, Contracts, Attendance, Loans, Leaves)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> addPerformanceReview(Map<String, dynamic> review) async {
-    final db = await database;
-    review['id'] ??= 'PR_${DateTime.now().millisecondsSinceEpoch}';
-    review['created_at'] ??= DateTime.now().toIso8601String();
-    review['updated_at'] = DateTime.now().toIso8601String();
-    review['sync_status'] = 0;
-    review['is_deleted'] = 0;
-    await db.insert('performance_reviews', review, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getPerformanceReviews({String? employeeId}) async {
-    final db = await database;
-    if (employeeId != null) {
-      return await db.query('performance_reviews', where: 'employee_id = ? AND is_deleted = 0', whereArgs: [employeeId], orderBy: 'review_date DESC');
-    }
-    return await db.query('performance_reviews', where: 'is_deleted = 0', orderBy: 'review_date DESC');
-  }
-
-  Future<void> addEmployeeContract(Map<String, dynamic> contract) async {
-    final db = await database;
-    contract['id'] ??= 'EC_${DateTime.now().millisecondsSinceEpoch}';
-    contract['created_at'] ??= DateTime.now().toIso8601String();
-    contract['updated_at'] = DateTime.now().toIso8601String();
-    contract['sync_status'] = 0;
-    contract['is_deleted'] = 0;
-    await db.insert('employee_contracts', contract, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getEmployeeContracts({String? employeeId}) async {
-    final db = await database;
-    if (employeeId != null) {
-      return await db.query('employee_contracts', where: 'employee_id = ? AND is_deleted = 0', whereArgs: [employeeId], orderBy: 'start_date DESC');
-    }
-    return await db.query('employee_contracts', where: 'is_deleted = 0', orderBy: 'start_date DESC');
-  }
-
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  ADVANCED PURCHASES (Orders & Debit Notes)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  Future<void> addPurchaseOrder(Map<String, dynamic> order, List<Map<String, dynamic>> lines) async {
-    final db = await database;
-    final String orderId = order['id'] ?? 'PO_${DateTime.now().millisecondsSinceEpoch}';
-    order['id'] = orderId;
-    order['created_at'] ??= DateTime.now().toIso8601String();
-    order['updated_at'] = DateTime.now().toIso8601String();
-    order['sync_status'] = 0;
-    order['is_deleted'] = 0;
-
-    await db.transaction((txn) async {
-      await txn.insert('purchase_orders', order, conflictAlgorithm: ConflictAlgorithm.replace);
-      for (var line in lines) {
-        line['id'] ??= 'POL_${DateTime.now().millisecondsSinceEpoch}_${lines.indexOf(line)}';
-        line['order_id'] = orderId;
-        line['updated_at'] = DateTime.now().toIso8601String();
-        line['sync_status'] = 0;
-        line['is_deleted'] = 0;
-        await txn.insert('purchase_order_lines', line, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getPurchaseOrders({String? status}) async {
-    final db = await database;
-    if (status != null) {
-      return await db.query('purchase_orders', where: 'status = ? AND is_deleted = 0', whereArgs: [status], orderBy: 'issue_date DESC');
-    }
-    return await db.query('purchase_orders', where: 'is_deleted = 0', orderBy: 'issue_date DESC');
-  }
-
-  Future<void> addDebitNote(Map<String, dynamic> note) async {
-    final db = await database;
-    note['id'] ??= 'DN_${DateTime.now().millisecondsSinceEpoch}';
-    note['created_at'] ??= DateTime.now().toIso8601String();
-    note['updated_at'] = DateTime.now().toIso8601String();
-    note['sync_status'] = 0;
-    note['is_deleted'] = 0;
-    await db.insert('debit_notes', note, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getDebitNotes({String? supplierId}) async {
-    final db = await database;
-    if (supplierId != null) {
-      return await db.query('debit_notes', where: 'supplier_id = ? AND is_deleted = 0', whereArgs: [supplierId], orderBy: 'date DESC');
-    }
-    return await db.query('debit_notes', where: 'is_deleted = 0', orderBy: 'date DESC');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ██  COMPREHENSIVE MODULE BINDING — ALL MISSING METHODS
-  // ══════════════════════════════════════════════════════════════════════════
-
-  // ─────────────────────────────────────────────────
-  // 📁 A. المشاريع (Projects)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addProject(Map<String, dynamic> project) async {
-    final db = await database;
-    project['id'] ??= 'PRJ_${DateTime.now().millisecondsSinceEpoch}';
-    project['created_at'] ??= DateTime.now().toIso8601String();
-    project['updated_at'] = DateTime.now().toIso8601String();
-    project['sync_status'] = 0;
-    project['is_deleted'] = 0;
-    await db.insert('projects', project, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🕐 B. الحضور والانصراف (Attendance)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addAttendanceLog(Map<String, dynamic> log) async {
-    final db = await database;
-    log['id'] ??= 'ATT_${DateTime.now().millisecondsSinceEpoch}';
-    log['created_at'] ??= DateTime.now().toIso8601String();
-    log['updated_at'] = DateTime.now().toIso8601String();
-    log['sync_status'] = 0;
-    log['is_deleted'] = 0;
-    await db.insert('attendance_logs', log, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> processAttendance(String employeeId, String date, String checkIn, String checkOut) async {
-    final db = await database;
-    final existing = await db.query('attendance_logs',
-      where: 'employee_id = ? AND date = ?', whereArgs: [employeeId, date]);
-    
-    if (existing.isNotEmpty) {
-      await db.update('attendance_logs', {
-        'check_in_time': checkIn,
-        'check_out_time': checkOut,
-        'updated_at': DateTime.now().toIso8601String(),
-      }, where: 'id = ?', whereArgs: [existing.first['id']]);
-    } else {
-      await addAttendanceLog({
-        'employee_id': employeeId,
-        'date': date,
-        'check_in_time': checkIn,
-        'check_out_time': checkOut,
-        'status': 'present',
-      });
-    }
-  }
-
-  // ─────────────────────────────────────────────────
-  // 💰 C. الرواتب (Payroll)
-  // ─────────────────────────────────────────────────
-
-  Future<void> saveSalarySlip(Map<String, dynamic> slip) async {
-    final db = await database;
-    slip['id'] ??= 'SS_${DateTime.now().millisecondsSinceEpoch}';
-    slip['created_at'] ??= DateTime.now().toIso8601String();
-    slip['updated_at'] = DateTime.now().toIso8601String();
-    slip['sync_status'] = 0;
-    slip['is_deleted'] = 0;
-    await db.insert('salary_slips', slip, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 💸 D. التحويلات المالية (Money Transfers)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getMoneyTransfers() async {
-    final db = await database;
-    return await db.query('money_transfers', orderBy: 'date DESC');
-  }
-
-  Future<void> addMoneyTransfer(Map<String, dynamic> transfer) async {
-    final db = await database;
-    transfer['id'] ??= 'MT_${DateTime.now().millisecondsSinceEpoch}';
-    transfer['created_at'] ??= DateTime.now().toIso8601String();
-    transfer['updated_at'] = DateTime.now().toIso8601String();
-    transfer['sync_status'] = 0;
-    transfer['is_deleted'] = 0;
-    await db.insert('money_transfers', transfer, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📊 E. الميزانيات (Budgets)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addBudget(Map<String, dynamic> budget) async {
-    final db = await database;
-    budget['id'] ??= 'BDG_${DateTime.now().millisecondsSinceEpoch}';
-    budget['created_at'] ??= DateTime.now().toIso8601String();
-    budget['updated_at'] = DateTime.now().toIso8601String();
-    budget['sync_status'] = 0;
-    budget['is_deleted'] = 0;
-    await db.insert('budgets', budget, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🏗️ F. الأصول والاستهلاك (Assets & Depreciation)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getAssetCustodyLogs({String? assetId, String? employeeId}) async {
-    final db = await database;
-    String where = '1=1';
-    List<dynamic> args = [];
-    if (assetId != null) { where += ' AND asset_id = ?'; args.add(assetId); }
-    if (employeeId != null) { where += ' AND employee_id = ?'; args.add(employeeId); }
-    return await db.query('asset_custody_logs', where: where, whereArgs: args, orderBy: 'issued_date DESC');
-  }
-
-  Future<void> addAssetCustodyLog(Map<String, dynamic> log) async {
-    final db = await database;
-    log['id'] ??= 'ACL_${DateTime.now().millisecondsSinceEpoch}';
-    log['created_at'] ??= DateTime.now().toIso8601String();
-    log['updated_at'] = DateTime.now().toIso8601String();
-    log['sync_status'] = 0;
-    log['is_deleted'] = 0;
-    await db.insert('asset_custody_logs', log, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getAssetDepreciation(String assetId) async {
-    final db = await database;
-    return await db.query('asset_depreciation_logs', where: 'asset_id = ?', whereArgs: [assetId], orderBy: 'date DESC');
-  }
-
-  Future<void> runDepreciation(String assetId) async {
-    final db = await database;
-    final assets = await db.query('assets', where: 'id = ?', whereArgs: [assetId]);
-    if (assets.isEmpty) return;
-
-    final asset = assets.first;
-    final double cost = (asset['cost_price'] as num?)?.toDouble() ?? 0;
-    final double salvage = (asset['salvage_value'] as num?)?.toDouble() ?? 0;
-    final int lifeMonths = (asset['useful_life_months'] as int?) ?? 60;
-    if (lifeMonths <= 0) return;
-
-    final double monthlyDep = (cost - salvage) / lifeMonths;
-    final nowStr = DateTime.now().toIso8601String();
-
-    await db.insert('asset_depreciation_logs', {
-      'id': 'DEP_${DateTime.now().millisecondsSinceEpoch}',
-      'asset_id': assetId,
-      'date': nowStr.split('T')[0],
-      'amount': monthlyDep,
-      'method': asset['depreciation_method'] ?? 'straight_line',
-      'created_at': nowStr,
-      'updated_at': nowStr,
-      'sync_status': 0,
-      'is_deleted': 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-    await db.update('assets', {
-      'last_depreciation_date': nowStr.split('T')[0],
-      'updated_at': nowStr,
-    }, where: 'id = ?', whereArgs: [assetId]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 💳 G. المصروفات (Expenses)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getExpenses({String? fromDate, String? toDate, String? category}) async {
-    final db = await database;
-    // Expenses = journal entries linked to expense accounts
-    String where = "a.type = 'expense'";
-    List<dynamic> args = [];
-    if (fromDate != null) { where += ' AND je.date >= ?'; args.add(fromDate); }
-    if (toDate != null) { where += ' AND je.date <= ?'; args.add(toDate); }
-
-    return await db.rawQuery('''
-      SELECT je.id, je.date, je.description, jl.debit as amount,
-        COALESCE(a.name, 'مصروف') as category,
-        jl.cost_center_id
-      FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.entry_id = je.id
-      JOIN accounts a ON jl.account_id = a.id
-      WHERE $where AND jl.debit > 0
-      ORDER BY je.date DESC
-    ''', args);
-  }
-
-  Future<void> addExpense(Map<String, dynamic> expense) async {
-    // Creates a journal entry for an expense
-    final date = expense['date'] ?? DateTime.now().toIso8601String().split('T')[0];
-    final description = expense['description'] ?? 'مصروف';
-    final double amount = (expense['amount'] as num?)?.toDouble() ?? 0;
-    final accountId = expense['account_id'] ?? 'ACC_EXPENSES_GENERAL';
-    final costCenterId = expense['cost_center_id'];
-
-    await saveManualJournalEntry(
-      date: date,
-      description: description,
-      lines: [
-        {'account_id': accountId, 'debit': amount, 'credit': 0.0, 'cost_center_id': costCenterId},
-        {'account_id': 'ACC_CASH', 'debit': 0.0, 'credit': amount},
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🏭 H. التصنيع (Manufacturing)
-  // ─────────────────────────────────────────────────
-
-  Future<void> addManufacturingOrder(Map<String, dynamic> order) async {
-    final db = await database;
-    order['id'] ??= 'MO_${DateTime.now().millisecondsSinceEpoch}';
-    order['created_at'] ??= DateTime.now().toIso8601String();
-    order['updated_at'] = DateTime.now().toIso8601String();
-    order['sync_status'] = 0;
-    order['is_deleted'] = 0;
-    await db.insert('manufacturing_orders', order, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🏢 I. المستودعات (Warehouses)
-  // ─────────────────────────────────────────────────
-
-  Future<void> deleteWarehouse(String id) async {
-    final db = await database;
-    await db.update('warehouses', {
-      'is_deleted': 1,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 👤 J. إدارة العملاء (Client Management)
-  // ─────────────────────────────────────────────────
-
-  Future<Map<String, dynamic>> getClientSummary(String clientId) async {
-    final db = await database;
-    final client = await db.query('clients', where: 'id = ?', whereArgs: [clientId]);
-    final invoices = await db.rawQuery(
-      "SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND is_deleted = 0",
-      [clientId],
-    );
-    final paid = await db.rawQuery(
-      "SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status = 'paid' AND is_deleted = 0",
-      [clientId],
-    );
-    final unpaid = await db.rawQuery(
-      "SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'paid' AND is_deleted = 0",
-      [clientId],
-    );
-
-    return {
-      'client': client.isNotEmpty ? client.first : {},
-      'total_invoices': (invoices.first['count'] as int?) ?? 0,
-      'total_amount': (invoices.first['total'] as num?)?.toDouble() ?? 0,
-      'paid_amount': (paid.first['total'] as num?)?.toDouble() ?? 0,
-      'unpaid_amount': (unpaid.first['total'] as num?)?.toDouble() ?? 0,
-    };
-  }
-
-  Future<List<Map<String, dynamic>>> getClientStatement(String clientId, {String? fromDate, String? toDate}) async {
-    final db = await database;
-    String where = 'client_id = ? AND is_deleted = 0';
-    List<dynamic> args = [clientId];
-    if (fromDate != null) { where += ' AND issue_date >= ?'; args.add(fromDate); }
-    if (toDate != null) { where += ' AND issue_date <= ?'; args.add(toDate); }
-    return await db.query('invoices', where: where, whereArgs: args, orderBy: 'issue_date DESC');
-  }
-
-  Future<void> registerClientPayment({
-    required String clientId,
-    required String invoiceId,
-    required double amount,
-    required String paymentMethod,
-    String? bankAccountId,
-    String? notes,
-  }) async {
-    final db = await database;
-    final nowStr = DateTime.now().toIso8601String();
-
-    // Record payment
-    await db.insert('payments', {
-      'id': 'PAY_${DateTime.now().millisecondsSinceEpoch}',
-      'partner_id': clientId,
-      'partner_type': 'client',
-      'amount': amount,
-      'type': 'receipt',
-      'date': nowStr.split('T')[0],
-      'sync_status': 0,
-      'updated_at': nowStr,
-      'is_deleted': 0,
-    });
-
-    // Update invoice status if fully paid
-    final inv = await db.query('invoices', where: 'id = ?', whereArgs: [invoiceId]);
-    if (inv.isNotEmpty) {
-      final total = (inv.first['total'] as num?)?.toDouble() ?? 0;
-      if (amount >= total) {
-        await db.update('invoices', {'status': 'paid', 'updated_at': nowStr}, where: 'id = ?', whereArgs: [invoiceId]);
-      } else {
-        await db.update('invoices', {'status': 'partial', 'updated_at': nowStr}, where: 'id = ?', whereArgs: [invoiceId]);
-      }
-    }
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📄 K. الفواتير (Invoices)
-  // ─────────────────────────────────────────────────
-
-  Future<void> updateInvoiceStatus(String invoiceId, String status) async {
-    final db = await database;
-    await db.update('invoices', {
-      'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [invoiceId]);
-  }
-
-  Future<void> deleteQuotation(String id) async {
-    final db = await database;
-    await db.update('quotations', {
-      'is_deleted': 1,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ─────────────────────────────────────────────────
-  // 🔄 L. المعاملات المتكررة (Recurring Transactions)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getRecurringTransactions() async {
-    final db = await database;
-    return await db.query('recurring_transactions', orderBy: 'next_run_date ASC');
-  }
-
-  Future<void> addRecurringTransaction(Map<String, dynamic> transaction) async {
-    final db = await database;
-    transaction['id'] ??= 'RT_${DateTime.now().millisecondsSinceEpoch}';
-    transaction['created_at'] ??= DateTime.now().toIso8601String();
-    transaction['is_active'] ??= 1;
-    await db.insert('recurring_transactions', transaction, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> processRecurringTransactions() async {
-    final db = await database;
-    final now = DateTime.now();
-    final todayStr = now.toIso8601String().split('T')[0];
-    
-    final transactions = await db.query('recurring_transactions', 
-      where: 'is_active = 1 AND is_deleted = 0 AND next_run_date <= ?', 
-      whereArgs: [todayStr]);
-
-    for (var tx in transactions) {
-      await db.transaction((txn) async {
-        // 1. Create the actual transaction
-        final type = tx['type'] as String;
-        final templateData = jsonDecode(tx['template_data'] as String);
-        
-        if (type == 'journal') {
-          final entryId = 'JR_${DateTime.now().millisecondsSinceEpoch}';
-          await txn.insert('journal_entries', {
-            'id': entryId,
-            'description': tx['description'],
-            'date': todayStr,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-          
-          List lines = templateData['lines'] as List;
-          for (var line in lines) {
-            await txn.insert('journal_entry_lines', {
-              'id': 'JRL_${DateTime.now().microsecondsSinceEpoch}',
-              'entry_id': entryId,
-              'account_id': line['account_id'],
-              'debit': line['debit'],
-              'credit': line['credit'],
-            });
-          }
-        }
-
-        // 2. Update next run date
-        DateTime nextDate = DateTime.parse(tx['next_run_date'] as String);
-        final freq = tx['frequency'] as String;
-        if (freq == 'daily') nextDate = nextDate.add(const Duration(days: 1));
-        else if (freq == 'weekly') nextDate = nextDate.add(const Duration(days: 7));
-        else if (freq == 'monthly') nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
-        else if (freq == 'yearly') nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
-
-        await txn.update('recurring_transactions', {
-          'last_run_date': todayStr,
-          'next_run_date': nextDate.toIso8601String().split('T')[0],
-        }, where: 'id = ?', whereArgs: [tx['id']]);
-        
-        // 3. Log to audit trail
-        await txn.insert('audit_trail', {
-          'id': 'AUDIT_${DateTime.now().millisecondsSinceEpoch}',
-          'action': 'RECURRING_TX_PROCESSED',
-          'table_name': 'recurring_transactions',
-          'record_id': tx['id'],
-          'details': 'Processed recurring: ${tx['description']}',
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-      });
-    }
-  }
-
-  Future<void> deleteRecurringTransaction(String id) async {
-    final db = await database;
-    await db.update('recurring_transactions', {'is_deleted': 1}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> updateRecurringTransactionStatus(String id, int status) async {
-    final db = await database;
-    await db.update('recurring_transactions', {'is_active': status}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> reconcileTransaction(String lineId, bool status) async {
-    final db = await database;
-    await db.update('journal_entry_lines', {'reconciled': status ? 1 : 0}, where: 'id = ?', whereArgs: [lineId]);
-  }
-
-  Future<List<Map<String, dynamic>>> getBankAccounts() async {
-    final db = await database;
-    return await db.query('accounts', where: "type = 'asset' AND (code LIKE '112%' OR name LIKE '%بنك%' OR name LIKE '%Bank%') AND is_deleted = 0");
-  }
-
-  Future<double> getReconciledBalance(String accountId) async {
-    final db = await database;
-    final res = await db.rawQuery('SELECT SUM(debit) as total_debit, SUM(credit) as total_credit FROM journal_entry_lines WHERE account_id = ? AND reconciled = 1', [accountId]);
-    if (res.isEmpty) return 0.0;
-    double debit = (res.first['total_debit'] as num?)?.toDouble() ?? 0.0;
-    double credit = (res.first['total_credit'] as num?)?.toDouble() ?? 0.0;
-    return debit - credit;
-  }
-
-  // ─────────────────────────────────────────────────
-  // 💵 M. التدفقات النقدية (Cash Flow)
-  // ─────────────────────────────────────────────────
-
-  Future<Map<String, dynamic>> getCashFlow({String? fromDate, String? toDate}) async {
-    final db = await database;
-    final String dateFilter = (fromDate != null && toDate != null)
-      ? "AND je.date BETWEEN '$fromDate' AND '$toDate'"
-      : '';
-
-    // Operating: revenue - expenses
-    final revenue = await db.rawQuery('''
-      SELECT COALESCE(SUM(jl.credit), 0) as total FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.entry_id = je.id
-      JOIN accounts a ON jl.account_id = a.id
-      WHERE a.type = 'revenue' $dateFilter
-    ''');
-    final expenses = await db.rawQuery('''
-      SELECT COALESCE(SUM(jl.debit), 0) as total FROM journal_entry_lines jl
-      JOIN journal_entries je ON jl.entry_id = je.id
-      JOIN accounts a ON jl.account_id = a.id
-      WHERE a.type = 'expense' $dateFilter
-    ''');
-
-    // Investing: asset purchases
-    final investing = await db.rawQuery('''
-      SELECT COALESCE(SUM(cost_price), 0) as total FROM assets
-      WHERE is_deleted = 0 ${fromDate != null ? "AND purchase_date >= '$fromDate'" : ''}
-    ''');
-
-    final double revTotal = (revenue.first['total'] as num?)?.toDouble() ?? 0;
-    final double expTotal = (expenses.first['total'] as num?)?.toDouble() ?? 0;
-    final double invTotal = (investing.first['total'] as num?)?.toDouble() ?? 0;
-
-    return {
-      'operating_inflow': revTotal,
-      'operating_outflow': expTotal,
-      'operating_net': revTotal - expTotal,
-      'investing_outflow': invTotal,
-      'financing_net': 0.0,
-      'net_change': revTotal - expTotal - invTotal,
-    };
-  }
-
-  // ─────────────────────────────────────────────────
-  // 📋 N. تقرير أعمار الديون (Aging Report)
-  // ─────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> getAgingReport() async {
-    final db = await database;
-    final invoices = await db.query('invoices', where: "status != 'paid' AND is_deleted = 0");
-    final now = DateTime.now();
-    Map<String, Map<String, double>> aging = {};
-
-    for (var inv in invoices) {
-      String client = inv['client_id']?.toString() ?? 'unknown';
-      DateTime date = DateTime.tryParse(inv['issue_date']?.toString() ?? '') ?? now;
-      int days = now.difference(date).inDays;
-      double amount = (inv['total'] as num?)?.toDouble() ?? 0;
-
-      aging.putIfAbsent(client, () => {'0-30': 0, '31-60': 0, '61-90': 0, '90+': 0, 'total': 0});
-
-      if (days <= 30) aging[client]!['0-30'] = aging[client]!['0-30']! + amount;
-      else if (days <= 60) aging[client]!['31-60'] = aging[client]!['31-60']! + amount;
-      else if (days <= 90) aging[client]!['61-90'] = aging[client]!['61-90']! + amount;
-      else aging[client]!['90+'] = aging[client]!['90+']! + amount;
-      aging[client]!['total'] = aging[client]!['total']! + amount;
-    }
-
-    return aging.entries.map((e) => {'client_id': e.key, ...e.value}).toList();
   }
 
   /// Returns the absolute path to the database file (for backups)
@@ -7590,147 +5514,4 @@ class DatabaseHelper {
       return join(await getDatabasesPath(), 'hisabati_offline.db');
     }
   }
-
-  Future<void> recalculatePartnerBalances() async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // 1. Reset all balances to 0
-      await txn.update('clients', {'balance': 0});
-      await txn.update('suppliers', {'balance': 0});
-
-      // 2. Sum up credit sales (receivables)
-      final sales = await txn.rawQuery("SELECT client_id, SUM(total) as total FROM invoices WHERE payment_type = 'credit' AND is_deleted = 0 GROUP BY client_id");
-      for (var row in sales) {
-        if (row['client_id'] != null) {
-          await txn.rawUpdate('UPDATE clients SET balance = balance + ? WHERE id = ?', [row['total'], row['client_id']]);
-        }
-      }
-
-      // 3. Sum up credit purchases (payables)
-      final purchases = await txn.rawQuery("SELECT supplier_id, SUM(total) as total FROM purchase_invoices WHERE payment_type = 'credit' AND is_deleted = 0 GROUP BY supplier_id");
-      for (var row in purchases) {
-        if (row['supplier_id'] != null) {
-          await txn.rawUpdate('UPDATE suppliers SET balance = balance + ? WHERE id = ?', [row['total'], row['supplier_id']]);
-        }
-      }
-
-      // 4. Subtract payments/receipts
-      final payments = await txn.rawQuery("SELECT partner_id, partner_type, SUM(amount) as total FROM payments WHERE is_deleted = 0 GROUP BY partner_id, partner_type");
-      for (var row in payments) {
-        if (row['partner_id'] != null) {
-          final table = row['partner_type'] == 'supplier' ? 'suppliers' : 'clients';
-          await txn.rawUpdate('UPDATE $table SET balance = balance - ? WHERE id = ?', [row['total'], row['partner_id']]);
-        }
-      }
-    });
-  }
-
-  Future<Map<String, dynamic>> getNetProfitLoss(String startDate, String endDate) async {
-    final db = await database;
-    
-    // Total Revenue
-    final revRes = await db.rawQuery('''
-      SELECT SUM(l.credit - l.debit) as total 
-      FROM journal_entry_lines l
-      JOIN journal_entries e ON l.entry_id = e.id
-      JOIN accounts a ON l.account_id = a.id
-      WHERE a.type = 'revenue' AND e.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-    
-    // Total Expense
-    final expRes = await db.rawQuery('''
-      SELECT SUM(l.debit - l.credit) as total 
-      FROM journal_entry_lines l
-      JOIN journal_entries e ON l.entry_id = e.id
-      JOIN accounts a ON l.account_id = a.id
-      WHERE a.type = 'expense' AND e.date BETWEEN ? AND ?
-    ''', [startDate, endDate]);
-
-    double revenue = (revRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    double expense = (expRes.first['total'] as num?)?.toDouble() ?? 0.0;
-    
-    return {
-      'revenue': revenue,
-      'expense': expense,
-      'net_profit': revenue - expense,
-    };
-  }
-
-  Future<List<Map<String, dynamic>>> getAuditRisks() async {
-    final db = await database;
-    List<Map<String, dynamic>> risks = [];
-
-    // 1. Unbalanced Journal Entries
-    final unbalanced = await db.rawQuery('''
-      SELECT e.id, e.description, e.date, SUM(l.debit) as total_debit, SUM(l.credit) as total_credit
-      FROM journal_entries e
-      JOIN journal_entry_lines l ON e.id = l.entry_id
-      GROUP BY e.id
-      HAVING ABS(SUM(l.debit) - SUM(l.credit)) > 0.01
-    ''');
-    for (var r in unbalanced) {
-      risks.add({
-        'type': 'unbalanced',
-        'severity': 'high',
-        'title': 'قيد غير متزن',
-        'description': 'القيد رقم ${r['id']} يحتوي على فرق بين المدين والدائن بقيمة ${( (r['total_debit'] as double) - (r['total_credit'] as double) ).abs()}',
-        'date': r['date'],
-        'reference_id': r['id'],
-      });
-    }
-
-    // 2. Suspicious Transactions (Manual edits to critical accounts like Cash/Bank)
-    final suspicious = await db.rawQuery('''
-      SELECT DISTINCT e.id, e.description, e.date
-      FROM journal_entries e
-      JOIN journal_entry_lines l ON e.id = l.entry_id
-      JOIN accounts a ON l.account_id = a.id
-      WHERE (a.id = 'ACC_CASH' OR a.id = 'ACC_BANK') 
-      AND (e.description LIKE '%تعديل%' OR e.description LIKE '%تصحيح%')
-    ''');
-    for (var r in suspicious) {
-      risks.add({
-        'type': 'suspicious',
-        'severity': 'medium',
-        'title': 'تعديل يدوي مشبوه',
-        'description': 'تم رصد تعديل يدوي على حساب النقدية/البنك في القيد رقم ${r['id']}',
-        'date': r['date'],
-        'reference_id': r['id'],
-      });
-    }
-
-    // 3. Transactions on non-existent accounts
-    final orphaned = await db.rawQuery('''
-      SELECT DISTINCT entry_id FROM journal_entry_lines 
-      WHERE account_id NOT IN (SELECT id FROM accounts)
-    ''');
-    for (var r in orphaned) {
-      risks.add({
-        'type': 'orphaned',
-        'severity': 'high',
-        'title': 'حساب غير موجود',
-        'description': 'القيد رقم ${r['entry_id']} يحتوي على حركات لحساب غير موجود في الدليل المحاسبي',
-        'date': 'N/A',
-        'reference_id': r['entry_id'],
-      });
-    }
-    
-    return risks;
-  }
-
-  Future<Map<String, double>?> fetchLiveRates() async {
-    try {
-      final response = await http.get(Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final rates = data['rates'] as Map<String, dynamic>;
-        return rates.map((key, value) => MapEntry(key, (value as num).toDouble()));
-      }
-    } catch (e) {
-      debugPrint("Live Rates Fetch Error: $e");
-    }
-    return null;
-  }
 }
-
-

@@ -60,7 +60,12 @@ class GeminiAiBrain implements AiBrainProvider {
     try {
       return await _callGeminiRest();
     } catch (e) {
-      debugPrint("REST Gemini Error: $e");
+      // 🛡️ CRITICAL FIX: If REST call fails, remove the user's message from history
+      // Gemini API throws 400 Bad Request if it sees two consecutive "user" roles.
+      if (_history.isNotEmpty && _history.last["role"] == "user") {
+        _history.removeLast();
+      }
+      debugPrint("REST AI Error: $e");
       rethrow; // Let the controller handle offline mode
     }
   }
@@ -135,14 +140,14 @@ class GeminiAiBrain implements AiBrainProvider {
       // Shorter retries for better responsiveness: 2, 4 seconds
       final delays = [2, 4];
       final delay = Duration(seconds: delays[retryCount]);
-      debugPrint("ℹ️ Gemini Quota Notice (429): Retrying in ${delay.inSeconds}s... (Attempt ${retryCount + 1}/2)");
+      debugPrint("ℹ️ AI Quota Notice (429): Retrying in ${delay.inSeconds}s... (Attempt ${retryCount + 1}/2)");
       await Future.delayed(delay);
       return _callGeminiRest(retryCount: retryCount + 1);
     } else {
       if (response.statusCode == 429) {
-        debugPrint("ℹ️ Gemini Quota Exhausted. switching to Local Assistant Mode.");
+        debugPrint("ℹ️ AI Quota Exhausted. switching to Offline Safe Mode.");
       } else {
-        debugPrint("❌ Gemini REST Error: ${response.statusCode} - ${response.body}");
+        debugPrint("❌ AI REST Error: ${response.statusCode} - ${response.body}");
       }
       throw Exception("API Error ${response.statusCode}");
     }
@@ -224,7 +229,7 @@ class GeminiAiBrain implements AiBrainProvider {
     final pendingInvoices = await db.getPendingInvoicesStats();
 
     return """
-أنت 'HBASSS' — المساعد المالي والتقني الذكي لشركة "${company['name'] ?? 'شركتي'}".
+أنت 'مساعد حساباتي' — المساعد المالي والتقني الذكي لشركة "${company['name'] ?? 'شركتي'}".
 معلومات حالية للشركة:
 - العملة الأساسية: $currency
 - نسبة الضريبة: $taxRate%
@@ -268,16 +273,13 @@ class GeminiAiBrain implements AiBrainProvider {
 
         case 'check_stock':
           final name = arguments['product_name'] ?? '';
-          final stock = await db.checkProductStock(name);
-          if (stock != null) {
-            return {
-              'status': 'success', 
-              'product': stock['name'], 
-              'quantity': stock['quantity'], 
-              'unit': stock['unit'] ?? 'قطعة'
-            };
-          }
-          return {'status': 'error', 'message': 'الصنف غير موجود في المخزن'};
+          final stockQty = await db.checkProductStock(name);
+          return {
+            'status': 'success', 
+            'product': name, 
+            'quantity': stockQty, 
+            'unit': 'قطعة'
+          };
 
         case 'calculate_tax':
           final amount = (arguments['amount'] as num?)?.toDouble() ?? 0;

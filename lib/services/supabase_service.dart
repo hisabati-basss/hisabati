@@ -18,12 +18,18 @@ class SupabaseService {
   }
 
   /// Fetch all updates since a specific timestamp across all devices EXCEPT the current one.
-  Future<List<Map<String, dynamic>>> fetchUpdates(String tableName, String since, String localDeviceId) async {
-    final response = await _supabase
+  Future<List<Map<String, dynamic>>> fetchUpdates(String tableName, String since, String localDeviceId, {String? companyId, String timestampColumn = 'updated_at'}) async {
+    var query = _supabase
         .from(tableName)
         .select()
-        .gt('updated_at', since)
+        .gt(timestampColumn, since)
         .neq('device_id', localDeviceId);
+        
+    if (companyId != null) {
+      query = query.eq('company_id', companyId);
+    }
+    
+    final response = await query;
         
     return List<Map<String, dynamic>>.from(response);
   }

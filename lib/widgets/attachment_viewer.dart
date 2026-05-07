@@ -12,7 +12,7 @@ class AttachmentViewer extends StatefulWidget {
     super.key,
     this.initialPath,
     required this.onAttachmentSelected,
-    this.label = "إرفاق مستند (صورة)",
+    this.label = "إرفاق مستند",
   });
 
   @override
@@ -30,7 +30,7 @@ class _AttachmentViewerState extends State<AttachmentViewer> {
 
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.any, // Allow any file type for professional use
     );
 
     if (result != null) {
@@ -48,8 +48,15 @@ class _AttachmentViewerState extends State<AttachmentViewer> {
     widget.onAttachmentSelected(null);
   }
 
+  bool _isImage(String path) {
+    final ext = path.toLowerCase();
+    return ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || ext.endsWith('.gif') || ext.endsWith('.webp');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isNetwork = _currentPath != null && _currentPath!.startsWith('http');
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -86,9 +93,9 @@ class _AttachmentViewerState extends State<AttachmentViewer> {
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_a_photo_outlined, color: Colors.white54),
+                    Icon(Icons.upload_file_outlined, color: Colors.white54),
                     SizedBox(height: 4),
-                    Text("انقر لإضافة صورة", style: TextStyle(fontSize: 10, color: Colors.white38)),
+                    Text("انقر لإضافة ملف أو صورة", style: TextStyle(fontSize: 10, color: Colors.white38)),
                   ],
                 ),
               ),
@@ -96,32 +103,28 @@ class _AttachmentViewerState extends State<AttachmentViewer> {
           else
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    Image.file(
-                      File(_currentPath!),
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                    PositionRectangle(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [Colors.black54, Colors.transparent],
+              child: Container(
+                height: 120,
+                width: double.infinity,
+                color: Colors.black26,
+                child: _isImage(_currentPath!)
+                    ? (isNetwork
+                        ? Image.network(_currentPath!, fit: BoxFit.cover)
+                        : Image.file(File(_currentPath!), fit: BoxFit.cover))
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.insert_drive_file, color: Colors.white70, size: 40),
+                          const SizedBox(height: 8),
+                          Text(
+                            _currentPath!.split('/').last.split('\\').last,
+                            style: const TextStyle(fontSize: 10, color: Colors.white70),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                    const Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Icon(Icons.check_circle, color: Colors.green, size: 20),
-                    )
-                  ],
-                ),
+              ),
             ),
         ],
       ),
@@ -129,12 +132,3 @@ class _AttachmentViewerState extends State<AttachmentViewer> {
   }
 }
 
-class PositionRectangle extends StatelessWidget {
-  final Widget child;
-  const PositionRectangle({super.key, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(child: child);
-  }
-}
