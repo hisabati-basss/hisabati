@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/context/LanguageContext";
+import Image from "next/image";
 
 const FacebookIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -36,7 +37,7 @@ export const Footer = () => {
         <div className="col-span-1 md:col-span-2">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 flex-shrink-0">
-              <img src="/hisabatilogo.png" alt="Hisabati Logo" className="w-full h-full object-contain" />
+              <Image src="/hisabatilogo.png" alt="Hisabati Logo" width={48} height={48} className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-extrabold tracking-tight">Hisabati</span>
           </div>
@@ -75,7 +76,7 @@ export const Footer = () => {
             <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys1")}</a></li>
             <li><a href="/privacy" className="hover:text-brand transition-colors">{t("footer.sys2")}</a></li>
             <li><a href="#" className="hover:text-brand transition-colors">{t("footer.sys3")}</a></li>
-            <li><a href="mailto:bassemsabri@outlook.sa" className="hover:text-brand transition-colors">{t("footer.sys4")}</a></li>
+            <li><a href="mailto:hisabati.basss@gmail.com" className="hover:text-brand transition-colors">{t("footer.sys4")}</a></li>
           </ul>
         </div>
       </div>

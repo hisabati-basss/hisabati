@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
     title: "Hisabati - The Global Offline-First ERP",
     description: "The ultimate offline-first ERP & Accounting System with Local Edge AI.",
     images: ["/dashboard-mockup.png"],
-    creator: "@hbasss",
+    creator: "@hisabati",
   },
   icons: {
     icon: "/hisabatilogo.png",
@@ -99,6 +100,7 @@ export default function RootLayout({
           </LanguageProvider>
         </ThemeProvider>
       </body>
+      <GoogleAnalytics gaId="G-YOUR_MEASUREMENT_ID" />
     </html>
   );
 }

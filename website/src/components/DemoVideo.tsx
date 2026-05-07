@@ -1,11 +1,14 @@
 "use client";
 
+import React, { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { Play, ArrowRight } from "lucide-react";
+import Image from "next/image";
 
 export const DemoVideo = () => {
   const { t } = useLanguage();
+  const [isPlaying, setIsPlaying] = useState(false);
 
   return (
     <section id="demo" className="py-24 px-6 relative">
@@ -19,33 +22,47 @@ export const DemoVideo = () => {
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="relative w-full aspect-video rounded-3xl glass-heavy border border-brand/20 shadow-2xl overflow-hidden group cursor-pointer"
-          onClick={() => window.open("https://youtube.com/@hisabati", "_blank")}
+          className="relative w-full aspect-video rounded-3xl glass-heavy border border-brand/20 shadow-2xl overflow-hidden group"
         >
-          {/* Gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-brand/10 via-transparent to-brand/5" />
-          
-          {/* Play button */}
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <motion.div
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-brand flex items-center justify-center shadow-2xl shadow-brand/40 group-hover:shadow-brand/60 transition-shadow"
+          {!isPlaying ? (
+            <div 
+              className="absolute inset-0 cursor-pointer"
+              onClick={() => setIsPlaying(true)}
             >
-              <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-white ml-1" />
-            </motion.div>
-          </div>
+              <div className="absolute inset-0 bg-gradient-to-br from-brand/10 via-transparent to-brand/5" />
+              
+              <div className="absolute inset-0 flex items-center justify-center z-10">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-brand flex items-center justify-center shadow-2xl shadow-brand/40 group-hover:shadow-brand/60 transition-shadow"
+                >
+                  <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-white ml-1" />
+                </motion.div>
+              </div>
 
-          {/* Decorative elements */}
-          <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-background/80 to-transparent z-10" />
-          
-          {/* Screenshot preview behind play button */}
-          <img
-            src="/dashboard-mockup.png"
-            alt="Demo Preview"
-            className="w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
+              <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-background/80 to-transparent z-10" />
+              
+              <Image
+                src={`https://img.youtube.com/vi/0skIKX1_lD8/maxresdefault.jpg`}
+                alt="Demo Preview"
+                width={1280}
+                height={720}
+                className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+              />
+            </div>
+          ) : (
+            <iframe
+              width="100%"
+              height="100%"
+              src="https://www.youtube.com/embed/0skIKX1_lD8?autoplay=1"
+              title="Hisabati ERP Demo"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="w-full h-full absolute inset-0 z-20 bg-black"
+            ></iframe>
+          )}
         </motion.div>
 
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mt-8">

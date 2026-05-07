@@ -4,6 +4,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { Monitor, Apple, Smartphone, Play, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 const StatCounter = ({ value, label, delay }: { value: string; label: string; delay: number }) => (
   <motion.div
@@ -160,9 +161,11 @@ export const Hero = () => {
                 </div>
                 
                 {/* Real screenshot overlay */}
-                <img
+                <Image
                   src="/dashboard-mockup.png"
                   alt="Hisabati Dashboard"
+                  width={1200}
+                  height={800}
                   className="w-full h-full object-cover z-10 relative transition-transform duration-700 group-hover:scale-[1.02] rounded-xl"
                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                 />

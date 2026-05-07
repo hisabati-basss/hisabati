@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "next-themes";
 import { Moon, Sun, Globe, Menu, X } from "lucide-react";
@@ -8,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const SunMoonToggle = ({ theme }: { theme: string | undefined }) => {
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="w-5 h-5" />;
   return theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />;
@@ -18,9 +20,13 @@ export const Navbar = () => {
   const { theme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<string>("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setIsScrolled(scrollY > 100);
+
       const sections = ["features", "solutions", "security", "affiliate", "pricing", "contact"];
       const scrollPos = window.scrollY + window.innerHeight / 3;
       let current = "";
@@ -45,7 +51,7 @@ export const Navbar = () => {
 
   const scrollTo = (id: string) => {
     if (window.location.pathname !== "/") {
-      window.location.href = `/#${id}`;
+      window.location.assign(`/#${id}`);
       return;
     }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -57,20 +63,19 @@ export const Navbar = () => {
       <div className="flex justify-center w-full">
         <motion.nav
           initial={{ y: -100, opacity: 0 }}
-          animate={{ y: [0, 2, 0], opacity: 1 }}
+          animate={{ y: isScrolled ? 0 : -150, opacity: isScrolled ? 1 : 0 }}
           transition={{ 
-            y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
-            opacity: { duration: 0.6 },
+            opacity: { duration: 0.4 },
             default: { type: "spring", stiffness: 100, damping: 20 }
           }}
-          className="fixed top-6 w-[95%] max-w-6xl z-50"
+          className={`fixed top-6 w-[95%] max-w-6xl z-50 ${isScrolled ? 'pointer-events-auto' : 'pointer-events-none'}`}
         >
           <div className="w-full h-full rounded-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-black/5 dark:border-white/10 shadow-2xl transition-all duration-300">
             <div className="px-6 h-20 flex items-center justify-between">
               {/* Logo */}
-              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { if(window.location.pathname !== "/") { window.location.href = "/"; } else { window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { if(window.location.pathname !== "/") { window.location.assign("/"); } else { window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
                 <div className="w-12 h-12 flex-shrink-0">
-                  <img src="/hisabatilogo.png" alt="Hisabati Logo" className="w-full h-full object-contain" />
+                  <Image src="/hisabatilogo.png" alt="Hisabati Logo" width={48} height={48} className="w-full h-full object-contain" />
                 </div>
                 <span className="text-xl font-extrabold tracking-tight">Hisabati</span>
               </div>
@@ -127,7 +132,7 @@ export const Navbar = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-28 left-[2.5%] right-[2.5%] z-40 lg:hidden"
+            className="fixed top-28 left-[2.5%] right-[2.5%] z-40 lg:hidden pointer-events-auto"
           >
             <div className="w-full h-full bg-white/30 dark:bg-neutral-900/60 backdrop-blur-xl backdrop-saturate-150 border border-black/5 dark:border-white/10 rounded-3xl shadow-2xl p-6 flex flex-col gap-3">
               {navLinks.map((link) => (

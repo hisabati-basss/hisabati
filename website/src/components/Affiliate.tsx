@@ -33,7 +33,7 @@ export const Affiliate = () => {
           <motion.a 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            href="mailto:contact@hbasss.com" 
+            href="mailto:contact@hisabati.com" 
             className="bg-brand hover:bg-brand-hover text-white text-lg px-8 py-4 rounded-full font-bold shadow-xl flex items-center justify-center gap-2 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 select-none cursor-pointer"
           >
             <DollarSign className="w-5 h-5" /> {t("affiliate.btn1")}
@@ -43,7 +43,7 @@ export const Affiliate = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => {
-              navigator.clipboard.writeText("https://hisabati.com/invite/hbasss");
+              navigator.clipboard.writeText("https://hisabati.com/invite/partner");
               alert("تم نسخ رابط الدعوة بنجاح! / Invite link copied!");
             }}
             className="glass border border-brand/30 hover:bg-white/5 text-lg px-8 py-4 rounded-full font-bold transition-colors flex items-center justify-center gap-2 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 select-none"

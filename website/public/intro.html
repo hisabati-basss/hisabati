@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hisabati Cinematic Intro - Ultra Premium</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.9.6/lottie.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --accent-gold: #ffaa00;
+            --accent-blue: #0088ff;
+            --glass-white: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg-dark); color: white; overflow: hidden; height: 100vh; width: 100vw; }
+
+        /* Main Container - The "Capsule" App Frame */
+        #app-frame {
+            position: fixed;
+            inset: 15px;
+            background: linear-gradient(135deg, #121212 0%, #080808 100%);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.8);
+        }
+
+        /* Side Navigation */
+        .sidebar {
+            width: 75px;
+            background: rgba(0,0,0,0.3);
+            border-left: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 25px 0;
+            gap: 30px;
+        }
+        .nav-item {
+            width: 45px; height: 45px;
+            background: var(--glass-white);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: #555;
+            transition: 0.3s;
+        }
+        .nav-item.active { background: var(--accent-gold); color: black; }
+
+        /* Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            height: 70px;
+            padding: 0 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .profile { display: flex; align-items: center; gap: 15px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #333; }
+
+        /* Robot Display - Central Mascot */
+        #robot-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #robot-box {
+            width: 500px; height: 500px;
+            transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Typing & Chat Area */
+        #chat-interface {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .typewriter-box {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 25px 35px;
+            font-size: 26px;
+            line-height: 1.6;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #eee;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .chat-history {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+        .chat-pill {
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            max-width: 80%;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: 0.5s;
+        }
+        .chat-pill.user { background: var(--accent-blue); color: white; align-self: flex-start; }
+        .chat-pill.ai { background: var(--accent-gold); color: black; align-self: flex-end; }
+
+        /* Visual Overlays (Dashboards) */
+        .visual-overlay {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.9);
+            width: 85%;
+            height: 60%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .overlay-img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            opacity: 0;
+            transition: 1s ease-in-out;
+            filter: drop-shadow(0 0 50px rgba(255,170,0,0.2));
+        }
+
+        /* Status Bar */
+        .status-bar {
+            height: 40px;
+            background: rgba(255,255,255,0.02);
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        /* Start Overlay */
+        #start {
+            position: fixed; inset: 0;
+            background: #000;
+            z-index: 999999;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            cursor: pointer;
+        }
+        .start-btn {
+            padding: 20px 60px;
+            background: var(--accent-gold);
+            color: black;
+            border: none;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .start-btn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(255,170,0,0.4); }
+
+        #debug-log {
+            position: fixed; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); color: #0f0;
+            padding: 10px; font-family: monospace;
+            z-index: 1000001; pointer-events: none;
+            border-radius: 8px; font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start">
+        <button class="start-btn">ابدأ العرض التجريبي</button>
+        <p style="margin-top: 25px; color: #555; font-size: 18px;">Pixel Perfect Experience (120s)</p>
+    </div>
+
+    <div id="debug-log"></div>
+
+    <div id="app-frame">
+        <div class="sidebar">
+            <div class="nav-item">🏠</div>
+            <div class="nav-item active">🤖</div>
+            <div class="nav-item">📊</div>
+            <div class="nav-item">⚙️</div>
+        </div>
+        <div class="main-content">
+            <div class="top-bar">
+                <div style="font-weight: bold; font-size: 20px;">حساباتي <span style="color: var(--accent-gold);">Capsule</span></div>
+                <div class="profile">
+                    <div style="text-align: left;">
+                        <div style="font-size: 14px; font-weight: bold;">أهلاً، باسّم</div>
+                        <div style="font-size: 12px; color: #666;">فرع القاهرة الرئيسي</div>
+                    </div>
+                    <div class="avatar"></div>
+                </div>
+            </div>
+
+            <div id="robot-container">
+                <div class="visual-overlay">
+                    <img id="viz-1" class="overlay-img" src="intro_assets/dashboard.png" alt="Analytics">
+                    <img id="viz-2" class="overlay-img" src="intro_assets/shield.png" alt="Security">
+                </div>
+                <div id="robot-box"></div>
+            </div>
+
+            <div id="chat-interface">
+                <div class="chat-history" id="history"></div>
+                <div class="typewriter-box" id="type-target">
+                    اضغط ابدأ لبدء العرض...
+                </div>
+            </div>
+
+            <div class="status-bar">
+                <div>متصل - زمن المزامنة: 0.2ms</div>
+                <div>النسخة التجريبية - Hisabati AI v4.0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const debug = (msg) => {
+            const log = document.getElementById('debug-log');
+            log.style.display = 'block';
+            log.innerHTML += `<div>> ${msg}</div>`;
+            console.log(msg);
+        };
+
+        window.onerror = (m, u, l) => debug(`ERR: ${m} @ ${l}`);
+
+        debug("Script Loaded.");
+
+        // Placeholder for robotData
+        const robotData = {"nm":"Main Scene","ddd":0,"h":1080,"w":1080,"layers":[],"v":"5.7.0","fr":30,"op":81,"ip":0,"assets":[]};
+
+        const scriptData = [
+            { type: "user", text: "مرحباً... هل تسمعني؟ هذه أول مرة أستخدم فيها المساعد الصوتي المدمج داخل نظام حساباتي.", duration: 8000 },
+            { type: "ai", text: "أهلاً بك. أنا هنا، أسمعك بوضوح ومستعد لمساعدتك في إدارة نظامك بالكامل. ماذا تريد أن ننجز اليوم؟", duration: 10000 },
+            { type: "user", text: "بصراحة، واجهة المستخدم هنا أنيقة جداً ومريحة للعين... لكنني تائه قليلاً في بياناتي القديمة. هل يمكنك استخراج تقرير سريع بمصروفات الربع الأول؟", duration: 14000 },
+            { type: "ai", text: "شكراً لك، لقد تم تصميم هذه الواجهة بعناية لتمنحك أفضل تجربة. لحظة واحدة... لقد قمت بتجميع وتحليل مصروفات الربع الأول. أود إخبارك أنك حققت وفراً بنسبة خمسة عشر بالمئة مقارنة بالعام الماضي.", duration: 18000, visual: "viz-1" },
+            { type: "user", text: "مهلاً، مهلاً! بهذه السرعة؟ عظيم جداً... ولكن انتظر، أنا أتصفح الإعدادات الآن وأرى أن النظام يعمل بدون إنترنت كخيار افتراضي؟ كيف يحدث هذا؟", duration: 14000 },
+            { type: "ai", text: "ملاحظة دقيقة! نظام حساباتي مبني على معمارية متطورة تضع العمل بدون إنترنت في المقام الأول. أنا أقوم بمعالجة بياناتك وتحليلها محلياً على جهازك لضمان السرعة والخصوصية التامة.", duration: 18000, visual: "viz-2" },
+            { type: "user", text: "هذا شيء عبقري! يعني أنني لست مضطراً لانتظار التحميل أو الاعتماد على خوادم سحابية طوال الوقت؟", duration: 10000 },
+            { type: "ai", text: "بالضبط. يمكنك إدارة نظامك بالكامل في أي وقت وأي مكان. وفور توفر الاتصال، سأقوم بمزامنة كل شيء بسلاسة تامة في الخلفية دون أن تشعر.", duration: 15000 },
+            { type: "user", text: "يجب أن أعترف... أنت لست مجرد تطبيق عادي، أنت نظام متكامل يريح العقل فعلاً.", duration: 10000 }
+        ];
+
+        let idx = 0;
+
+        function init() {
+            debug("Init triggered");
+            document.getElementById('start').style.display = 'none';
+            try {
+                if (typeof lottie !== 'undefined') {
+                    lottie.loadAnimation({
+                        container: document.getElementById('robot-box'),
+                        renderer: 'svg',
+                        loop: true,
+                        autoplay: true,
+                        animationData: robotData
+                    });
+                    debug("Lottie active");
+                }
+            } catch(e) { debug("Lottie fail: " + e.message); }
+            run();
+        }
+
+        function run() {
+            if (idx >= scriptData.length) {
+                debug("Script Finished.");
+                return;
+            }
+            const item = scriptData[idx];
+            debug(`Step ${idx}: ${item.type}`);
+            const target = document.getElementById('type-target');
+
+            if (item.type === "user") {
+                typeText(target, item.text).then(() => {
+                    setTimeout(() => {
+                        target.innerHTML = 'أخبرني بما تريد تنفيذه...';
+                        addPill(item);
+                        handleVisuals(item);
+                    }, 1200);
+                });
+            } else {
+                addPill(item);
+                handleVisuals(item);
+            }
+        }
+
+        async function typeText(el, text) {
+            el.innerHTML = '';
+            for (let char of text) {
+                el.innerHTML += char;
+                await new Promise(r => setTimeout(r, 45));
+            }
+        }
+
+        function handleVisuals(item) {
+            document.querySelectorAll('.overlay-img').forEach(img => { 
+                img.style.opacity = '0'; 
+                img.style.transform = 'translateX(-50%) scale(0.9) translateY(60px)'; 
+            });
+            if (item.visual) {
+                const v = document.getElementById(item.visual);
+                if(v) {
+                    v.style.opacity = '1';
+                    v.style.transform = 'translateX(-50%) scale(1) translateY(0)';
+                }
+                document.getElementById('robot-box').style.transform = 'scale(0.6) translateY(-100px)';
+            } else {
+                document.getElementById('robot-box').style.transform = 'scale(1) translateY(0)';
+            }
+            idx++;
+            setTimeout(run, item.duration);
+        }
+
+        function addPill(item) {
+            const history = document.getElementById('history');
+            if (history.children.length >= 2) history.removeChild(history.firstChild);
+            const pill = document.createElement('div');
+            pill.className = `chat-pill ${item.type}`;
+            pill.innerText = item.text;
+            history.appendChild(pill);
+            setTimeout(() => { pill.style.opacity = '1'; pill.style.transform = 'translateY(0)'; }, 50);
+        }
+
+        window.onload = () => {
+            debug("Window Ready");
+            const btn = document.querySelector('.start-btn');
+            if(btn) btn.onclick = (e) => { e.stopPropagation(); init(); };
+            document.getElementById('start').onclick = init;
+        };
+    </script>
+</body>
+</html>

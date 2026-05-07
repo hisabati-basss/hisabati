@@ -1,9 +1,11 @@
+import Image from "next/image";
+
 export const TrustMarquee = () => {
   const baseLogos = [
     <span key="1" className="text-2xl font-black font-serif tracking-widest">STRIPE</span>,
     <span key="2" className="text-2xl font-black tracking-tighter">VISA</span>,
     <span key="3" className="text-xl font-bold uppercase border-2 border-current px-2">ISO 27001</span>,
-    <img key="dev" src="/dev-logo.svg" alt="Dev Logo" className="h-10 w-auto object-contain" />,
+    <Image key="dev" src="/dev-logo.svg" alt="Dev Logo" width={100} height={40} className="h-10 w-auto object-contain" />,
     <span key="4" className="text-2xl font-bold italic text-blue-600">PayPal</span>,
     <span key="5" className="text-2xl font-black">GDPR Ready</span>,
     <span key="6" className="text-2xl font-mono border border-current px-3 rounded-lg">SQLite</span>,
