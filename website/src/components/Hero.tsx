@@ -73,8 +73,8 @@ export const Hero = () => {
 
           <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 mb-10">
             <a
-              href="https://github.com/hisabati-basss/hisabati/releases/download/v1.0.0/hisabatisetup.exe"
-              download="Hisabati_Setup.exe"
+              href="https://github.com/hisabati-basss/hisabati/releases/download/v1.0.0/Hisabati.exe"
+              download="Hisabati.exe"
               className="bg-brand hover:bg-brand-hover text-white text-lg px-8 py-4 rounded-full font-bold transition-all transform hover:scale-105 active:scale-95 shadow-2xl shadow-brand/30 flex items-center gap-3 outline-none select-none"
             >
               <Monitor className="w-6 h-6" />
